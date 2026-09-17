@@ -1,0 +1,158 @@
+/**
+ * Bridge between the UI and the Rust backend.
+ *
+ * Inside Tauri `invoke`/`listen` talk to the native commands. When the page is
+ * opened in a normal browser (no `window.__TAURI__`) every call is answered by
+ * an in-memory mock so the UI can be worked on without a full build.
+ */
+(function () {
+  const internals = window.__TAURI__ && window.__TAURI__.core ? window.__TAURI__.core : null;
+  const eventsApi = window.__TAURI__ && window.__TAURI__.event ? window.__TAURI__.event : null;
+  const live = !!(internals && typeof internals.invoke === "function");
+
+  /** event name -> Set<handler>, used to dispatch in preview mode only. */
+  const previewListeners = new Map();
+
+  const MOCK_SETTINGS = {
+    enabled: true,
+    triggerOnDrag: true,
+    triggerOnDoubleClick: true,
+    targetLang: "zh-CN",
+    provider: "google",
+    credentials: {},
+    restoreClipboard: true,
+    showOriginal: true,
+    minSelectionLen: 2,
+    ignoredApps: [],
+    theme: "system",
+    fontScale: 100,
+    popupWidth: 356,
+    popupOpacity: 100,
+    autoCloseSecs: 0,
+    closeAfterCopy: false,
+    hotkey: "Ctrl+Alt+C",
+    uiLang: "system",
+  };
+
+  let settings = { ...MOCK_SETTINGS };
+
+  function previewEmit(event, payload) {
+    const set = previewListeners.get(event);
+    if (!set) return;
+    set.forEach((handler) => handler({ event, payload }));
+  }
+
+  function stripTags(value) {
+    return String(value || "").replace(/<\/?[^>]+>/g, "");
+  }
+
+  function mockTranslate(text, overrides) {
+    const source = String(text || "").trim();
+    const forced = overrides || {};
+    const isWord = source.length <= 32 && source.split(/\s+/).length <= 4;
+    const base = {
+      sourceText: source,
+      sourceLang: forced.sourceLang || (/[\u4e00-\u9fff]/.test(source) ? "zh-CN" : "en"),
+      targetLang: forced.targetLang || settings.targetLang,
+      provider: "Google · preview",
+    };
+    if (isWord) {
+      return {
+        ...base,
+        kind: "word",
+        translation: "跑步",
+        phonetic: "ˈrəniNG",
+        meanings: [
+          { partOfSpeech: "noun", definitions: ["赛跑", "跑步"] },
+          { partOfSpeech: "adverb", definitions: ["连续地", "不断地"] },
+          { partOfSpeech: "adjective", definitions: ["跑动的", "流动的"] },
+        ],
+        example: "marathon " + source,
+      };
+    }
+    return {
+      ...base,
+      kind: "sentence",
+      translation: "敏捷的棕色狐狸跳过了那只懒狗。这句话包含了英文里所有字母，常被用来测试字体和键盘。",
+      phonetic: null,
+      meanings: [],
+      example: null,
+    };
+  }
+
+  async function mockInvoke(command, args) {
+    const input = args || {};
+    switch (command) {
+      case "get_settings":
+        return { ...settings };
+      case "save_settings":
+        settings = { ...settings, ...(input.settings || {}) };
+        previewEmit("glossy://settings", { ...settings });
+        return { ...settings };
+      case "translate_text":
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        if (!String(input.text || "").trim()) throw new Error("nothing selected");
+        return mockTranslate(input.text, input);
+      case "capture_status":
+        return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
+      case "running_apps":
+        return [
+          { name: "explorer.exe", title: "File Explorer" },
+          { name: "chrome.exe", title: "Preview · Glossy" },
+          { name: "Code.exe", title: "app.js - Glossy - Visual Studio Code" },
+        ];
+      case "pick_app":
+        previewEmit("glossy://picked-app", { name: "chrome.exe" });
+        return null;
+      case "copy_text":
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(input.text || "").catch(() => {});
+        }
+        return true;
+      case "popup_present":
+      case "popup_resize":
+      case "popup_sync_anchor":
+      case "popup_close":
+      case "show_popup":
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  async function invoke(command, args) {
+    if (live) return internals.invoke(command, args);
+    return mockInvoke(command, args);
+  }
+
+  /**
+   * Reads the persisted settings, retrying while the backend is still starting.
+   *
+   * The windows defined in `tauri.conf.json` begin loading before the Rust
+   * `setup` hook has registered the application state, so the very first call
+   * can arrive too early and be rejected with "state not managed".
+   */
+  async function readSettings(attempts = 25) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await invoke("get_settings");
+      } catch (error) {
+        if (attempt >= attempts) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    }
+  }
+
+  /**
+   * Subscribes to a backend event. Returns a promise of the unlisten function.
+   */
+  function listen(event, handler) {
+    if (live && eventsApi) return eventsApi.listen(event, handler);
+    if (!previewListeners.has(event)) previewListeners.set(event, new Set());
+    previewListeners.get(event).add(handler);
+    return Promise.resolve(() => previewListeners.get(event).delete(handler));
+  }
+
+  window.Glossy = { live, invoke, listen, readSettings, stripTags };
+  window.Glossy.preview = !live;
+})();

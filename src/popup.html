@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossy</title>
+    <link rel="stylesheet" href="styles/popup.css" />
+  </head>
+  <body data-state="loading">
+    <div class="card" id="card">
+      <header class="bar">
+        <div class="grip" id="grip" data-tauri-drag-region="deep">
+          <span class="headword" id="headword">Glossy</span>
+        </div>
+        <button class="icon-button" id="copy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="12" height="12" rx="2.5" />
+            <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+          </svg>
+        </button>
+        <button class="icon-button" id="close" type="button" data-i18n-title="popup.close" title="Close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </header>
+      <div class="langbar" id="langbar" hidden>
+        <select class="lang-select" id="langFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
+        <button class="lang-swap" id="langSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8h13M14 5l3 3-3 3" />
+            <path d="M20 16H7M10 13l-3 3 3 3" />
+          </svg>
+        </button>
+        <select class="lang-select" id="langTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+      </div>
+      <div class="content" id="content"></div>
+    </div>
+    <script src="js/bridge.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/popup.js"></script>
+  </body>
+</html>

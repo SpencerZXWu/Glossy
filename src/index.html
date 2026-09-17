@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossy</title>
+    <link rel="stylesheet" href="styles/app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo">G</span>
+          <div class="brand-text">
+            <h1>Glossy</h1>
+            <p data-i18n="brand.tagline">Select text anywhere and translate it on the spot.</p>
+          </div>
+        </div>
+        <div class="topbar-tools">
+          <select id="uiLang" aria-label="Interface language" title="Interface language">
+            <option value="system" data-i18n="ui.system">Follow Windows</option>
+            <option value="zh" data-i18n="ui.zh">简体中文</option>
+            <option value="en" data-i18n="ui.en">English</option>
+          </select>
+          <div class="status" id="status" data-tone="ok">
+            <span class="dot"></span>
+            <span id="statusText" data-i18n="status.listening">Listening</span>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <section class="panel">
+          <label class="row master" for="enabled">
+            <span class="row-text">
+              <strong data-i18n="master.title">Enable text selection translation</strong>
+              <span class="hint" data-i18n="master.hint">Translate a selection as soon as you release the mouse.</span>
+            </span>
+            <input type="checkbox" id="enabled" class="switch" />
+          </label>
+
+          <div class="options" id="options">
+            <label class="check"><input type="checkbox" id="triggerOnDrag" /><span data-i18n="option.drag">Translate when the mouse drags across text</span></label>
+            <label class="check"><input type="checkbox" id="triggerOnDoubleClick" /><span data-i18n="option.doubleClick">Translate a word on double click</span></label>
+            <label class="check"><input type="checkbox" id="restoreClipboard" /><span data-i18n="option.restoreClipboard">Put the clipboard back after reading a selection</span></label>
+            <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.trigger">Trigger</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="minSelectionLen" data-i18n="field.minLength">Shortest selection to translate</label>
+              <input type="number" id="minSelectionLen" min="1" max="40" step="1" />
+            </div>
+            <div class="field">
+              <label for="hotkey" data-i18n="field.hotkey">Global hotkey</label>
+              <input type="text" id="hotkey" spellcheck="false" autocomplete="off" placeholder="Ctrl+Alt+C" />
+            </div>
+          </div>
+          <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
+
+          <div class="field">
+            <label for="ignoredInput" data-i18n="field.ignored">Never translate in these programs</label>
+            <div class="chips" id="ignoredList" role="list"></div>
+            <div class="picker">
+              <select id="ignoredRunning" title="Pick from running programs…"></select>
+              <input type="text" id="ignoredInput" spellcheck="false" autocomplete="off" placeholder="Type a program name" />
+              <button type="button" class="ghost" id="ignoredAdd" data-i18n="ignored.add">Add</button>
+              <button type="button" class="ghost" id="ignoredPick" data-i18n="ignored.pick">Pick with the mouse</button>
+            </div>
+          </div>
+          <p class="hint" id="ignoredHint"></p>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.popup">Popup</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="theme" data-i18n="field.theme">Colours</label>
+              <select id="theme">
+                <option value="system" data-i18n="theme.system">Follow Windows</option>
+                <option value="light" data-i18n="theme.light">Always light</option>
+                <option value="dark" data-i18n="theme.dark">Always dark</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fontScale" data-i18n="field.fontScale">Text size</label>
+              <select id="fontScale">
+                <option value="90" data-i18n="font.90">90 %</option>
+                <option value="100" data-i18n="font.100">100 % · default</option>
+                <option value="115" data-i18n="font.115">115 %</option>
+                <option value="130" data-i18n="font.130">130 %</option>
+                <option value="150" data-i18n="font.150">150 %</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="popupWidth" data-i18n="field.width">Width</label>
+              <select id="popupWidth">
+                <option value="300" data-i18n="width.300">Compact · 300 px</option>
+                <option value="356" data-i18n="width.356">Default · 356 px</option>
+                <option value="400" data-i18n="width.400">Wide · 400 px</option>
+                <option value="460" data-i18n="width.460">Wider · 460 px</option>
+                <option value="520" data-i18n="width.520">Extra wide · 520 px</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="popupOpacity" data-i18n="field.opacity">Opacity</label>
+              <select id="popupOpacity">
+                <option value="100" data-i18n="opacity.100">100 % · solid</option>
+                <option value="95" data-i18n="opacity.95">95 %</option>
+                <option value="90" data-i18n="opacity.90">90 %</option>
+                <option value="80" data-i18n="opacity.80">80 %</option>
+                <option value="70" data-i18n="opacity.70">70 %</option>
+                <option value="60" data-i18n="opacity.60">60 %</option>
+                <option value="50" data-i18n="opacity.50">50 % · see-through</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="autoCloseSecs" data-i18n="field.autoClose">Close by itself</label>
+              <select id="autoCloseSecs">
+                <option value="0" data-i18n="autoClose.0">Never</option>
+                <option value="3" data-i18n="autoClose.3">After 3 seconds</option>
+                <option value="5" data-i18n="autoClose.5">After 5 seconds</option>
+                <option value="10" data-i18n="autoClose.10">After 10 seconds</option>
+                <option value="20" data-i18n="autoClose.20">After 20 seconds</option>
+                <option value="30" data-i18n="autoClose.30">After 30 seconds</option>
+              </select>
+            </div>
+          </div>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="closeAfterCopy" /><span data-i18n="option.closeAfterCopy">Close the popup right after the translation is copied</span></label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.language">Language and provider</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="targetLang" data-i18n="field.targetLang">Translate into</label>
+              <select id="targetLang"></select>
+            </div>
+            <div class="field">
+              <label for="provider" data-i18n="field.provider">Translation provider</label>
+              <select id="provider">
+                <option value="google" data-i18n="provider.google">Google · free, no key</option>
+                <option value="baidu" data-i18n="provider.baidu">Baidu 翻译 · free monthly quota, APP ID + key</option>
+                <option value="zhipu" data-i18n="provider.zhipu">Zhipu GLM · free tier, API key</option>
+                <option value="deepl" data-i18n="provider.deepl">DeepL · API key</option>
+                <option value="openai" data-i18n="provider.openai">OpenAI · API key</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" id="apiIdField" hidden>
+            <label for="apiId" data-i18n="field.appId">APP ID</label>
+            <input type="text" id="apiId" spellcheck="false" autocomplete="off" placeholder="Baidu 翻译开放平台 APP ID" />
+          </div>
+          <div class="field" id="apiKeyField" hidden>
+            <label for="apiKey" data-i18n="field.apiKey">API key</label>
+            <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
+          </div>
+          <p class="hint" id="providerHint"></p>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.demo">Translate</h2>
+          <p class="hint" data-i18n="demo.hint">
+            Type or paste a text, then select a word, a phrase or a sentence — or press
+            Translate — to see the result right here, in the same card as the popup.
+          </p>
+          <textarea id="demoText" class="demo-input" rows="4" spellcheck="false" data-i18n-placeholder="demo.placeholder"></textarea>
+          <div class="demo-actions">
+            <button type="button" id="demoRun" class="ghost" data-i18n="demo.run">Translate</button>
+            <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
+            <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
+          </div>
+          <div class="card" id="demoCard" hidden>
+            <header class="bar">
+              <div class="grip">
+                <span class="headword" id="demoHeadword"></span>
+              </div>
+              <button class="icon-button" id="demoCopy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="12" height="12" rx="2.5" />
+                  <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+                </svg>
+              </button>
+            </header>
+            <div class="langbar" id="demoLangbar" hidden>
+              <select class="lang-select" id="demoFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
+              <button class="lang-swap" id="demoSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 8h13M14 5l3 3-3 3" />
+                  <path d="M20 16H7M10 13l-3 3 3 3" />
+                </svg>
+              </button>
+              <select class="lang-select" id="demoTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+            </div>
+            <div class="content" id="demoResult"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="js/bridge.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/render.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
