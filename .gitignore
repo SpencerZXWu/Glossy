@@ -4,3 +4,9 @@ src-tauri/gen/schemas/
 .tmp/
 .mixmark/
 *.log
+
+# Built installers are uploaded to GitHub Releases instead of committed; see release/README.md
+release/**/*.exe
+release/**/*.msi
+release/**/*.zip
+release/**/*.sig

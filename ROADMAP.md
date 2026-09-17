@@ -13,7 +13,7 @@ the milestone is closed and the tag is pushed.
 | Tests | 58 Rust tests, no frontend tests, no CI |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, no auto-update, no single instance, no autostart |
-| Repository | Description set; no license, changelog, tag or release yet |
+| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases |
 
 Three items are carried into the plan below because they block other work:
 
@@ -133,9 +133,13 @@ in it early.
 
 1. Update the version number (from its single source) and `CHANGELOG.md`.
 2. `cargo test`, the frontend tests and CI all pass.
-3. Tag `vX.Y.Z` on `main` and push the tag.
-4. Publish a GitHub release with the NSIS installer and a checksum.
-5. From v0.2.0 on, the release also serves as the auto-update feed.
+3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` builds the installer
+   and stages it in `release/vX.Y.Z/` with `SHA256SUMS.txt` and the text for the
+   release description.
+4. Tag `vX.Y.Z` on `main` and push the tag.
+5. Publish a GitHub release at that tag: paste `release/vX.Y.Z/RELEASE_NOTES.md` into
+   the description and attach the installer together with the checksum.
+6. From v0.2.0 on, the release also serves as the auto-update feed.
 
 ## What is explicitly out of scope
 

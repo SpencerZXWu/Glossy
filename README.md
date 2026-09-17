@@ -170,6 +170,12 @@ npm.cmd run tauri build  # release build (installer + .exe)
 
 `npm.cmd run icon` regenerates `src-tauri/icons` from `assets/`.
 
+`scripts\release.ps1` wraps the release build: it stages the installer in
+`release\v<version>\` together with a checksum and the text for the release
+description. Run it as `powershell -ExecutionPolicy Bypass -File
+scripts\release.ps1` — scripts are blocked by the default execution policy, the same
+reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
+
 ### Toolchain notes (Windows, GNU toolchain)
 
 The project builds with the GNU Rust target (`x86_64-pc-windows-gnu`), which needs
@@ -211,6 +217,10 @@ src-tauri/src/
   popup.rs               placement/clamping geometry
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
+scripts/
+  release.ps1            release build + staging for a GitHub release
+release/
+  v<version>/            installer, RELEASE_NOTES.md and checksum of a release
 ```
 
 ## Roadmap
