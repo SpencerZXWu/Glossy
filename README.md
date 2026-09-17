@@ -8,6 +8,16 @@ translation under the cursor.
 - **Sentence or paragraph** → a smooth translation into your target language.
 - The source language is detected automatically.
 
+## Install
+
+Download the latest installer from
+[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest)
+(`Glossy_<version>_x64-setup.exe`) and run it. Windows 11 x64; WebView2 is
+required and ships with current Windows builds.
+
+The installer is not code-signed yet, so SmartScreen warns about an unknown
+publisher. To build from source instead, see [Development](#development).
+
 ## Using it
 
 1. Start Glossy: the settings window opens and Glossy starts listening.
