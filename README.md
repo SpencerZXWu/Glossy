@@ -178,14 +178,14 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 55 tests
+cargo test   # 58 tests
 ```
 
 ## Layout
 
 ```
 src/                     frontend (plain HTML/CSS/JS, no bundler)
-  index.html             settings window + playground
+  index.html             settings window + in-app translate card
   popup.html             floating card
   js/bridge.js           Tauri IPC helpers used by both windows
   js/i18n.js             English/Chinese dictionaries and DOM translation
@@ -202,3 +202,15 @@ src-tauri/src/
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
 ```
+
+## Roadmap
+
+[ROADMAP.md](./ROADMAP.md) holds the planned releases (`v0.1.1` through `v1.0.0`) with
+their acceptance criteria, the versioning policy, the known risks and the release
+process. Each release maps to a GitHub milestone of the same name.
+
+[CHANGELOG.md](./CHANGELOG.md) lists what shipped in every released version.
+
+## License
+
+[MIT](./LICENSE) © 2026 Spencer Wu
