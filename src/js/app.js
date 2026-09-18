@@ -75,6 +75,8 @@
 
   let settings = null;
   let saveTimer = 0;
+  /** True while a change was made but not written to the settings file yet. */
+  let pending = false;
   let toastTimer = 0;
   let selection = "";
   /** Programs that never trigger a translation, as shown by the chip list. */
@@ -364,8 +366,24 @@
   }
 
   function scheduleSave() {
+    pending = true;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 180);
+    saveTimer = setTimeout(flushSave, 180);
+  }
+
+  /**
+   * Writes a change the debounce is still holding.
+   *
+   * The settings window is closed (and the window is hidden rather than
+   * destroyed) as soon as the user is done, which happens well inside the 180ms
+   * the debounce waits, so the last edit would be dropped without this.
+   */
+  function flushSave() {
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    if (!pending) return;
+    pending = false;
+    save();
   }
 
   async function refreshStatus() {
@@ -645,6 +663,16 @@
     if (value.length < 2) return;
     Glossy.invoke("show_popup", { text: value }).catch(() => {});
   });
+
+  // A pending change is written before the window goes away, whichever way it
+  // goes away: hidden by the close button, minimized, or unloaded.
+  Glossy.listen("glossy://flush-settings", flushSave);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) flushSave();
+  });
+  window.addEventListener("blur", flushSave);
+  window.addEventListener("pagehide", flushSave);
+  window.addEventListener("beforeunload", flushSave);
 
   (async function start() {
     try {

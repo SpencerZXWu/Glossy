@@ -20,7 +20,36 @@ impl Kind {
 
 /// Characters that unambiguously end a clause or sentence.
 fn is_sentence_terminator(c: char) -> bool {
-    matches!(c, '.' | '!' | '?' | ';' | '\n' | '。' | '！' | '？' | '；' | '…')
+    matches!(
+        c,
+        '.' | '!' | '?' | ';' | '\n' | '。' | '！' | '？' | '；' | '…'
+    )
+}
+
+/// Characters that may follow a terminator, e.g. the quote in `"Done!"`.
+fn is_closing_mark(c: char) -> bool {
+    matches!(
+        c,
+        '"' | '\'' | '”' | '’' | ')' | ']' | '}' | '」' | '』' | '》' | '）'
+    )
+}
+
+fn last_significant(text: &str) -> Option<char> {
+    text.trim_end_matches(|c: char| c.is_whitespace() || is_closing_mark(c))
+        .chars()
+        .next_back()
+}
+
+/// True when the text ends with sentence punctuation, ignoring trailing spaces
+/// and closing quotes: `"Nice to meet you."` is prose even though it is short.
+fn ends_a_sentence(text: &str) -> bool {
+    last_significant(text).is_some_and(is_sentence_terminator)
+}
+
+/// `?` and `!` are never part of an abbreviation, so unlike `.` they always end
+/// an utterance.
+fn ends_an_utterance(text: &str) -> bool {
+    last_significant(text).is_some_and(|c| matches!(c, '!' | '?' | '！' | '？' | '…'))
 }
 
 pub fn has_cjk(text: &str) -> bool {
@@ -64,8 +93,9 @@ pub fn classify(raw: &str) -> Kind {
 
     if tokens.len() == 1 {
         let token = tokens[0];
-        // A trailing period ("etc.") or an abbreviation stays a word lookup.
-        return if token.chars().count() <= 48 {
+        // A trailing period ("etc.") or an abbreviation stays a word lookup, but
+        // a question or exclamation mark never belongs to one.
+        return if token.chars().count() <= 48 && !ends_an_utterance(token) {
             Kind::Word
         } else {
             Kind::Sentence
@@ -77,7 +107,7 @@ pub fn classify(raw: &str) -> Kind {
         .chars()
         .take(text.chars().count().saturating_sub(1))
         .any(is_sentence_terminator);
-    if terminates_early {
+    if terminates_early || ends_a_sentence(text) {
         return Kind::Sentence;
     }
 
@@ -100,7 +130,7 @@ fn classify_cjk(text: &str) -> Kind {
         .take(significant.len().saturating_sub(1))
         .any(|c| is_sentence_terminator(*c));
 
-    if has_terminator || significant.len() > 12 {
+    if has_terminator || ends_a_sentence(text) || significant.len() > 12 {
         Kind::Sentence
     } else {
         Kind::Word
@@ -123,6 +153,35 @@ mod tests {
         assert_eq!(classify("good morning"), Kind::Word);
         assert_eq!(classify("carpe diem"), Kind::Word);
         assert_eq!(classify("as soon as possible"), Kind::Word);
+    }
+
+    #[test]
+    fn short_sentence_with_terminal_punctuation_is_a_sentence() {
+        assert_eq!(classify("Nice to meet you."), Kind::Sentence);
+        assert_eq!(classify("See you soon!"), Kind::Sentence);
+        assert_eq!(classify("Are you okay?"), Kind::Sentence);
+        assert_eq!(classify("What a day!"), Kind::Sentence);
+        assert_eq!(classify("\"See you soon!\""), Kind::Sentence);
+        assert_eq!(classify("(Are you okay?)"), Kind::Sentence);
+    }
+
+    #[test]
+    fn a_lone_word_becomes_a_sentence_only_when_it_ends_an_utterance() {
+        assert_eq!(classify("Really?"), Kind::Sentence);
+        assert_eq!(classify("Stop!"), Kind::Sentence);
+        assert_eq!(classify("Wait…"), Kind::Sentence);
+        // A dot can be part of an abbreviation, so it keeps the dictionary card.
+        assert_eq!(classify("running."), Kind::Word);
+        assert_eq!(classify("etc."), Kind::Word);
+        assert_eq!(classify("U.S.A."), Kind::Word);
+    }
+
+    #[test]
+    fn short_cjk_sentence_with_a_full_stop_is_a_sentence() {
+        assert_eq!(classify("今天天气很好。"), Kind::Sentence);
+        assert_eq!(classify("你好吗？"), Kind::Sentence);
+        assert_eq!(classify("你好"), Kind::Word);
+        assert_eq!(classify("一丝不苟"), Kind::Word);
     }
 
     #[test]

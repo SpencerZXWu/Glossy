@@ -307,7 +307,14 @@ mod tests {
 
     #[test]
     fn rejects_an_answer_without_a_translation() {
-        assert!(parse(r#"{"sourceLang":"en"}"#, "openai", "hello", "zh-CN", Kind::Word).is_err());
+        assert!(parse(
+            r#"{"sourceLang":"en"}"#,
+            "openai",
+            "hello",
+            "zh-CN",
+            Kind::Word
+        )
+        .is_err());
         assert!(parse("not json at all", "openai", "hello", "zh-CN", Kind::Word).is_err());
     }
 }

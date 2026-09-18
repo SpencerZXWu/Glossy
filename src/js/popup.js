@@ -42,6 +42,11 @@
     uiLang: "system",
   };
   let size = { width: 0, height: 0 };
+  /** Usable height in CSS pixels of the monitor the popup currently sits on.
+      Reported by the backend, which knows where the window really landed. */
+  let availableHeight = null;
+  /** Height cap currently written into the stylesheet. */
+  let screenCap = 0;
   let ticket = 0;
   let copyTimer = 0;
   let closeTimer = 0;
@@ -90,13 +95,29 @@
       "--popup-opacity",
       String((Number.isFinite(opacity) ? Math.min(Math.max(opacity, 50), 100) : 100) / 100),
     );
-    root.style.setProperty("--card-width", cardWidth() + "px");
-    root.style.setProperty("--max-card-height", maxCardHeight() + "px");
+    applyMetrics();
+  }
+
+  /**
+   * Writes the size limits into the stylesheet. The cap depends on the monitor
+   * the popup is on, so it is re-applied once the backend reports where the
+   * window was placed. Returns true when the cap actually changed.
+   */
+  function applyMetrics() {
+    const cap = maxCardHeight();
+    const changed = cap !== screenCap;
+    screenCap = cap;
+    document.documentElement.style.setProperty("--card-width", cardWidth() + "px");
+    document.documentElement.style.setProperty("--max-card-height", cap + "px");
+    return changed;
   }
 
   /** Tallest the card may grow: as much of the screen as the popup can use. */
   function maxCardHeight() {
-    const available = Number(window.screen && window.screen.availHeight);
+    const available =
+      Number.isFinite(availableHeight) && availableHeight > 0
+        ? availableHeight
+        : Number(window.screen && window.screen.availHeight);
     if (!Number.isFinite(available) || available < 200) return FALLBACK_CARD_HEIGHT;
     return Math.round(available - CARD_MARGIN);
   }
@@ -114,7 +135,12 @@
     closeTimer = setTimeout(dismiss, Math.min(seconds, 600) * 1000);
   }
 
-  /** Reports the measured card size to the backend, resizing and repositioning. */
+  /**
+   * Reports the measured card size to the backend, which resizes and
+   * repositions the window and answers with the height the monitor it landed on
+   * offers. The card is capped to that height, so the limit always belongs to
+   * the screen the popup is really on.
+   */
   async function place(reveal) {
     const next = measure();
     if (!reveal && next.height === size.height && next.width === size.width) {
@@ -123,10 +149,23 @@
     }
     size = next;
     const command = reveal ? "popup_present" : "popup_resize";
+    let available = null;
     try {
-      await Glossy.invoke(command, next);
+      available = await Glossy.invoke(command, next);
     } catch (error) {
       console.warn("glossy: unable to place popup", error);
+    }
+
+    // The window may have moved to another monitor, which changes how tall the
+    // card is allowed to be. That is only known now, so re-measure once and
+    // resize when the cap changed.
+    if (Number.isFinite(available) && available > 0) availableHeight = available;
+    if (!applyMetrics()) return;
+    size = measure();
+    try {
+      await Glossy.invoke("popup_resize", size);
+    } catch (error) {
+      console.warn("glossy: unable to re-measure popup", error);
     }
   }
 

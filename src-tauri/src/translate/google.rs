@@ -28,7 +28,13 @@ fn looks_like_html(body: &str) -> bool {
     head.starts_with('<') && head.chars().take(512).collect::<String>().contains("<html")
 }
 
-pub fn endpoint(client: &str, text: &str, source: &str, target: &str, with_dictionary: bool) -> String {
+pub fn endpoint(
+    client: &str,
+    text: &str,
+    source: &str,
+    target: &str,
+    with_dictionary: bool,
+) -> String {
     let mut url = format!(
         "{BASE}{client}&sl={}&dt=t&dt=rm&tl={}",
         urlencoding::encode(source),
@@ -190,19 +196,60 @@ fn parse_meanings(data: &serde_json::Value) -> Vec<Meaning> {
     meanings
 }
 
+/// Longest run of bytes that is still read as a tag.
+const MAX_TAG_LEN: usize = 64;
+
 /// Drops any markup and collapses the whitespace of a value from the response.
+///
+/// Only something that really looks like a tag is removed: a `<`, an optional
+/// `/` and a letter, then the `>`. Anything else — a comparison such as
+/// `if x < 5`, an operator such as `<<`, or a lone `<` at the end — is text the
+/// provider meant to show and is kept as it is.
 fn clean(value: &str) -> String {
+    let bytes = value.as_bytes();
     let mut text = String::with_capacity(value.len());
-    let mut in_tag = false;
-    for character in value.chars() {
-        match character {
-            '<' => in_tag = true,
-            '>' if in_tag => in_tag = false,
-            _ if !in_tag => text.push(character),
-            _ => {}
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'<' {
+            if let Some(length) = tag_length(&bytes[index..]) {
+                index += length;
+                continue;
+            }
         }
+        let character = value[index..]
+            .chars()
+            .next()
+            .expect("index is a character boundary");
+        text.push(character);
+        index += character.len_utf8();
     }
     text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Length in bytes of the tag that starts at a `<`, or `None` when the input
+/// only looks like the beginning of one.
+fn tag_length(bytes: &[u8]) -> Option<usize> {
+    if bytes.first() != Some(&b'<') {
+        return None;
+    }
+    let mut index = 1;
+    if bytes.get(index) == Some(&b'/') {
+        index += 1;
+    }
+    // A tag name starts with a letter (`<b>`, `</b>`, `<a href="…">`), which also
+    // rules out the `<` of a comparison.
+    if !bytes.get(index).is_some_and(u8::is_ascii_alphabetic) {
+        return None;
+    }
+    while index < bytes.len() && index <= MAX_TAG_LEN {
+        match bytes[index] {
+            b'>' => return Some(index + 1),
+            // A nested `<` means this was never a tag.
+            b'<' => return None,
+            _ => index += 1,
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -230,11 +277,19 @@ mod tests {
 
     #[test]
     fn parses_a_sentence_without_dictionary_data() {
-        let result =
-            parse(SENTENCE, "The quick brown fox jumps over the lazy dog.", "zh-CN", Kind::Sentence)
-                .expect("fixture parses");
+        let result = parse(
+            SENTENCE,
+            "The quick brown fox jumps over the lazy dog.",
+            "zh-CN",
+            Kind::Sentence,
+        )
+        .expect("fixture parses");
 
-        assert!(result.translation.starts_with("敏捷的棕色狐狸"), "{}", result.translation);
+        assert!(
+            result.translation.starts_with("敏捷的棕色狐狸"),
+            "{}",
+            result.translation
+        );
         assert!(result.meanings.is_empty());
         assert!(result.phonetic.is_none());
         assert!(result.example.is_none());
@@ -287,5 +342,29 @@ mod tests {
     #[test]
     fn prefers_the_client_that_is_not_throttled() {
         assert_eq!(CLIENTS[0], "dict-chrome-ex");
+    }
+
+    #[test]
+    fn strips_the_markup_of_a_definition() {
+        assert_eq!(clean("<b>running</b>"), "running");
+        assert_eq!(clean("run<b>ning</b>"), "running");
+        assert_eq!(clean("<a href=\"https://example.com\">link</a>"), "link");
+        assert_eq!(clean("<i>  a  </i>\n <em>b</em>"), "a b");
+    }
+
+    #[test]
+    fn keeps_a_less_than_sign_that_is_not_markup() {
+        assert_eq!(clean("if x < 5 then stop"), "if x < 5 then stop");
+        assert_eq!(clean("a < b > c"), "a < b > c");
+        assert_eq!(clean("value <"), "value <");
+        assert_eq!(clean("2 << 3"), "2 << 3");
+        assert_eq!(clean("< 5"), "< 5");
+        assert_eq!(clean("a <b"), "a <b");
+    }
+
+    #[test]
+    fn keeps_text_after_an_unfinished_tag() {
+        // A `<` that never closes must not swallow the rest of the value.
+        assert_eq!(clean("cost < 10 and > 5"), "cost < 10 and > 5");
     }
 }

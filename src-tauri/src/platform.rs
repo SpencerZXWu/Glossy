@@ -221,9 +221,7 @@ pub fn make_non_activating(handle: Handle) {
     unsafe {
         let hwnd = handle.to_hwnd();
         let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let updated = current
-            | (WS_EX_NOACTIVATE.0 as isize)
-            | (WS_EX_TOOLWINDOW.0 as isize);
+        let updated = current | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
     }
 }

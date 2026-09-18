@@ -72,7 +72,7 @@ impl TranslationResult {
             self.example = other.example.clone();
         }
         if self.source_lang == "auto" && other.source_lang != "auto" {
-            self.source_lang = other.source_lang.clone();
+            self.source_lang = normalize_lang_code(&other.source_lang);
         }
     }
 }
@@ -146,15 +146,19 @@ pub async fn translate(
     let (mut target, forced) = resolve_target(text, &settings.target_lang, languages);
 
     let mut result = call_provider(client, settings, text, source, &target, kind).await?;
+    result.source_lang = normalize_lang_code(&result.source_lang);
 
     // Translating a language into itself just echoes the selection back.
-    if !forced && same_language(&result.source_lang, &target) && resembles(&result.translation, text)
+    if !forced
+        && same_language(&result.source_lang, &target)
+        && resembles(&result.translation, text)
     {
         if let Some(alternate) = alternate_target(&target) {
             if let Ok(retry) = call_provider(client, settings, text, source, &alternate, kind).await
             {
                 target = alternate;
                 result = retry;
+                result.source_lang = normalize_lang_code(&result.source_lang);
             }
         }
     }
@@ -164,9 +168,8 @@ pub async fn translate(
         // request on the free endpoint.
         dictionary::enrich(client, text, &mut result).await;
 
-        let incomplete = result.phonetic.is_none()
-            || result.meanings.is_empty()
-            || result.example.is_none();
+        let incomplete =
+            result.phonetic.is_none() || result.meanings.is_empty() || result.example.is_none();
         if incomplete && settings.provider != Provider::Google {
             if let Ok(details) = google::translate(client, text, source, &target, kind).await {
                 result.fill_gaps_from(&details);
@@ -302,6 +305,66 @@ fn same_language(a: &str, b: &str) -> bool {
     !a.is_empty() && a == b
 }
 
+/// Maps a language code a provider reported onto the codes the rest of Glossy
+/// speaks.
+///
+/// Baidu answers with `jp`, `fra` or `cht` and DeepL with `EN` or `ZH-HANS`.
+/// Left alone those codes end up in the language menus of the popup, where no
+/// entry matches them, and - worse - in the next request as a source or a
+/// target, which the other providers reject or silently ignore.
+pub fn normalize_lang_code(code: &str) -> String {
+    let lower = code.trim().to_ascii_lowercase().replace('_', "-");
+    if lower.is_empty() {
+        return String::new();
+    }
+    let base = lower.split('-').next().unwrap_or("");
+
+    if base == "zh" || base == "cht" {
+        return if base == "cht"
+            || lower.contains("tw")
+            || lower.contains("hk")
+            || lower.contains("hant")
+        {
+            "zh-TW".to_string()
+        } else {
+            "zh-CN".to_string()
+        };
+    }
+
+    match base {
+        "ja" | "jp" | "jpn" => "ja",
+        "ko" | "kor" => "ko",
+        "fr" | "fra" | "fre" => "fr",
+        "de" | "deu" | "ger" => "de",
+        "es" | "spa" => "es",
+        "pt" | "por" => "pt",
+        "it" | "ita" => "it",
+        "ru" | "rus" => "ru",
+        "uk" | "ukr" => "uk",
+        "vi" | "vie" => "vi",
+        "ms" | "may" | "msa" => "ms",
+        "da" | "dan" => "da",
+        "fi" | "fin" => "fi",
+        "he" | "heb" | "iw" => "he",
+        "no" | "nor" | "nb" | "nn" => "no",
+        "ro" | "ron" | "rom" => "ro",
+        "sv" | "swe" => "sv",
+        "ar" | "ara" => "ar",
+        "cs" | "ces" | "cze" | "cz" => "cs",
+        "el" | "ell" | "gre" => "el",
+        "hu" | "hun" => "hu",
+        "sk" | "slk" | "slo" => "sk",
+        "pl" | "pol" => "pl",
+        "nl" | "nld" | "dut" => "nl",
+        "tr" | "tur" => "tr",
+        "th" | "tha" => "th",
+        "hi" | "hin" => "hi",
+        "id" | "ind" => "id",
+        other => return other.to_string(),
+    }
+    .to_string()
+}
+
 fn resembles(a: &str, b: &str) -> bool {
     let normalize = |value: &str| {
         value
@@ -341,6 +404,43 @@ mod tests {
     }
 
     #[test]
+    fn provider_private_codes_are_mapped_onto_the_shared_ones() {
+        // Baidu
+        assert_eq!(normalize_lang_code("jp"), "ja");
+        assert_eq!(normalize_lang_code("kor"), "ko");
+        assert_eq!(normalize_lang_code("fra"), "fr");
+        assert_eq!(normalize_lang_code("spa"), "es");
+        assert_eq!(normalize_lang_code("zh"), "zh-CN");
+        assert_eq!(normalize_lang_code("cht"), "zh-TW");
+        // DeepL
+        assert_eq!(normalize_lang_code("EN"), "en");
+        assert_eq!(normalize_lang_code("ZH-HANS"), "zh-CN");
+        assert_eq!(normalize_lang_code("ZH-HANT"), "zh-TW");
+        assert_eq!(normalize_lang_code("PT-BR"), "pt");
+        // Anything else keeps the spelling the provider chose.
+        assert_eq!(normalize_lang_code("  EN "), "en");
+        assert_eq!(normalize_lang_code("zh_TW"), "zh-TW");
+        assert_eq!(normalize_lang_code("fil"), "fil");
+        assert_eq!(normalize_lang_code(""), "");
+    }
+
+    #[test]
+    fn a_normalized_code_is_understood_by_every_provider() {
+        // The popup feeds the detected language back in when the user swaps the
+        // languages, so a private code of one provider must never reach another
+        // one: it goes through the shared spelling first.
+        let detected = normalize_lang_code("cht");
+        assert_eq!(detected, "zh-TW");
+        assert_eq!(baidu::baidu_target(&detected), "cht");
+        assert_eq!(deepl::deepl_target(&detected), "ZH-HANT");
+
+        let detected = normalize_lang_code("kor");
+        assert_eq!(detected, "ko");
+        assert_eq!(baidu::baidu_target(&detected), "kor");
+        assert_eq!(deepl::deepl_target(&detected), "KO");
+    }
+
+    #[test]
     fn detects_echoed_translations() {
         assert!(resembles("Hello world", "hello  world"));
         assert!(!resembles("你好", "hello"));
@@ -357,7 +457,10 @@ mod tests {
         let none = Languages::default();
         assert_eq!(none.source_code(), "auto");
         assert_eq!(none.target_code(), None);
-        assert_eq!(resolve_target("你好世界", "zh-CN", &none), ("en".to_string(), false));
+        assert_eq!(
+            resolve_target("你好世界", "zh-CN", &none),
+            ("en".to_string(), false)
+        );
 
         let auto = Languages {
             source: Some("Auto".to_string()),
@@ -377,6 +480,9 @@ mod tests {
         assert_eq!(forced.source_code(), "ja");
         assert_eq!(forced.target_code(), Some("fr"));
         // Even a selection that is already French keeps the chosen target.
-        assert_eq!(resolve_target("bonjour", "fr", &forced), ("fr".to_string(), true));
+        assert_eq!(
+            resolve_target("bonjour", "fr", &forced),
+            ("fr".to_string(), true)
+        );
     }
 }

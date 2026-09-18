@@ -58,7 +58,9 @@ pub async fn enrich(client: &reqwest::Client, text: &str, result: &mut Translati
                     .map(|list| {
                         list.iter()
                             .filter_map(|definition| {
-                                definition.get("definition").and_then(|value| value.as_str())
+                                definition
+                                    .get("definition")
+                                    .and_then(|value| value.as_str())
                             })
                             .map(|value| value.trim().to_string())
                             .filter(|value| !value.is_empty())

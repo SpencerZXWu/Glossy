@@ -111,6 +111,9 @@
         return true;
       case "popup_present":
       case "popup_resize":
+        // The real backend reports the usable height of the monitor the popup
+        // landed on; in the preview the single browser window is that monitor.
+        return Number(window.screen && window.screen.availHeight) || null;
       case "popup_sync_anchor":
       case "popup_close":
       case "show_popup":

@@ -14,6 +14,10 @@
     "ui.en": "English",
 
     "brand.tagline": "Select text anywhere and translate it on the spot.",
+    "notice.title": "Glossy is running in the background",
+    "notice.body": "Click here to open the settings, or use the tray icon.",
+    "notice.close": "Dismiss",
+    "brand.trayHint": "Closing this window keeps Glossy in the notification area. The tray icon is the only way back — it opens this window on its next launch too.",
     "status.listening": "Listening",
     "status.listening.title": "Select text anywhere to translate it.",
     "status.paused": "Paused",
@@ -147,6 +151,10 @@
     "ui.en": "English",
 
     "brand.tagline": "在任何地方选中文字，立即翻译。",
+    "notice.title": "Glossy 已在后台运行",
+    "notice.body": "点这里打开设置，也可以使用托盘图标。",
+    "notice.close": "关闭",
+    "brand.trayHint": "关闭本窗口后 Glossy 会留在通知区域继续运行。托盘图标是重新打开本窗口的唯一入口，下次启动也不会再自动弹出。",
     "status.listening": "监听中",
     "status.listening.title": "在任意位置选中文字即可翻译。",
     "status.paused": "已暂停",

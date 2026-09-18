@@ -8,18 +8,19 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, OnceLock};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExW, MSLLHOOKSTRUCT, MSG, WH_MOUSE_LL,
+    CallNextHookEx, GetMessageW, SetWindowsHookExW, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL,
     WM_LBUTTONDOWN, WM_LBUTTONUP,
 };
 
 use crate::clipboard::{self, Capture};
 use crate::hotkey;
+use crate::notice;
 use crate::platform;
 use crate::popup;
 use crate::settings::{self, Settings};
@@ -31,6 +32,10 @@ const DRAG_MIN_PX: i32 = 5;
 const DOUBLE_CLICK_MS: u128 = 450;
 /// Maximum pointer travel between the two clicks of a double click.
 const DOUBLE_CLICK_SLOP: i32 = 6;
+/// How long a double click waits for the rest of a click chain. Triple and
+/// quadruple clicks select a sentence or a paragraph, and every one of those
+/// clicks would otherwise translate on its own.
+const CHAIN_SETTLE_MS: u64 = 250;
 /// How long "pick the program under the cursor" waits for a click.
 const PICK_TIMEOUT_MS: u64 = 30_000;
 
@@ -49,10 +54,20 @@ pub enum Trigger {
 
 #[derive(Debug, Clone, Copy)]
 enum HookEvent {
-    ButtonDown { x: i32, y: i32 },
-    ButtonUp { x: i32, y: i32, trigger: Trigger },
+    ButtonDown {
+        x: i32,
+        y: i32,
+    },
+    ButtonUp {
+        x: i32,
+        y: i32,
+        trigger: Trigger,
+    },
     /// The next click after a pick request: report the program under it.
-    Pick { x: i32, y: i32 },
+    Pick {
+        x: i32,
+        y: i32,
+    },
 }
 
 /// Program reported by the "click a window" picker.
@@ -97,8 +112,16 @@ struct Tracker {
 struct Down {
     x: i32,
     y: i32,
-    inside_popup: bool,
+    inside_overlay: bool,
     repeated: bool,
+}
+
+/// True when the point lands on one of Glossy's own floating cards.
+///
+/// Clicks and drags there belong to the card, not to the program the user is
+/// reading in, so they must never start a translation.
+fn on_overlay(x: i32, y: i32) -> bool {
+    popup::contains(x, y) || notice::contains(x, y)
 }
 
 fn now_ms() -> u128 {
@@ -137,7 +160,7 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
                         tracker.down = Some(Down {
                             x,
                             y,
-                            inside_popup: popup::contains(x, y),
+                            inside_overlay: on_overlay(x, y),
                             repeated,
                         });
                         send(HookEvent::ButtonDown { x, y });
@@ -153,9 +176,10 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
                         let Some(down) = tracker.down.take() else {
                             return;
                         };
-                        // A drag that started on the popup itself (its header) or
-                        // that ends inside it must never trigger a translation.
-                        if down.inside_popup || popup::contains(x, y) {
+                        // A drag that started on one of our own cards (the popup
+                        // header, the start hint) or that ends on one must never
+                        // trigger a translation.
+                        if down.inside_overlay || on_overlay(x, y) {
                             return;
                         }
                         let moved = (x - down.x).abs().max((y - down.y).abs());
@@ -231,17 +255,82 @@ pub fn install(app: AppHandle, state: Arc<AppState>) {
 }
 
 fn worker(app: AppHandle, state: Arc<AppState>, rx: Receiver<HookEvent>) {
-    while let Ok(event) = rx.recv() {
+    let mut pending: Option<HookEvent> = None;
+    loop {
+        let event = match pending.take() {
+            Some(event) => event,
+            None => match rx.recv() {
+                Ok(event) => event,
+                Err(_) => return,
+            },
+        };
         match event {
             HookEvent::ButtonDown { x, y } => {
                 if !popup::contains(x, y) {
                     popup::hide(&app);
                 }
             }
-            HookEvent::ButtonUp { x, y, trigger } => on_trigger(&app, &state, x, y, trigger),
+            HookEvent::ButtonUp { x, y, trigger } => {
+                let (x, y) = settle_click_chain(&rx, &mut pending, x, y, trigger);
+                on_trigger(&app, &state, x, y, trigger);
+            }
             HookEvent::Pick { x, y } => on_pick(&app, x, y),
         }
     }
+}
+
+/// True when `b` looks like another click of the chain started at `a`.
+fn same_click_chain(a: (i32, i32), b: (i32, i32)) -> bool {
+    (a.0 - b.0).abs() <= DOUBLE_CLICK_SLOP && (a.1 - b.1).abs() <= DOUBLE_CLICK_SLOP
+}
+
+/// Waits out the rest of a click chain and returns the coordinates to translate.
+///
+/// Triple and quadruple clicks select a sentence or a paragraph, and each of
+/// those clicks reports the same double click trigger near the same spot. Waiting
+/// briefly collapses the chain into a single translation of whatever the last
+/// click of the chain selected. Dragging is never delayed because it cannot be
+/// followed by another click of the same chain.
+fn settle_click_chain(
+    rx: &Receiver<HookEvent>,
+    pending: &mut Option<HookEvent>,
+    x: i32,
+    y: i32,
+    trigger: Trigger,
+) -> (i32, i32) {
+    if trigger != Trigger::DoubleClick {
+        return (x, y);
+    }
+
+    let (mut x, mut y) = (x, y);
+    let mut deadline = Instant::now() + Duration::from_millis(CHAIN_SETTLE_MS);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let Ok(event) = rx.recv_timeout(remaining) else {
+            break;
+        };
+        match event {
+            HookEvent::ButtonUp {
+                x: next_x,
+                y: next_y,
+                trigger: Trigger::DoubleClick,
+            } if same_click_chain((x, y), (next_x, next_y)) => {
+                x = next_x;
+                y = next_y;
+                // A longer chain keeps the wait open for the next click.
+                deadline = Instant::now() + Duration::from_millis(CHAIN_SETTLE_MS);
+            }
+            other => {
+                // Not part of the chain: keep it for the main loop.
+                *pending = Some(other);
+                break;
+            }
+        }
+    }
+    (x, y)
 }
 
 /// Reports the program the user clicked on while the pick mode was armed.
@@ -282,22 +371,28 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     popup::reveal(app, state, text, (x as f64, y as f64));
 }
 
-/// Translates the clipboard after the user pressed the global hotkey.
+/// Translates the text the user has selected when the hotkey is pressed.
 ///
-/// The clipboard is the primary source; when it holds no text at all the live
-/// selection is copied instead, which covers "select, press the hotkey".
+/// The live selection is the primary source, so a stale clipboard from an
+/// earlier copy can never be translated by mistake; the clipboard only serves
+/// as the fallback for "copy first, then press the hotkey".
 fn on_hotkey(app: &AppHandle, state: &AppState) {
     let settings = state.settings();
     if !settings.enabled {
         return;
     }
+    // The hotkey is pressed inside another program, so there is nothing to do
+    // when one of our own windows is in front or the program is ignored.
+    if platform::foreground_is_self() {
+        return;
+    }
+    if is_ignored(&settings) {
+        return;
+    }
 
-    let text = match clipboard::read_text() {
-        Some(text) if !text.trim().is_empty() => text,
-        _ => match clipboard::capture_selection(settings.restore_clipboard) {
-            Capture::Text(text) => text,
-            _ => return,
-        },
+    let selection = clipboard::capture_selection(settings.restore_clipboard);
+    let Some(text) = preferred_text(selection, clipboard::read_text()) else {
+        return;
     };
 
     let text = text.trim().to_string();
@@ -307,6 +402,17 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
 
     let (x, y) = platform::cursor_pos();
     popup::reveal(app, state, text, (x as f64, y as f64));
+}
+
+/// The text to translate: the selection that was just copied, or the clipboard
+/// content when the foreground program had nothing selected.
+fn preferred_text(selection: Capture, clipboard_text: Option<String>) -> Option<String> {
+    if let Capture::Text(text) = selection {
+        if !text.trim().is_empty() {
+            return Some(text);
+        }
+    }
+    clipboard_text.filter(|text| !text.trim().is_empty())
 }
 
 fn allows(settings: &Settings, trigger: Trigger) -> bool {
@@ -371,5 +477,68 @@ mod tests {
         settings.min_selection_len = 4;
         assert!(!long_enough(&settings, "abc"));
         assert!(long_enough(&settings, "  abcd  "));
+    }
+
+    #[test]
+    fn groups_the_clicks_of_one_chain() {
+        // A triple click stays within the slop of the previous click.
+        assert!(same_click_chain((100, 200), (103, 197)));
+        assert!(same_click_chain((100, 200), (100, 200)));
+        // A click somewhere else is a new selection.
+        assert!(!same_click_chain((100, 200), (140, 200)));
+        assert!(!same_click_chain((100, 200), (100, 260)));
+    }
+
+    #[test]
+    fn keeps_a_queued_event_that_is_not_part_of_the_chain() {
+        let (tx, rx) = channel();
+        let mut pending = None;
+        tx.send(HookEvent::ButtonDown { x: 900, y: 900 }).unwrap();
+
+        let (x, y) = settle_click_chain(&rx, &mut pending, 100, 200, Trigger::DoubleClick);
+        assert_eq!((x, y), (100, 200));
+        assert!(matches!(pending, Some(HookEvent::ButtonDown { .. })));
+    }
+
+    #[test]
+    fn dragging_is_never_delayed() {
+        let (_tx, rx) = channel();
+        let mut pending = None;
+        let start = Instant::now();
+        let (x, y) = settle_click_chain(&rx, &mut pending, 100, 200, Trigger::Drag);
+        assert_eq!((x, y), (100, 200));
+        assert!(start.elapsed() < Duration::from_millis(CHAIN_SETTLE_MS));
+        assert!(pending.is_none());
+    }
+
+    #[test]
+    fn the_hotkey_prefers_the_live_selection() {
+        let text = preferred_text(
+            Capture::Text("selected".to_string()),
+            Some("copied earlier".to_string()),
+        );
+        assert_eq!(text.as_deref(), Some("selected"));
+    }
+
+    #[test]
+    fn the_hotkey_falls_back_to_the_clipboard() {
+        let clipboard = Some("copied earlier".to_string());
+        for empty in [Capture::NoSelection, Capture::NoResponse] {
+            let text = preferred_text(empty, clipboard.clone());
+            assert_eq!(text.as_deref(), Some("copied earlier"));
+        }
+        assert_eq!(
+            preferred_text(Capture::Text("   ".to_string()), clipboard).as_deref(),
+            Some("copied earlier")
+        );
+    }
+
+    #[test]
+    fn the_hotkey_needs_text_from_somewhere() {
+        assert_eq!(preferred_text(Capture::NoSelection, None), None);
+        assert_eq!(
+            preferred_text(Capture::NoResponse, Some("  \n ".to_string())),
+            None
+        );
     }
 }

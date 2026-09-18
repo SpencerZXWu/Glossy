@@ -4,8 +4,9 @@
 //! the accelerator is registered on the mouse hook message loop owned by
 //! `selection` instead of on a thread of its own.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
@@ -24,8 +25,14 @@ pub const ID: i32 = 0x6075;
 pub const WM_RELOAD: u32 = WM_APP + 7;
 
 static LOOP_THREAD: AtomicU32 = AtomicU32::new(0);
+/// Reload requests handed to the loop thread, and the ones it has carried out.
+static RELOAD_SENT: AtomicU64 = AtomicU64::new(0);
+static RELOAD_DONE: AtomicU64 = AtomicU64::new(0);
 static ACTIVE: Mutex<Option<String>> = Mutex::new(None);
 static PROBLEM: Mutex<Option<String>> = Mutex::new(None);
+
+/// Longest [`status`] waits for a reload that is still on its way.
+const RELOAD_WAIT: Duration = Duration::from_millis(300);
 
 /// Parsed accelerator, together with its canonical spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,13 +161,20 @@ pub fn install_on_this_thread(spec: &str) -> Result<String, String> {
     }
 
     let accelerator = parse(spec)?;
-    unsafe { RegisterHotKey(None, ID, accelerator.modifiers, u32::from(accelerator.key.0)) }
-        .map_err(|error| {
-            format!(
-                "Windows refused {}. Another program probably owns it ({error}).",
-                accelerator.label
-            )
-        })?;
+    unsafe {
+        RegisterHotKey(
+            None,
+            ID,
+            accelerator.modifiers,
+            u32::from(accelerator.key.0),
+        )
+    }
+    .map_err(|error| {
+        format!(
+            "Windows refused {}. Another program probably owns it ({error}).",
+            accelerator.label
+        )
+    })?;
     Ok(accelerator.label)
 }
 
@@ -174,10 +188,22 @@ pub fn reload(state: &AppState) {
     };
     *ACTIVE.lock().unwrap() = active;
     *PROBLEM.lock().unwrap() = problem;
+    RELOAD_DONE.fetch_add(1, Ordering::SeqCst);
 }
 
 /// Registered accelerator and, when it is not active, the reason why.
+///
+/// The registration happens on the hook thread, so a reload that was just asked
+/// for is waited for here: a caller that saves a setting and reads the status
+/// right afterwards would otherwise be told about the previous accelerator.
 pub fn status() -> (Option<String>, Option<String>) {
+    let deadline = Instant::now() + RELOAD_WAIT;
+    while RELOAD_DONE.load(Ordering::SeqCst) < RELOAD_SENT.load(Ordering::SeqCst) {
+        if Instant::now() >= deadline {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
     (
         ACTIVE.lock().unwrap().clone(),
         PROBLEM.lock().unwrap().clone(),
@@ -195,8 +221,13 @@ pub fn request_reload() {
     if thread == 0 {
         return;
     }
-    unsafe {
-        let _ = PostThreadMessageW(thread, WM_RELOAD, WPARAM(0), LPARAM(0));
+    // Counted before the message is posted, so a status check that follows the
+    // save waits for this reload instead of reading the previous accelerator.
+    RELOAD_SENT.fetch_add(1, Ordering::SeqCst);
+    let posted = unsafe { PostThreadMessageW(thread, WM_RELOAD, WPARAM(0), LPARAM(0)) };
+    if posted.is_err() {
+        // Nothing will be reloaded, so do not let `status` wait for it.
+        RELOAD_DONE.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -255,5 +286,26 @@ mod tests {
         assert!(is_hotkey_message(WM_HOTKEY, ID as usize));
         assert!(!is_hotkey_message(WM_HOTKEY, 0));
         assert!(!is_hotkey_message(WM_RELOAD, ID as usize));
+    }
+
+    #[test]
+    fn reading_the_status_waits_for_a_pending_reload_only() {
+        let started = Instant::now();
+        let _ = status();
+        assert!(
+            started.elapsed() < RELOAD_WAIT,
+            "waited without a reload pending"
+        );
+
+        RELOAD_SENT.fetch_add(1, Ordering::SeqCst);
+        let started = Instant::now();
+        let _ = status();
+        let waited = started.elapsed();
+        // Nothing is going to complete this reload, so the wait has to end on
+        // its own instead of blocking forever.
+        RELOAD_DONE.store(RELOAD_SENT.load(Ordering::SeqCst), Ordering::SeqCst);
+
+        assert!(waited >= RELOAD_WAIT, "gave up after {waited:?}");
+        assert!(waited < RELOAD_WAIT * 8, "waited far too long: {waited:?}");
     }
 }

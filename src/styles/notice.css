@@ -1,0 +1,141 @@
+/* The starting hint: a small card in the corner of the screen. Its window is
+   fixed in size and fully transparent, so the card carries the whole look. */
+
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f5f6f8;
+  --fg: #14161a;
+  --fg-soft: #4a5160;
+  --muted: #8b93a2;
+  --line: rgba(15, 23, 42, 0.09);
+  --accent: #2f6bff;
+  --accent-soft: rgba(47, 107, 255, 0.1);
+  --shadow: 0 10px 26px rgba(12, 20, 38, 0.2), 0 2px 6px rgba(12, 20, 38, 0.1);
+}
+
+:root[data-theme="dark"] {
+  --bg: #1c1f26;
+  --bg-soft: #262a33;
+  --fg: #eceef3;
+  --fg-soft: #c3c8d4;
+  --muted: #8b93a2;
+  --line: rgba(255, 255, 255, 0.1);
+  --accent: #7ba2ff;
+  --accent-soft: rgba(123, 162, 255, 0.16);
+  --shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1f26;
+    --bg-soft: #262a33;
+    --fg: #eceef3;
+    --fg-soft: #c3c8d4;
+    --line: rgba(255, 255, 255, 0.1);
+    --accent: #7ba2ff;
+    --accent-soft: rgba(123, 162, 255, 0.16);
+    --shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  padding: 8px;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 10px 10px 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  user-select: none;
+  animation: rise 220ms ease-out;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+.logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.text strong {
+  font-weight: 600;
+}
+
+.text span {
+  color: var(--fg-soft);
+  font-size: 11.5px;
+}
+
+.close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+
+.close svg {
+  width: 12px;
+  height: 12px;
+}

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossy</title>
+    <link rel="stylesheet" href="styles/notice.css" />
+  </head>
+  <body>
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span class="logo" aria-hidden="true">G</span>
+      <div class="text">
+        <strong data-i18n="notice.title">Glossy is running in the background</strong>
+        <span data-i18n="notice.body">Click here to open the settings, or use the tray icon.</span>
+      </div>
+      <button class="close" id="close" type="button" data-i18n-title="notice.close" title="Dismiss" aria-label="Dismiss">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <script src="js/bridge.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/notice.js"></script>
+  </body>
+</html>

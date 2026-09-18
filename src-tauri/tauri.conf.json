@@ -18,7 +18,27 @@
         "minWidth": 620,
         "minHeight": 560,
         "center": true,
-        "resizable": true
+        "resizable": true,
+        "visible": false
+      },
+      {
+        "label": "notice",
+        "title": "Glossy",
+        "url": "notice.html",
+        "width": 340,
+        "height": 104,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false,
+        "center": false
       },
       {
         "label": "popup",

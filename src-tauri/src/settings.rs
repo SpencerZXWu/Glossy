@@ -9,9 +9,10 @@ use tauri::{AppHandle, Manager};
 /// Minimum selection length (in characters) that may trigger the popup.
 pub const MIN_SELECTION_LEN: usize = 2;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Provider {
     /// Free public Google translate endpoint, no API key required.
+    #[default]
     #[serde(rename = "google")]
     Google,
     /// Zhipu GLM chat completions, free tier, requires an API key.
@@ -26,12 +27,6 @@ pub enum Provider {
     /// OpenAI chat completions, requires an API key.
     #[serde(rename = "openai")]
     OpenAI,
-}
-
-impl Default for Provider {
-    fn default() -> Self {
-        Provider::Google
-    }
 }
 
 impl Provider {
@@ -71,9 +66,10 @@ impl Credentials {
 }
 
 /// Language the interface itself is drawn in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum UiLanguage {
     /// Follow the Windows display language.
+    #[default]
     #[serde(rename = "system")]
     System,
     #[serde(rename = "zh")]
@@ -82,28 +78,60 @@ pub enum UiLanguage {
     English,
 }
 
-impl Default for UiLanguage {
-    fn default() -> Self {
-        UiLanguage::System
+/// Bundle identifier from `tauri.conf.json`. The settings file lives in
+/// `%APPDATA%\<identifier>`, and a second launch has to read it before Tauri,
+/// and therefore an `AppHandle`, exists.
+const IDENTIFIER: &str = "com.glossy.translator";
+
+/// The stored interface language preference, read without an `AppHandle`.
+pub fn stored_ui_language() -> UiLanguage {
+    #[derive(Deserialize)]
+    struct Stored {
+        #[serde(default, rename = "uiLang")]
+        ui_lang: UiLanguage,
+    }
+
+    let Some(base) = std::env::var_os("APPDATA") else {
+        return UiLanguage::default();
+    };
+    let path = PathBuf::from(base).join(IDENTIFIER).join("settings.json");
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return UiLanguage::default();
+    };
+    serde_json::from_str::<Stored>(raw.trim_start_matches('\u{feff}'))
+        .map(|stored| stored.ui_lang)
+        .unwrap_or_default()
+}
+
+/// Turns the preference into the language the native parts actually speak,
+/// resolving "follow Windows" the way the frontend's `i18n.resolve` does.
+pub fn resolve_ui_language(preference: UiLanguage) -> UiLanguage {
+    match preference {
+        UiLanguage::System => {
+            if crate::platform::user_locale()
+                .to_lowercase()
+                .starts_with("zh")
+            {
+                UiLanguage::Chinese
+            } else {
+                UiLanguage::English
+            }
+        }
+        concrete => concrete,
     }
 }
 
 /// Colour scheme used by the settings window and the popup.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Theme {
     /// Follow the Windows / WebView2 preference.
+    #[default]
     #[serde(rename = "system")]
     System,
     #[serde(rename = "light")]
     Light,
     #[serde(rename = "dark")]
     Dark,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::System
-    }
 }
 
 /// Default popup card width in CSS pixels, kept in sync with `popup.css`.
@@ -184,8 +212,6 @@ fn default_target_lang() -> String {
         "ja".to_string()
     } else if lower.starts_with("ko") {
         "ko".to_string()
-    } else if lower.starts_with("en") {
-        "en".to_string()
     } else {
         "en".to_string()
     }
@@ -213,6 +239,9 @@ pub struct Settings {
     #[serde(rename = "appId", default, skip_serializing)]
     pub legacy_app_id: String,
     /// Put the previous clipboard content back after reading a selection.
+    ///
+    /// The whole clipboard is covered, not just its text: images and file lists
+    /// survive the Ctrl+C that reads the selection.
     pub restore_clipboard: bool,
     /// Show the original text above the translation.
     pub show_original: bool,
@@ -223,6 +252,10 @@ pub struct Settings {
     pub ignored_apps: Vec<String>,
     /// Language of the interface itself.
     pub ui_lang: UiLanguage,
+    /// Whether Glossy has never been started before. Only the very first
+    /// launch opens the settings window; every later one goes straight to the
+    /// notification area.
+    pub first_run: bool,
     /// Colour scheme for both windows.
     pub theme: Theme,
     /// Popup text size as a percentage of the default.
@@ -255,6 +288,7 @@ impl Default for Settings {
             min_selection_len: MIN_SELECTION_LEN,
             ignored_apps: Vec::new(),
             ui_lang: UiLanguage::default(),
+            first_run: true,
             theme: Theme::default(),
             font_scale: 100,
             popup_width: DEFAULT_POPUP_WIDTH,
@@ -285,13 +319,44 @@ impl Settings {
     }
 
     /// Reads persisted JSON, falling back to the defaults for anything unusable.
+    ///
+    /// The file is merged into the defaults one setting at a time: a value that
+    /// does not fit its setting (a hand edit, a number stored as a string, a
+    /// provider that no longer exists) costs only that setting instead of
+    /// resetting the whole file - which the next save would then write back as
+    /// defaults, losing everything the user had configured.
     fn parse(raw: &str) -> Settings {
         // Editors on Windows like to write a UTF-8 byte order mark.
-        let settings: Settings =
-            serde_json::from_str(raw.trim_start_matches('\u{feff}')).unwrap_or_default();
-        // Out of range or badly spelled values in the file are repaired right
-        // away, so the settings window never shows something unusable.
-        settings.sanitized()
+        let text = raw.trim_start_matches('\u{feff}');
+        let Ok(serde_json::Value::Object(stored)) = serde_json::from_str(text) else {
+            return Settings::default().sanitized();
+        };
+
+        let mut merged = serde_json::to_value(Settings::default())
+            .ok()
+            .and_then(|value| value.as_object().cloned())
+            .unwrap_or_default();
+
+        for (key, value) in stored {
+            // Keys written by older versions are kept: they are migrated into
+            // `credentials` by `sanitized`, so they must survive the merge.
+            if !merged.contains_key(&key) && !matches!(key.as_str(), "apiKey" | "appId") {
+                continue;
+            }
+            // Deserializing the single setting tells whether it still fits; the
+            // other fields come from the defaults and cannot fail the probe.
+            let probe = serde_json::json!({ key.clone(): value.clone() });
+            match serde_json::from_value::<Settings>(probe) {
+                Ok(_) => {
+                    merged.insert(key, value);
+                }
+                Err(error) => eprintln!("glossy: ignoring the stored setting `{key}`: {error}"),
+            }
+        }
+
+        serde_json::from_value::<Settings>(serde_json::Value::Object(merged))
+            .unwrap_or_default()
+            .sanitized()
     }
 
     pub fn save(&self, app: &AppHandle) -> Result<(), String> {
@@ -336,6 +401,11 @@ impl Settings {
     pub fn sanitized(mut self) -> Settings {
         if self.target_lang.trim().is_empty() {
             self.target_lang = default_target_lang();
+        } else {
+            // A code from another vendor (`jp`, `ZH-HANS`) or one written by
+            // hand has to match an entry of the language menu, otherwise the
+            // dropdown has nothing to show for it.
+            self.target_lang = crate::translate::normalize_lang_code(&self.target_lang);
         }
         self.migrate_legacy_credentials();
         self.min_selection_len = self.min_selection_len.clamp(1, 40);
@@ -382,6 +452,83 @@ mod tests {
     }
 
     #[test]
+    fn the_hard_coded_identifier_matches_the_bundle_identifier() {
+        // `stored_ui_language` finds the settings file without an AppHandle, so
+        // it has to hard-code the directory Tauri derives from this value.
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("the config is JSON");
+
+        assert_eq!(conf["identifier"], serde_json::json!(IDENTIFIER));
+    }
+
+    #[test]
+    fn the_stored_language_is_read_from_the_ui_lang_key() {
+        let json = serde_json::to_string(&Settings::default()).expect("settings serialize");
+
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&json).expect("valid JSON")["uiLang"],
+            serde_json::json!("system")
+        );
+    }
+
+    #[test]
+    fn only_the_system_preference_is_resolved_against_the_locale() {
+        assert_eq!(
+            resolve_ui_language(UiLanguage::Chinese),
+            UiLanguage::Chinese
+        );
+        assert_eq!(
+            resolve_ui_language(UiLanguage::English),
+            UiLanguage::English
+        );
+        assert!(matches!(
+            resolve_ui_language(UiLanguage::System),
+            UiLanguage::Chinese | UiLanguage::English
+        ));
+    }
+
+    #[test]
+    fn one_unreadable_setting_keeps_every_other_setting() {
+        // `popupWidth` was written by hand as a word: only that setting may
+        // fall back to its default.
+        let settings = Settings::parse(
+            "{\"enabled\":false,\"targetLang\":\"ja\",\"popupWidth\":\"wide\",\
+             \"hotkey\":\"Ctrl+Alt+Z\"}",
+        );
+
+        assert!(!settings.enabled);
+        assert_eq!(settings.target_lang, "ja");
+        assert_eq!(settings.hotkey, "Ctrl+Alt+Z");
+        assert_eq!(settings.popup_width, DEFAULT_POPUP_WIDTH);
+    }
+
+    #[test]
+    fn one_unreadable_setting_keeps_the_saved_credentials() {
+        let settings = Settings::parse(
+            "{\"provider\":\"baidu\",\"fontScale\":\"big\",\
+             \"credentials\":{\"baidu\":{\"appId\":\" 2024 \",\"apiKey\":\" secret \"}}}",
+        );
+
+        assert_eq!(settings.provider, Provider::Baidu);
+        assert_eq!(settings.font_scale, 100);
+        let baidu = settings.active_credentials();
+        assert_eq!(baidu.app_id, "2024");
+        assert_eq!(baidu.api_key, "secret");
+    }
+
+    #[test]
+    fn ignores_settings_that_no_longer_exist() {
+        let settings =
+            Settings::parse("{\"unknownSetting\":42,\"targetLang\":\"fr\",\"provider\":\"gone\"}");
+
+        assert_eq!(settings.target_lang, "fr");
+        // A provider that was removed falls back to the default one, and the
+        // remaining settings are untouched.
+        assert_eq!(settings.provider, Provider::default());
+        assert!(settings.enabled);
+    }
+
+    #[test]
     fn keeps_the_defaults_for_settings_written_by_an_older_version() {
         let settings = Settings::parse("{\"enabled\":true,\"provider\":\"zhipu\"}");
 
@@ -391,6 +538,20 @@ mod tests {
         assert_eq!(settings.font_scale, 100);
         assert_eq!(settings.theme, Theme::System);
         assert!(!settings.close_after_copy);
+    }
+
+    #[test]
+    fn the_settings_window_opens_only_on_the_very_first_launch() {
+        // Nothing stored yet, and a file that predates the flag: both mean the
+        // settings window still has to be shown.
+        assert!(Settings::default().first_run);
+        assert!(Settings::parse("{\"enabled\":true}").first_run);
+
+        let recorded = Settings::parse("{\"firstRun\":false}");
+        assert!(!recorded.first_run);
+
+        let json = serde_json::to_string(&Settings::default()).unwrap();
+        assert!(json.contains("\"firstRun\":true"));
     }
 
     #[test]
@@ -442,16 +603,16 @@ mod tests {
     #[test]
     fn keeps_a_single_api_key_next_to_the_per_provider_map() {
         let mut settings = Settings::parse("{\"provider\":\"zhipu\",\"apiKey\":\" old-key \"}");
-        assert_eq!(
-            settings.active_credentials().api_key,
-            "old-key".to_string()
-        );
+        assert_eq!(settings.active_credentials().api_key, "old-key".to_string());
 
         // Switching provider and back keeps the key.
         settings.provider = Provider::Google;
         settings = settings.sanitized();
         assert!(settings.active_credentials().is_empty());
-        assert_eq!(settings.credentials.get("zhipu").unwrap().api_key, "old-key");
+        assert_eq!(
+            settings.credentials.get("zhipu").unwrap().api_key,
+            "old-key"
+        );
 
         settings.provider = Provider::Zhipu;
         settings = settings.sanitized();
