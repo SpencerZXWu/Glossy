@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewW
 
 use crate::platform::ScreenRect;
 use crate::state::AppState;
+use crate::translate::TranslationResult;
 
 pub const POPUP_LABEL: &str = "popup";
 
@@ -32,6 +33,9 @@ struct PopupBounds {
     right: AtomicI32,
     bottom: AtomicI32,
     visible: AtomicBool,
+    /// Set while the user has pinned the card, which is what keeps a click
+    /// elsewhere from dismissing it.
+    pinned: AtomicBool,
 }
 
 static BOUNDS: PopupBounds = PopupBounds {
@@ -40,6 +44,7 @@ static BOUNDS: PopupBounds = PopupBounds {
     right: AtomicI32::new(0),
     bottom: AtomicI32::new(0),
     visible: AtomicBool::new(false),
+    pinned: AtomicBool::new(false),
 };
 
 fn bounds() -> Option<ScreenRect> {
@@ -65,6 +70,24 @@ fn store_bounds(rect: ScreenRect) {
 /// True when the screen point is currently covered by the popup.
 pub fn contains(x: i32, y: i32) -> bool {
     bounds().is_some_and(|rect| rect.contains_padded(x, y, 0))
+}
+
+/// True while the card is pinned, so a click elsewhere has to leave it alone.
+pub fn pinned() -> bool {
+    BOUNDS.pinned.load(Ordering::Relaxed)
+}
+
+/// Pins or unpins the card, as chosen by the button in its header.
+pub fn set_pinned(pinned: bool) {
+    BOUNDS.pinned.store(pinned, Ordering::Relaxed);
+}
+
+/// Whether a mouse click at this screen point dismisses the card.
+///
+/// Only a click outside an unpinned card does: a pinned one was asked to stay,
+/// and a click inside it belongs to the card itself.
+pub fn dismisses_click(x: i32, y: i32) -> bool {
+    !contains(x, y) && !pinned()
 }
 
 /// Follows the window while the user drags the popup by its header.
@@ -172,6 +195,21 @@ pub fn reveal(app: &AppHandle, state: &AppState, text: String, anchor: (f64, f64
     let _ = window.emit("glossy://selection", SelectionPayload { text });
 }
 
+/// Shows the card for a translation that was already made, which is how the
+/// history puts an old result back on screen without asking the provider again.
+pub fn reveal_result(
+    app: &AppHandle,
+    state: &AppState,
+    result: TranslationResult,
+    anchor: (f64, f64),
+) {
+    let Some(window) = popup_window(app) else {
+        return;
+    };
+    state.set_anchor(anchor);
+    let _ = window.emit("glossy://result", result);
+}
+
 /// Sizes, places and optionally shows the popup window.
 ///
 /// `width` and `height` are CSS pixels reported by the popup itself. The
@@ -271,6 +309,9 @@ pub fn hide(app: &AppHandle) {
         let _ = window.hide();
     }
     BOUNDS.visible.store(false, Ordering::Relaxed);
+    // The pin belongs to the card that is on screen, not to the popup window,
+    // which lives on between translations.
+    BOUNDS.pinned.store(false, Ordering::Relaxed);
 }
 
 /// Re-anchors the popup after the user dragged it to a new position.
@@ -404,5 +445,27 @@ mod tests {
         BOUNDS.visible.store(false, Ordering::Relaxed);
         track_move(0, 0);
         assert!(!contains(0, 0));
+    }
+
+    #[test]
+    fn a_pinned_card_survives_a_click_elsewhere() {
+        store_bounds(ScreenRect {
+            left: 100,
+            top: 100,
+            right: 400,
+            bottom: 300,
+        });
+
+        // Unpinned, the click that starts the next selection dismisses the card.
+        assert!(!dismisses_click(350, 250));
+        assert!(dismisses_click(500, 500));
+
+        set_pinned(true);
+        assert!(pinned());
+        assert!(!dismisses_click(500, 500));
+
+        set_pinned(false);
+        assert!(!pinned());
+        assert!(dismisses_click(500, 500));
     }
 }

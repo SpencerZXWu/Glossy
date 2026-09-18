@@ -89,6 +89,25 @@
         settings = { ...settings, ...(input.settings || {}) };
         previewEmit("glossy://settings", { ...settings });
         return { ...settings };
+      case "export_settings":
+        return "C:\\Users\\you\\Documents\\glossy-settings.json";
+      case "import_settings":
+        settings = { ...settings, ...(JSON.parse(input.json || "{}") || {}) };
+        previewEmit("glossy://settings", { ...settings });
+        return { ...settings };
+      case "history_list":
+        return [];
+      case "history_clear":
+      case "history_remove":
+      case "history_reopen":
+        return null;
+      case "update_capability":
+        return true;
+      case "check_for_update":
+        // The browser preview has no release feed to ask.
+        return null;
+      case "install_update":
+        return null;
       case "translate_text":
         await new Promise((resolve) => setTimeout(resolve, 350));
         if (!String(input.text || "").trim()) throw new Error("nothing selected");
@@ -116,6 +135,7 @@
         return Number(window.screen && window.screen.availHeight) || null;
       case "popup_sync_anchor":
       case "popup_close":
+      case "popup_set_pinned":
       case "show_popup":
         return null;
       default:

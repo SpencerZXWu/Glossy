@@ -40,6 +40,7 @@
   const LANGUAGES = {
     auto: "Auto detect",
     en: "English",
+    zh: "Chinese",
     "zh-CN": "Chinese (Simplified)",
     "zh-TW": "Chinese (Traditional)",
     ja: "Japanese",
@@ -81,11 +82,23 @@
   /** English spelling, used when the interface is not in Chinese. */
   function englishName(code) {
     const value = String(code);
-    if (LANGUAGES[value]) return LANGUAGES[value];
+    const exact = lookup(value);
+    if (exact) return exact;
     const base = value.split("-")[0].toLowerCase();
-    const suffix = value.slice(base.length + 1).toUpperCase();
-    if (LANGUAGES[base]) return suffix ? `${LANGUAGES[base]} (${suffix})` : LANGUAGES[base];
+    const name = lookup(base);
+    if (name) {
+      const suffix = value.slice(base.length + 1).toUpperCase();
+      return suffix ? `${name} (${suffix})` : name;
+    }
     return value.toUpperCase();
+  }
+
+  /** Looks a language up ignoring case, since providers spell codes differently. */
+  function lookup(code) {
+    if (LANGUAGES[code]) return LANGUAGES[code];
+    const needle = String(code).toLowerCase();
+    const match = Object.keys(LANGUAGES).find((key) => key.toLowerCase() === needle);
+    return match ? LANGUAGES[match] : "";
   }
 
   function node(tag, className, text) {
@@ -147,8 +160,9 @@
     } else {
       target.appendChild(node("div", "translation", translation || empty()));
 
-      if (data.phonetic) {
-        target.appendChild(node("div", "phonetic", phoneticText(data.phonetic)));
+      const phonetic = phoneticText(data.phonetic || "");
+      if (phonetic) {
+        target.appendChild(node("div", "phonetic", phonetic));
       }
 
       const meanings = Array.isArray(data.meanings) ? data.meanings : [];

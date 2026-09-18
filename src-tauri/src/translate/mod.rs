@@ -30,7 +30,7 @@ pub struct Meaning {
     pub definitions: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranslationResult {
     /// `word` for dictionary style output, `sentence` for a plain translation.

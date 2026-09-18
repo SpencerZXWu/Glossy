@@ -266,7 +266,7 @@ fn worker(app: AppHandle, state: Arc<AppState>, rx: Receiver<HookEvent>) {
         };
         match event {
             HookEvent::ButtonDown { x, y } => {
-                if !popup::contains(x, y) {
+                if popup::dismisses_click(x, y) {
                     popup::hide(&app);
                 }
             }

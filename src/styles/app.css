@@ -715,3 +715,146 @@ input:focus-visible {
     transform: translate(-50%, 0);
   }
 }
+
+/* --------------------------------------------------------------- history */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 330px;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.history-item:hover,
+.history-item:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.history-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-source {
+  color: var(--fg);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.history-translation {
+  margin-top: 3px;
+  color: var(--fg-soft);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.history-meta {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.history-button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.history-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.history-button:hover {
+  border-color: var(--line);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* ----------------------------------------------------- settings confirm */
+
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.confirm[hidden] {
+  display: none;
+}
+
+.confirm-box {
+  width: min(360px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.confirm-box h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.confirm-box p {
+  margin: 0;
+  color: var(--fg-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.confirm-actions button:not(.ghost) {
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.hint.warn {
+  color: var(--bad);
+}

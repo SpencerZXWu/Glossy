@@ -32,6 +32,7 @@
     "option.doubleClick": "Translate a word on double click",
     "option.restoreClipboard": "Put the clipboard back after reading a selection",
     "option.showOriginal": "Show the original text in the popup",
+    "option.autostart": "Start Glossy with Windows",
 
     "panel.trigger": "Trigger",
     "field.minLength": "Shortest selection to translate",
@@ -131,9 +132,56 @@
     "toast.saved": "Settings saved",
     "toast.saveFailed": "Could not save: ",
     "toast.loadFailed": "Could not load settings: ",
+    "toast.copied": "Translation copied",
+    "panel.history": "History",
+    "field.historyLimit": "Remember",
+    "field.historySearch": "Search",
+    "history.search": "Text or translation",
+    "history.hint": "Click an entry to show it in the floating card again.",
+    "history.open": "Show this translation again",
+    "history.copy": "Copy this translation",
+    "history.remove": "Remove this entry",
+    "history.clear": "Forget everything",
+    "history.empty": "Nothing translated yet.",
+    "history.count": "{0} entries",
+    "history.matching": "matched {0} of {1}",
+    "history.cleared": "History cleared",
+    "history.limit.off": "Off",
+    "history.limit.20": "The last 20",
+    "history.limit.50": "The last 50",
+    "history.limit.100": "The last 100",
+    "history.limit.200": "The last 200",
+    "history.limit.500": "The last 500",
+    "panel.backup": "Settings file",
+    "backup.hint": "Export writes Documents\\glossy-settings.json. Import reads back a file you pick.",
+    "backup.export": "Export…",
+    "backup.import": "Import…",
+    "backup.exported": "Settings exported to {0}",
+    "backup.exportFailed": "Could not export: ",
+    "backup.imported": "Settings imported",
+    "backup.importFailed": "Could not import: ",
+    "option.exportKeys": "Include my API keys in the exported file",
+    "backup.keysWarning": "The file would hold your API keys in plain text.",
+    "backup.confirmTitle": "Export your API keys?",
+    "backup.confirmText": "The JSON file will hold them as plain text, and anyone who opens it can use them.",
+    "backup.confirmOk": "Export with keys",
+    "backup.cancel": "Cancel",
+
+    "panel.updates": "Updates",
+    "option.checkUpdates": "Check for a new version when Glossy starts",
+    "update.check": "Check now",
+    "update.install": "Download and restart",
+    "update.available": "Version {0} is ready to install.",
+    "update.upToDate": "Glossy is up to date.",
+    "update.found": "Version {0} is available.",
+    "update.failed": "Could not update: ",
+    "update.downloading": "Downloading…",
+    "update.unavailable": "This build carries no update signing key, so it cannot update itself yet.",
 
     "popup.copy": "Copy translation",
     "popup.close": "Close",
+    "popup.pin": "Pin the card, so it stays open",
+    "popup.unpin": "Unpin the card",
     "popup.sourceLang": "Source language",
     "popup.targetLang": "Target language",
     "popup.swap": "Swap languages and translate back",
@@ -169,6 +217,7 @@
     "option.doubleClick": "双击单词时翻译",
     "option.restoreClipboard": "读取选区后恢复剪贴板",
     "option.showOriginal": "在弹窗中显示原文",
+    "option.autostart": "随 Windows 启动",
 
     "panel.trigger": "触发",
     "field.minLength": "触发翻译的最短长度",
@@ -267,9 +316,56 @@
     "toast.saved": "设置已保存",
     "toast.saveFailed": "保存失败：",
     "toast.loadFailed": "读取设置失败：",
+    "toast.copied": "译文已复制",
+    "panel.history": "历史记录",
+    "field.historyLimit": "保留",
+    "field.historySearch": "搜索",
+    "history.search": "原文或译文",
+    "history.hint": "点击一条记录，可在浮动窗口中重新查看。",
+    "history.open": "再次显示这条译文",
+    "history.copy": "复制这条译文",
+    "history.remove": "删除这条记录",
+    "history.clear": "清空历史记录",
+    "history.empty": "还没有翻译记录。",
+    "history.count": "共 {0} 条",
+    "history.matching": "匹配 {0} / {1} 条",
+    "history.cleared": "历史记录已清空",
+    "history.limit.off": "关闭",
+    "history.limit.20": "最近 20 条",
+    "history.limit.50": "最近 50 条",
+    "history.limit.100": "最近 100 条",
+    "history.limit.200": "最近 200 条",
+    "history.limit.500": "最近 500 条",
+    "panel.backup": "设置文件",
+    "backup.hint": "导出会写入「文档」目录下的 glossy-settings.json，导入可读取你选择的文件。",
+    "backup.export": "导出…",
+    "backup.import": "导入…",
+    "backup.exported": "设置已导出到 {0}",
+    "backup.exportFailed": "导出失败：",
+    "backup.imported": "设置已导入",
+    "backup.importFailed": "导入失败：",
+    "option.exportKeys": "导出文件中包含我的 API 密钥",
+    "backup.keysWarning": "文件中会以明文保存你的 API 密钥。",
+    "backup.confirmTitle": "要导出 API 密钥吗？",
+    "backup.confirmText": "JSON 文件会以明文保存这些密钥，任何打开它的人都能使用。",
+    "backup.confirmOk": "仍然导出",
+    "backup.cancel": "取消",
+
+    "panel.updates": "更新",
+    "option.checkUpdates": "启动 Glossy 时检查新版本",
+    "update.check": "立即检查",
+    "update.install": "下载并重启",
+    "update.available": "版本 {0} 已可安装。",
+    "update.upToDate": "Glossy 已是最新版本。",
+    "update.found": "发现新版本 {0}。",
+    "update.failed": "更新失败：",
+    "update.downloading": "正在下载…",
+    "update.unavailable": "此版本还没有更新签名公钥，暂时无法自动更新。",
 
     "popup.copy": "复制译文",
     "popup.close": "关闭",
+    "popup.pin": "固定窗口，不随点击关闭",
+    "popup.unpin": "取消固定",
     "popup.sourceLang": "源语言",
     "popup.targetLang": "目标语言",
     "popup.swap": "交换语言并反向翻译",
@@ -285,6 +381,7 @@
     zh: {
       auto: "自动检测",
       en: "英语",
+      zh: "中文",
       "zh-CN": "简体中文",
       "zh-TW": "繁体中文",
       ja: "日语",
@@ -345,16 +442,22 @@
     });
   }
 
-  /** Fills every `data-i18n*` element below `root`. */
+  /** Fills every `data-i18n*` element at or below `root`. */
   function apply(root) {
     const scope = root || document;
-    scope.querySelectorAll("[data-i18n]").forEach((element) => {
+    const fill = (selector, setter) => {
+      const found = Array.from(scope.querySelectorAll(selector));
+      // A root element is not part of its own `querySelectorAll` result.
+      if (scope.nodeType === 1 && scope.matches(selector)) found.unshift(scope);
+      found.forEach(setter);
+    };
+    fill("[data-i18n]", (element) => {
       element.innerHTML = t(element.dataset.i18n);
     });
-    scope.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+    fill("[data-i18n-placeholder]", (element) => {
       element.placeholder = t(element.dataset.i18nPlaceholder);
     });
-    scope.querySelectorAll("[data-i18n-title]").forEach((element) => {
+    fill("[data-i18n-title]", (element) => {
       element.title = t(element.dataset.i18nTitle);
     });
   }
@@ -362,7 +465,14 @@
   /** Localized name of a language code, falling back to the code itself. */
   function languageName(code, fallback) {
     const table = LANGUAGE_NAMES[language];
-    if (table && code && table[code]) return table[code];
+    if (table && code) {
+      const value = String(code);
+      if (table[value]) return table[value];
+      // Providers spell codes differently ("zh-CN" vs "zh-cn").
+      const needle = value.toLowerCase();
+      const match = Object.keys(table).find((key) => key.toLowerCase() === needle);
+      if (match) return table[match];
+    }
     return fallback ? fallback(code) : String(code || "");
   }
 

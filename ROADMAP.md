@@ -8,12 +8,12 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `0.1.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~7,600 lines: ~4,600 Rust, ~3,000 frontend (plain HTML/CSS/JS), tests and comments included |
-| Tests | 90 Rust tests, no frontend tests; `cargo fmt`, `cargo clippy` and `cargo test` run in CI on `windows-latest` |
+| Version | `0.2.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~9,800 lines: ~5,400 Rust, ~3,700 frontend (plain HTML/CSS/JS) and ~800 test lines, comments included |
+| Tests | 97 Rust tests and 71 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
-| Distribution | NSIS installer only; no code signing, no auto-update, no autostart |
-| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases |
+| Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
+| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.0` staged in `release/v0.2.0/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
@@ -57,15 +57,18 @@ Goal: from "it runs" to "I leave it running".
 | Work item | Details | State |
 | --- | --- | --- |
 | Encrypt stored credentials | API keys are protected with DPAPI (`CryptProtectData`, current-user scope) before writing. A settings file written by an older version is migrated and rewritten on the first launch of this build, and a key that belongs to another Windows login is dropped instead of being sent on | done, in `src-tauri/src/secrets.rs` |
-| Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook | planned |
-| Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings | planned |
-| Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy | planned |
-| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed | planned |
-| Import and export settings | JSON file out and in, validating through `sanitized()`. Now that credentials are protected, an export has to confirm before it includes them, and an import has to protect what it brings | planned |
-| Frontend tests | `node --test` coverage for the logic behind `i18n.js`, `render.js` and the classification in `classify.rs`; at least 25 cases | planned |
-| Manual regression list | A pre-release checklist in the README: multiple monitors, 150% scaling, both colour schemes, every provider, the ignore list | planned |
+| Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook | done, in `src-tauri/src/autostart.rs` |
+| Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings | done, in `src-tauri/src/updater.rs`; waiting for a key pair |
+| Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy | done, in `src-tauri/src/history.rs` |
+| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed | done |
+| Import and export settings | JSON file out and in, validating through `sanitized()`. Now that credentials are protected, an export has to confirm before it includes them, and an import has to protect what it brings | done, in `export_settings` / `import_settings` |
+| Frontend tests | `node --test` coverage for the logic behind `i18n.js`, `render.js` and the classification in `classify.rs`; at least 25 cases | done, 71 cases in `tests/`, wired into CI |
+| Manual regression list | A pre-release checklist in the README: multiple monitors, 150% scaling, both colour schemes, every provider, the ignore list | done, 17 items in the README |
 
-One of the eight items is already in the tree; the remaining seven are open.
+All eight items are in the tree. The update check works end to end except for the
+signing key: `tauri.conf.json` carries a placeholder public key, so the check
+reports that this build cannot update itself, and the uploader needs a real key
+pair before a release can be published as an update.
 
 Estimated effort: 3–5 days.
 

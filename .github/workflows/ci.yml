@@ -69,6 +69,16 @@ jobs:
       - name: Version numbers agree
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/version.ps1 -Check
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The frontend is plain browser JavaScript with no build step, so these
+      # tests run the sources straight from `src/`.
+      - name: Frontend tests
+        run: npm test
+
       - name: Formatting
         working-directory: src-tauri
         run: cargo fmt --all --check

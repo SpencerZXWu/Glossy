@@ -45,6 +45,7 @@
             <label class="check"><input type="checkbox" id="triggerOnDoubleClick" /><span data-i18n="option.doubleClick">Translate a word on double click</span></label>
             <label class="check"><input type="checkbox" id="restoreClipboard" /><span data-i18n="option.restoreClipboard">Put the clipboard back after reading a selection</span></label>
             <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
+            <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
           </div>
         </section>
 
@@ -201,7 +202,78 @@
             <div class="content" id="demoResult"></div>
           </div>
         </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.history">History</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="historyLimit" data-i18n="field.historyLimit">Keep</label>
+              <select id="historyLimit">
+                <option value="0" data-i18n="history.limit.off">Off</option>
+                <option value="20" data-i18n="history.limit.20">The last 20</option>
+                <option value="50" data-i18n="history.limit.50">The last 50</option>
+                <option value="100" data-i18n="history.limit.100">The last 100</option>
+                <option value="200" data-i18n="history.limit.200">The last 200</option>
+                <option value="500" data-i18n="history.limit.500">The last 500</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="historySearch" data-i18n="field.historySearch">Search</label>
+              <input type="search" id="historySearch" spellcheck="false" autocomplete="off" data-i18n-placeholder="history.search" placeholder="Text or translation" />
+            </div>
+          </div>
+          <p class="hint" data-i18n="history.hint">Click an entry to show it in the floating card again.</p>
+          <ul class="history" id="historyList"></ul>
+          <div class="demo-actions">
+            <button type="button" id="historyClear" class="ghost" data-i18n="history.clear">Forget everything</button>
+            <span class="hint" id="historyCount"></span>
+          </div>
+        </section>
+        <section class="panel">
+          <h2 data-i18n="panel.backup">Settings file</h2>
+          <p class="hint" data-i18n="backup.hint">
+            Export writes Documents\glossy-settings.json. Import reads back a file you pick.
+          </p>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="exportKeys" /><span data-i18n="option.exportKeys">Include my API keys in the exported file</span></label>
+          </div>
+          <p class="hint warn" id="exportKeysHint" data-i18n="backup.keysWarning" hidden>
+            The file would hold your API keys in plain text.
+          </p>
+          <div class="demo-actions">
+            <button type="button" id="settingsExport" class="ghost" data-i18n="backup.export">Export…</button>
+            <button type="button" id="settingsImport" class="ghost" data-i18n="backup.import">Import…</button>
+          </div>
+          <input type="file" id="settingsFile" accept=".json,application/json" hidden />
+        </section>
+        <section class="panel">
+          <h2 data-i18n="panel.updates">Updates</h2>
+          <p class="hint warn" id="updateUnavailable" data-i18n="update.unavailable" hidden>
+            This build carries no update signing key, so it cannot update itself yet.
+          </p>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="checkUpdates" /><span data-i18n="option.checkUpdates">Check for a new version when Glossy starts</span></label>
+          </div>
+          <div class="demo-actions">
+            <button type="button" id="updateCheck" class="ghost" data-i18n="update.check">Check now</button>
+            <button type="button" id="updateInstall" class="ghost" data-i18n="update.install" hidden>Download and restart</button>
+            <span class="hint" id="updateStatus"></span>
+          </div>
+        </section>
       </main>
+    </div>
+
+    <div class="confirm" id="exportConfirm" role="dialog" aria-modal="true" aria-labelledby="exportConfirmTitle" hidden>
+      <div class="confirm-box">
+        <h3 id="exportConfirmTitle" data-i18n="backup.confirmTitle">Export your API keys?</h3>
+        <p data-i18n="backup.confirmText">
+          The JSON file will hold them as plain text, and anyone who opens it can use them.
+        </p>
+        <div class="confirm-actions">
+          <button type="button" id="exportCancel" class="ghost" data-i18n="backup.cancel">Cancel</button>
+          <button type="button" id="exportConfirmOk" data-i18n="backup.confirmOk">Export with keys</button>
+        </div>
+      </div>
     </div>
 
     <div class="toast" id="toast" hidden></div>

@@ -62,6 +62,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | --- | --- |
 | Interface language | `Follow Windows`, `简体中文` or `English`. Switches the settings window and the popup immediately. |
 | Enable selection translation | Master switch. Turning it off pauses the global selection capture immediately. |
+| Start Glossy with Windows | Adds a `--autostart` entry to `HKCU\...\Run`, so Glossy is already waiting in the notification area after a login. Started that way it does not show the "Glossy is running" card. |
 | Translate when the mouse drags across text | Enables the drag gesture. |
 | Translate a word on double click | Enables the double-click gesture. |
 | Put the clipboard back after reading a selection | Restores your previous clipboard content after Glossy copied the selection. |
@@ -76,6 +77,9 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | Close by itself | Seconds before the popup hides on its own; `Never` keeps it open until dismissed. |
 | Close the popup right after the translation is copied | Hides the card once the copy button was used. |
 | Target language | Language the result is translated into. |
+| History | How many finished translations to remember (`Off` to `The last 500`, default 50). The list below the selector keeps the original, the translation, the provider and the time; `Search` filters both texts, clicking an entry shows it in the floating card again (no second provider call), and each entry has a copy and a remove button. `Forget everything` empties the list. The file lives in `%APPDATA%\com.glossy.translator\history.json`. |
+| Settings file | `Export…` writes `Documents\glossy-settings.json`; `Import…` reads a file you pick back into the app. Tick `Include my API keys in the exported file` to carry the keys as well — Glossy asks once more before it writes them in plain text. An import validates through `sanitized()` and protects the keys it brings with DPAPI on the way to disk. |
+| Updates | `Check for a new version when Glossy starts` asks GitHub Releases on every start (off by default). `Check now` looks immediately and says which version is waiting, and `Download and restart` installs it. A build without an update signing key — which is every build until the release key pair exists — hides the buttons and says so. |
 | Translation provider | `google` (free, no key), `baidu` (free monthly quota, APP ID + key), `zhipu` (free tier, API key), `deepl` or `openai` (API key). |
 | APP ID / API key | Shown only for the providers that need them: `baidu` asks for both fields, `zhipu`, `deepl` and `openai` for the key alone, and the free `google` provider hides both. The values are remembered per provider, so switching to a provider you configured earlier fills its fields back in. |
 
@@ -219,11 +223,18 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
+node --test                                                          # 71 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
 cargo test --locked
 ```
+
+`npm test` runs the same `node --test` command. The frontend tests load
+`src/js/i18n.js` and `src/js/render.js` into a minimal DOM (see `tests/helpers/`)
+and cover the dictionaries, the placeholder substitution and the card renderer.
+Run the plain directory form on Node 24/Windows — `node --test tests` and
+`node --test .` do not resolve the test files there.
 
 The version lives in six places (see `scripts\version.ps1`), so never edit them by
 hand: `tauri.conf.json` is authoritative, `scripts\version.ps1 -Set 0.1.2` writes it
@@ -231,8 +242,59 @@ everywhere else, and `scripts\version.ps1 -Get` prints it for scripts such as
 `release.ps1`, which refuses to build when the numbers disagree. The same check runs
 in CI, so a forgotten bump fails the build.
 
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs all four checks on
-`windows-latest` for every push and pull request.
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs all four checks plus
+the frontend test suite on `windows-latest` for every push and pull request.
+
+### Updates
+
+Glossy asks
+`https://github.com/SpencerZXWu/Glossy/releases/latest/download/latest.json` for a
+newer release. An update is only accepted if it carries a signature made with the
+release key:
+
+```powershell
+cargo tauri signer generate -w $env:USERPROFILE\.tauri\glossy.key   # once
+```
+
+Put the printed public key into `plugins.updater.pubkey` in
+`src-tauri\tauri.conf.json` (the placeholder there is what makes the settings
+window say the build cannot update itself) and export the private one before
+building a release:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $env:USERPROFILE\.tauri\glossy.key -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
+```
+
+`bundle.createUpdaterArtifacts` in `tauri.conf.json` stays off until that secret
+exists: without it the bundler fails, with it the build also writes the signed
+installer and the `latest.json` an update is read from. Keep the private key out of
+the repository — it is the only thing that lets a release be replaced.
+
+### Manual regression checklist
+
+Run this before tagging a release. Every item was a real bug at some point, and
+none of them is covered by the automated tests.
+
+| # | What to do | What has to happen |
+| --- | --- | --- |
+| 1 | Start Glossy on a clean profile | The settings window opens, nothing is preselected by accident, and the status line says the capture is running |
+| 2 | Close the settings window, then start Glossy again | No second window and no second mouse hook: the notification says Glossy is already running, and the tray icon opens the window again |
+| 3 | Tick "Start Glossy with Windows", reboot, then sign in | No console window flashes, no "running" card appears, the tray icon is there |
+| 4 | Untick it, reboot | Glossy does not start (`reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v Glossy` finds nothing) |
+| 5 | Select a word in Notepad, a browser, Word and a terminal | The popup appears under the cursor each time, with phonetics and definitions for the word |
+| 6 | Select a sentence in each of the same programs | The popup shows the translation only, without phonetics or meanings |
+| 7 | Drag the popup to each monitor, and to each screen edge | The card stays inside the work area on every monitor and at 100 %, 125 % and 150 % scaling |
+| 8 | Pin the popup, click elsewhere on the desktop, wait past the auto-close timeout | The card stays open until the pin is released or the × is used |
+| 9 | Click outside an unpinned card | It closes as soon as the click lands outside |
+| 10 | Switch Windows between light and dark, then force each scheme in the settings | Both windows follow the choice, with readable text and borders in both |
+| 11 | Translate with each of the five providers, including one with a bad key | A result for the good ones; a readable error with a retry button for the bad one |
+| 12 | Add a running program to the ignore list, translate inside it, then remove it | Nothing pops up while it is listed, and the popup is back once it is removed |
+| 13 | Press the global hotkey with text on the clipboard, then with an empty clipboard and a selection | The translation opens next to the cursor in the first case, the current selection is used in the second |
+| 14 | Export without keys, export with keys, then import each file | Plain export has no `credentials` block; the keyed export asks for confirmation first; an import restores every setting and the keys work |
+| 15 | Set the history to `The last 50`, translate 60 texts, then set it to `Off` | The list keeps 50, search filters them, clicking one reopens it in the card, and `Off` empties the file |
+| 16 | Change the opacities, font size and width, restart | The popup keeps the chosen values |
+| 17 | Open the Updates section | This build, without a signing key, hides the check buttons and says the build cannot update itself; after a key pair exists, `Check now` reports either the running version or the one that is waiting |
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -252,7 +314,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 87 tests; see "Checks" above for lint and format runs
+cargo test   # 97 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -268,6 +330,7 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
   js/app.js              settings window logic
   js/popup.js            popup window logic
   js/notice.js           start card logic
+tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
   selection.rs           global mouse hook, gesture tracking, capture
@@ -275,6 +338,10 @@ src-tauri/src/
   classify.rs            word/phrase vs. sentence detection
   translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
+  history.rs             the translation store behind the History panel
+  autostart.rs           the login item and the --autostart marker
+  updater.rs             the release feed behind the Updates section
+  secrets.rs             DPAPI protection for the stored API keys
   notice.rs              start card placement and lifetime
   tray.rs                notification area icon: open the window, quit
   instance.rs            named-mutex guard against a second Glossy

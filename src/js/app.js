@@ -12,6 +12,7 @@
     triggerOnDoubleClick: $("triggerOnDoubleClick"),
     restoreClipboard: $("restoreClipboard"),
     showOriginal: $("showOriginal"),
+    autostart: $("autostart"),
     minSelectionLen: $("minSelectionLen"),
     hotkey: $("hotkey"),
     hotkeyHint: $("hotkeyHint"),
@@ -49,6 +50,24 @@
     demoPopup: $("demoPopup"),
     demoResult: $("demoResult"),
     selectionHint: $("selectionHint"),
+    historyLimit: $("historyLimit"),
+    historySearch: $("historySearch"),
+    historyList: $("historyList"),
+    historyClear: $("historyClear"),
+    historyCount: $("historyCount"),
+    exportKeys: $("exportKeys"),
+    exportKeysHint: $("exportKeysHint"),
+    settingsExport: $("settingsExport"),
+    settingsImport: $("settingsImport"),
+    settingsFile: $("settingsFile"),
+    exportConfirm: $("exportConfirm"),
+    exportCancel: $("exportCancel"),
+    exportConfirmOk: $("exportConfirmOk"),
+    checkUpdates: $("checkUpdates"),
+    updateCheck: $("updateCheck"),
+    updateInstall: $("updateInstall"),
+    updateStatus: $("updateStatus"),
+    updateUnavailable: $("updateUnavailable"),
     toast: $("toast"),
   };
 
@@ -69,6 +88,7 @@
   const FONT_SCALES = [90, 100, 115, 130, 150];
   const AUTO_CLOSE = [0, 3, 5, 10, 20, 30];
   const OPACITIES = [50, 60, 70, 80, 90, 95, 100];
+  const HISTORY_LIMITS = [0, 20, 50, 100, 200, 500];
 
   /** Source value that lets the provider detect the language itself. */
   const AUTO = "auto";
@@ -98,10 +118,14 @@
   let demoCopyTimer = 0;
   /** Sample text the card box is filled with until the user types something. */
   let sampleText = "";
+  /** Translations the backend remembers, newest first. */
+  let history = [];
 
   const COPY_ICON = els.demoCopy.innerHTML;
   const DONE_ICON =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  const REMOVE_ICON =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/></svg>';
 
   /**
    * Applies the chosen colour scheme. "system" hands back to the CSS
@@ -217,6 +241,201 @@
       : Glossy.i18n.t("ignored.empty");
   }
 
+  /** Reads the history the backend keeps and shows it. */
+  async function loadHistory() {
+    try {
+      history = (await Glossy.invoke("history_list")) || [];
+    } catch (error) {
+      history = [];
+    }
+    renderHistory();
+  }
+
+  /** The entries that match what the search box holds. */
+  function matchingHistory() {
+    const needle = els.historySearch.value.trim().toLowerCase();
+    if (!needle) return history;
+    return history.filter((entry) => {
+      const result = entry.result || {};
+      return (
+        String(result.sourceText || "").toLowerCase().includes(needle) ||
+        String(result.translation || "").toLowerCase().includes(needle)
+      );
+    });
+  }
+
+  function historyButton(labelKey, svg, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "history-button";
+    button.title = Glossy.i18n.t(labelKey);
+    button.setAttribute("aria-label", button.title);
+    button.innerHTML = svg;
+    button.addEventListener("click", (event) => {
+      // The click would otherwise reach the entry and reopen it.
+      event.stopPropagation();
+      onClick();
+    });
+    return button;
+  }
+
+  function renderHistory() {
+    const entries = matchingHistory();
+    els.historyList.innerHTML = "";
+
+    entries.forEach((entry) => {
+      const result = entry.result || {};
+      const item = document.createElement("li");
+      item.className = "history-item";
+      item.tabIndex = 0;
+      item.setAttribute("role", "listitem");
+      item.title = Glossy.i18n.t("history.open");
+
+      const body = document.createElement("div");
+      body.className = "history-body";
+      const source = document.createElement("div");
+      source.className = "history-source";
+      source.textContent = result.sourceText || "";
+      const translation = document.createElement("div");
+      translation.className = "history-translation";
+      translation.textContent = result.translation || "";
+      const meta = document.createElement("div");
+      meta.className = "history-meta";
+      meta.textContent = [
+        Glossy.i18n.providerName(result.provider),
+        new Date(Number(entry.at) * 1000).toLocaleString(),
+      ].join(" · ");
+      body.append(source, translation, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "history-actions";
+      actions.append(
+        historyButton("history.copy", COPY_ICON, async () => {
+          await Glossy.invoke("copy_text", { text: String(result.translation || "") }).catch(
+            () => false,
+          );
+          showToast(Glossy.i18n.t("toast.copied"));
+        }),
+        historyButton("history.remove", REMOVE_ICON, async () => {
+          await Glossy.invoke("history_remove", { id: entry.id }).catch(() => null);
+          await loadHistory();
+        }),
+      );
+
+      const open = () => Glossy.invoke("history_reopen", { id: entry.id }).catch(() => null);
+      item.addEventListener("click", open);
+      item.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+
+      item.append(body, actions);
+      els.historyList.appendChild(item);
+    });
+
+    els.historyList.hidden = entries.length === 0;
+    els.historyCount.textContent = history.length
+      ? Glossy.i18n.t(
+          entries.length === history.length ? "history.count" : "history.matching",
+          entries.length,
+          history.length,
+        )
+      : Glossy.i18n.t("history.empty");
+  }
+
+  async function clearHistory() {
+    await Glossy.invoke("history_clear").catch(() => null);
+    await loadHistory();
+    showToast(Glossy.i18n.t("history.cleared"));
+  }
+
+  /** Writes the settings to Documents and reports where they landed. */
+  async function exportSettings(includeKeys) {
+    try {
+      const path = await Glossy.invoke("export_settings", {
+        includeCredentials: includeKeys,
+      });
+      showToast(Glossy.i18n.t("backup.exported", path));
+    } catch (error) {
+      showToast(Glossy.i18n.t("backup.exportFailed") + Glossy.errorMessage(error));
+    }
+  }
+
+  /** Replaces the settings with those of a file the user picked. */
+  async function importSettings(file) {
+    try {
+      const json = await file.text();
+      apply(await Glossy.invoke("import_settings", { json }));
+      await refreshStatus();
+      await loadHistory();
+      showToast(Glossy.i18n.t("backup.imported"));
+    } catch (error) {
+      showToast(Glossy.i18n.t("backup.importFailed") + Glossy.errorMessage(error));
+    }
+  }
+
+  /** Whether this build can update at all; false without a signing key. */
+  let canUpdate = true;
+
+  /** The release waiting to be installed, if any. */
+  let pendingUpdate = null;
+
+  /** Shows the line under the update buttons, empty when there is nothing to say. */
+  function setUpdateStatus(key, ...args) {
+    els.updateStatus.textContent = key ? Glossy.i18n.t(key, ...args) : "";
+  }
+
+  function rememberUpdate(info) {
+    pendingUpdate = info || null;
+    els.updateInstall.hidden = !pendingUpdate;
+    els.updateCheck.hidden = !!pendingUpdate;
+    if (pendingUpdate) setUpdateStatus("update.available", pendingUpdate.version);
+    return pendingUpdate;
+  }
+
+  /** Asks the release feed; only a click on the button reports "up to date". */
+  async function checkForUpdate(announce) {
+    if (!canUpdate) return;
+    els.updateCheck.disabled = true;
+    try {
+      const info = rememberUpdate(await Glossy.invoke("check_for_update"));
+      if (info) showToast(Glossy.i18n.t("update.found", info.version));
+      else if (announce) showToast(Glossy.i18n.t("update.upToDate"));
+    } catch (error) {
+      if (announce) showToast(Glossy.i18n.t("update.failed") + Glossy.errorMessage(error));
+    } finally {
+      els.updateCheck.disabled = false;
+    }
+  }
+
+  async function installUpdate() {
+    els.updateInstall.disabled = true;
+    setUpdateStatus("update.downloading");
+    try {
+      // The new version only runs after a restart, so this call does not return
+      // before Glossy has closed.
+      await Glossy.invoke("install_update");
+    } catch (error) {
+      els.updateInstall.disabled = false;
+      setUpdateStatus("update.available", pendingUpdate ? pendingUpdate.version : "");
+      showToast(Glossy.i18n.t("update.failed") + Glossy.errorMessage(error));
+    }
+  }
+
+  /** Hides the whole section on a build that cannot update itself. */
+  async function loadUpdateCapability() {
+    try {
+      canUpdate = !!(await Glossy.invoke("update_capability"));
+    } catch {
+      canUpdate = false;
+    }
+    els.updateUnavailable.hidden = canUpdate;
+    els.updateCheck.hidden = !canUpdate;
+    els.checkUpdates.disabled = !canUpdate;
+  }
+
   /** Fills the dropdown with the programs that currently own a visible window. */
   async function loadRunningApps() {
     const loading = new Option(Glossy.i18n.t("ignored.loading"), "");
@@ -289,6 +508,7 @@
     showHotkey(lastStatus);
     fillSample();
     syncDemoLanguage();
+    renderHistory();
     if (settings) {
       fillLanguages(settings.targetLang);
       els.targetLang.value = settings.targetLang;
@@ -311,6 +531,7 @@
     els.triggerOnDoubleClick.checked = !!next.triggerOnDoubleClick;
     els.restoreClipboard.checked = !!next.restoreClipboard;
     els.showOriginal.checked = !!next.showOriginal;
+    els.autostart.checked = !!next.autostart;
     els.minSelectionLen.value = String(numberOr(next.minSelectionLen, 2));
     ignored = normalizeIgnored(next.ignoredApps);
     els.hotkey.value = next.hotkey || "";
@@ -320,6 +541,8 @@
     els.popupOpacity.value = String(pick(OPACITIES, next.popupOpacity, 100));
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
+    els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
+    els.checkUpdates.checked = !!next.checkUpdates;
     applyTheme(els.theme.value);
     fillLanguages(next.targetLang);
     els.targetLang.value = next.targetLang;
@@ -340,6 +563,7 @@
       triggerOnDoubleClick: els.triggerOnDoubleClick.checked,
       restoreClipboard: els.restoreClipboard.checked,
       showOriginal: els.showOriginal.checked,
+      autostart: els.autostart.checked,
       minSelectionLen: numberOr(els.minSelectionLen.value, 2),
       ignoredApps: ignored,
       hotkey: els.hotkey.value.trim(),
@@ -349,6 +573,8 @@
       popupOpacity: numberOr(els.popupOpacity.value, 100),
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
+      historyLimit: numberOr(els.historyLimit.value, 50),
+      checkUpdates: els.checkUpdates.checked,
       targetLang: els.targetLang.value,
       provider: els.provider.value,
       uiLang: els.uiLang.value,
@@ -360,6 +586,9 @@
       apply(await Glossy.invoke("save_settings", { settings: collect() }));
       showToast(Glossy.i18n.t("toast.saved"));
       await refreshStatus();
+      // A change of the cap, or of nothing at all: the list stays right by
+      // asking the backend what it remembers.
+      await loadHistory();
     } catch (error) {
       showToast(Glossy.i18n.t("toast.saveFailed") + Glossy.errorMessage(error));
     }
@@ -626,6 +855,7 @@
     els.apiKey,
     els.restoreClipboard,
     els.showOriginal,
+    els.autostart,
     els.minSelectionLen,
     els.hotkey,
     els.fontScale,
@@ -633,8 +863,50 @@
     els.popupOpacity,
     els.autoCloseSecs,
     els.closeAfterCopy,
+    els.historyLimit,
+    els.checkUpdates,
   ].forEach((element) => {
     element.addEventListener("change", scheduleSave);
+  });
+
+  els.historySearch.addEventListener("input", renderHistory);
+  els.historyClear.addEventListener("click", clearHistory);
+
+  els.updateCheck.addEventListener("click", () => checkForUpdate(true));
+  els.updateInstall.addEventListener("click", installUpdate);
+
+  /** Only an export that carries the keys needs the second look. */
+  function closeExportConfirm() {
+    els.exportConfirm.hidden = true;
+  }
+
+  els.exportKeys.addEventListener("change", () => {
+    els.exportKeysHint.hidden = !els.exportKeys.checked;
+  });
+  els.settingsExport.addEventListener("click", () => {
+    if (els.exportKeys.checked) {
+      els.exportConfirm.hidden = false;
+      return;
+    }
+    exportSettings(false);
+  });
+  els.exportConfirmOk.addEventListener("click", () => {
+    closeExportConfirm();
+    exportSettings(true);
+  });
+  els.exportCancel.addEventListener("click", closeExportConfirm);
+  els.exportConfirm.addEventListener("click", (event) => {
+    if (event.target === els.exportConfirm) closeExportConfirm();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !els.exportConfirm.hidden) closeExportConfirm();
+  });
+  els.settingsImport.addEventListener("click", () => els.settingsFile.click());
+  els.settingsFile.addEventListener("change", () => {
+    const file = els.settingsFile.files && els.settingsFile.files[0];
+    // Clearing the input lets the same file be picked twice in a row.
+    els.settingsFile.value = "";
+    if (file) importSettings(file);
   });
 
   els.demoText.addEventListener("mouseup", () => setTimeout(translateHighlighted, 0));
@@ -684,5 +956,12 @@
     Glossy.listen("glossy://status", refreshStatus);
     setInterval(refreshStatus, 4000);
     loadRunningApps();
+    await loadHistory();
+    await loadUpdateCapability();
+    // The start-up check ran before this window existed, so it arrives as an
+    // event rather than as the answer to a call.
+    Glossy.listen("glossy://update", (event) => {
+      rememberUpdate((event && event.payload) || null);
+    });
   })();
 })(window.Glossy);

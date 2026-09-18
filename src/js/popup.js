@@ -11,6 +11,7 @@
   const langTo = document.getElementById("langTo");
   const langSwap = document.getElementById("langSwap");
   const copyButton = document.getElementById("copy");
+  const pinButton = document.getElementById("pin");
   const closeButton = document.getElementById("close");
 
   /** Source value that lets the provider detect the language itself. */
@@ -50,6 +51,9 @@
   let ticket = 0;
   let copyTimer = 0;
   let closeTimer = 0;
+  /** True while the card is pinned: clicks elsewhere leave it alone and the
+      "close by itself" countdown stands still. */
+  let pinned = false;
 
   /** Pair shown in the language bar. `source: AUTO` asks the provider to detect
       the language and `target: null` follows the configured target. */
@@ -76,6 +80,7 @@
     Glossy.i18n.apply(document);
     copyButton.setAttribute("aria-label", Glossy.i18n.t("popup.copy"));
     closeButton.setAttribute("aria-label", Glossy.i18n.t("popup.close"));
+    pinButton.setAttribute("aria-label", pinLabel());
     langFrom.setAttribute("aria-label", Glossy.i18n.t("popup.sourceLang"));
     langTo.setAttribute("aria-label", Glossy.i18n.t("popup.targetLang"));
     langSwap.setAttribute("aria-label", Glossy.i18n.t("popup.swap"));
@@ -130,9 +135,36 @@
   /** Restarts the "close by itself" countdown, if one is configured. */
   function scheduleAutoClose() {
     clearTimeout(closeTimer);
+    if (pinned) return;
     const seconds = Number(preferences.autoCloseSecs);
     if (!Number.isFinite(seconds) || seconds <= 0) return;
     closeTimer = setTimeout(dismiss, Math.min(seconds, 600) * 1000);
+  }
+
+  function pinLabel() {
+    return Glossy.i18n.t(pinned ? "popup.unpin" : "popup.pin");
+  }
+
+  /** Writes the pin state into the button that shows it. */
+  function showPin() {
+    pinButton.dataset.state = pinned ? "on" : "off";
+    pinButton.setAttribute("aria-pressed", pinned ? "true" : "false");
+    pinButton.setAttribute("data-i18n-title", pinned ? "popup.unpin" : "popup.pin");
+    pinButton.title = pinLabel();
+    pinButton.setAttribute("aria-label", pinButton.title);
+  }
+
+  /**
+   * Pins or unpins the card. The backend has to know as well: the click that
+   * would dismiss the card is caught by the mouse hook, not by this window.
+   */
+  function setPinned(next) {
+    if (next === pinned) return;
+    pinned = next;
+    showPin();
+    Glossy.invoke("popup_set_pinned", { pinned }).catch(() => {});
+    if (pinned) clearTimeout(closeTimer);
+    else scheduleAutoClose();
   }
 
   /**
@@ -248,7 +280,9 @@
     document.body.dataset.state = "loading";
     Glossy.render.loading(content);
     size = { width: 0, height: 0 };
-    await place(true);
+    // A pinned card stays where it is; only a fresh, unpinned one follows the
+    // cursor to the new selection.
+    await place(!pinned);
     if (mine !== ticket) return;
 
     try {
@@ -277,6 +311,28 @@
     }
   }
 
+  /** Shows a translation the history already has, without asking the provider
+      again: the stored card keeps its phonetic symbols, meanings and example. */
+  async function showStored(result) {
+    if (!result || !result.translation) return;
+    const mine = ++ticket;
+    clearTimeout(closeTimer);
+    resetLanguages();
+
+    text = String(result.sourceText || "");
+    current = result;
+    detected = result.sourceLang || "";
+    headword.textContent = text;
+    document.body.dataset.state = result.kind === "sentence" ? "sentence" : "word";
+    Glossy.render.result(content, result, { showOriginal: preferences.showOriginal });
+    showLanguages(result);
+
+    size = { width: 0, height: 0 };
+    await place(!pinned);
+    if (mine !== ticket) return;
+    scheduleAutoClose();
+  }
+
   async function copyResult() {
     const value = current && current.translation ? String(current.translation) : "";
     if (!value) return;
@@ -297,11 +353,16 @@
   function dismiss() {
     ticket += 1;
     clearTimeout(closeTimer);
+    // Unpinning here keeps the button in step with the card that is about to
+    // vanish; the backend forgets the pin with the card.
+    pinned = false;
+    showPin();
     document.body.dataset.state = "idle";
     Glossy.invoke("popup_close").catch(() => {});
   }
 
   copyButton.addEventListener("click", copyResult);
+  pinButton.addEventListener("click", () => setPinned(!pinned));
   closeButton.addEventListener("click", dismiss);
   langFrom.addEventListener("change", () => {
     pair.source = langFrom.value;
@@ -320,6 +381,10 @@
   Glossy.listen("glossy://selection", (event) => {
     resetLanguages();
     run(event && event.payload ? event.payload.text : "");
+  });
+
+  Glossy.listen("glossy://result", (event) => {
+    showStored(event && event.payload);
   });
 
   Glossy.listen("glossy://settings", (event) => {
@@ -369,6 +434,7 @@
     }
     applyAppearance();
     applyLanguage();
+    showPin();
     if (!Glossy.live) preview();
   })();
 })(window.Glossy);

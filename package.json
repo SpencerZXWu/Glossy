@@ -1,12 +1,13 @@
 {
   "name": "glossy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Glossy - a lightweight select-to-translate desktop app built with Tauri",
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
     "tauri": "tauri",
+    "test": "node --test",
     "icon": "tauri icon assets/icon.png"
   },
   "devDependencies": {

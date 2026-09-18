@@ -236,6 +236,11 @@ body.dragging .card {
   color: #17a673;
 }
 
+.icon-button[data-state="on"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 /* ------------------------------------------------------------------ body */
 
 .content {

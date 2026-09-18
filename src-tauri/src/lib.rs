@@ -1,9 +1,11 @@
 //! Glossy: select text anywhere on the desktop and translate it in a floating
 //! popup window.
 
+mod autostart;
 mod classify;
 mod clipboard;
 pub mod console;
+mod history;
 mod hotkey;
 mod input;
 mod instance;
@@ -16,6 +18,7 @@ mod settings;
 mod state;
 mod translate;
 mod tray;
+mod updater;
 
 use std::sync::Arc;
 
@@ -58,6 +61,22 @@ fn save_settings(
     // Only the very first launch opens the settings window, and that launch is
     // over by now, so the interface never gets to ask for it again.
     settings.first_run = false;
+    // The login item lives outside the settings file, so changing it is part of
+    // saving. What the system reports back is what gets stored, which keeps the
+    // checkbox from claiming a state Windows does not have.
+    let before = state.settings();
+    if settings.autostart != before.autostart {
+        settings.autostart = match autostart::apply(&app, settings.autostart) {
+            Ok(actual) => actual,
+            Err(error) => {
+                eprintln!("Glossy could not change its login item: {error}");
+                before.autostart
+            }
+        };
+    }
+    if settings.history_limit != before.history_limit {
+        history::set_limit(&app, settings.history_limit);
+    }
     settings.save(&app)?;
     state.set_settings(settings.clone());
 
@@ -67,14 +86,50 @@ fn save_settings(
     // The accelerator lives on the hook thread, which re-reads it on demand.
     hotkey::request_reload();
     let _ = app.emit("glossy://settings", settings.clone());
+    let _ = app.emit("glossy://history", ());
     Ok(settings)
 }
 
-/// Translates a selection. Called by the popup window and by the demo pane.
-/// `source_lang` / `target_lang` are optional overrides coming from the popup's
+/// Writes the settings to `Documents\glossy-settings.json` and answers with the
+/// path it used. `include_credentials` is asked for separately because the file
+/// is plain JSON: without it the export holds everything but the API keys.
+#[tauri::command]
+fn export_settings(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    include_credentials: bool,
+) -> Result<String, String> {
+    let mut settings = state.settings();
+    if !include_credentials {
+        settings.credentials.clear();
+    }
+    let path = app
+        .path()
+        .document_dir()
+        .map_err(|error| format!("the Documents folder is not available: {error}"))?
+        .join("glossy-settings.json");
+    let json = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
+    std::fs::write(&path, json)
+        .map_err(|error| format!("could not write {}: {error}", path.display()))?;
+    Ok(path.display().to_string())
+}
+
+/// Replaces the current settings with those of an exported file. The file holds
+/// unprotected keys, so saving it again is what gets them encrypted.
+#[tauri::command]
+fn import_settings(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    json: String,
+) -> Result<Settings, String> {
+    save_settings(app, state, Settings::import(&json)?)
+}
+
+/// Translates a selection. Called by the popup window and by the demo pane./// `source_lang` / `target_lang` are optional overrides coming from the popup's
 /// language bar; both fall back to the settings when they are missing.
 #[tauri::command]
 async fn translate_text(
+    app: AppHandle,
     state: State<'_, Arc<AppState>>,
     text: String,
     source_lang: Option<String>,
@@ -85,7 +140,35 @@ async fn translate_text(
         source: source_lang,
         target: target_lang,
     };
-    translate::translate(&text, &settings, &languages).await
+    let result = translate::translate(&text, &settings, &languages).await?;
+    history::record(&app, &result, settings.history_limit);
+    Ok(result)
+}
+
+/// Every translation this session (and the previous ones) remembers, newest
+/// first.
+#[tauri::command]
+fn history_list() -> Vec<history::Entry> {
+    history::list()
+}
+
+#[tauri::command]
+fn history_clear(app: AppHandle) {
+    history::clear(&app);
+}
+
+#[tauri::command]
+fn history_remove(app: AppHandle, id: u64) {
+    history::remove(&app, id);
+}
+
+/// Puts an old translation back into the floating card, anchored to the cursor.
+#[tauri::command]
+fn history_reopen(app: AppHandle, state: State<'_, Arc<AppState>>, id: u64) -> Result<(), String> {
+    let entry = history::get(id).ok_or("that translation is no longer in the history")?;
+    let (x, y) = platform::cursor_pos();
+    popup::reveal_result(&app, &state, entry.result, (x as f64, y as f64));
+    Ok(())
 }
 
 /// Shows the floating popup for `text`, anchored to the mouse cursor. The demo
@@ -129,6 +212,13 @@ fn popup_sync_anchor(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<
 #[tauri::command]
 fn popup_close(app: AppHandle) {
     popup::hide(&app);
+}
+
+/// Called when the pin button of the card is used: a pinned card survives the
+/// clicks that would otherwise dismiss it.
+#[tauri::command]
+fn popup_set_pinned(pinned: bool) {
+    popup::set_pinned(pinned);
 }
 
 #[tauri::command]
@@ -185,6 +275,11 @@ pub fn run() {
     };
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![autostart::FLAG]),
+        ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
             let mut settings = Settings::load(&handle);
@@ -201,6 +296,8 @@ pub fn run() {
             }
             let state = Arc::new(AppState::new(settings));
             app.manage(Arc::clone(&state));
+
+            history::load(&handle, state.settings().history_limit);
 
             if let Err(error) = tray::install(&handle, language) {
                 eprintln!("Glossy could not add its notification area icon: {error}");
@@ -228,10 +325,27 @@ pub fn run() {
 
             if first_run {
                 tray::show_main(&handle);
+            } else if autostart::started_by_system() {
+                // Nobody asked for this start, so it must not put anything on
+                // screen; the icon in the notification area is enough.
             } else {
                 // Nothing else would tell the user that Glossy came up: its icon
                 // usually sits in the overflow of the notification area.
                 notice::show(&handle);
+            }
+
+            // A login item that points at a build the user since moved or
+            // renamed would silently stop working; rewrite it while it is on.
+            if state.settings().autostart {
+                if let Err(error) = autostart::apply(&handle, true) {
+                    eprintln!("Glossy could not repair its login item: {error}");
+                }
+            }
+
+            // The check runs off the main thread and says nothing unless a newer
+            // release really exists.
+            if state.settings().check_updates {
+                updater::check_in_background(&handle);
             }
 
             selection::install(handle, Arc::clone(&state));
@@ -265,18 +379,28 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
+            export_settings,
+            import_settings,
             translate_text,
             show_popup,
             popup_present,
             popup_resize,
             popup_sync_anchor,
             popup_close,
+            popup_set_pinned,
             copy_text,
+            history_list,
+            history_clear,
+            history_remove,
+            history_reopen,
             capture_status,
             running_apps,
             pick_app,
             notice_open,
             notice_close,
+            updater::update_capability,
+            updater::check_for_update,
+            updater::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("Glossy could not start");

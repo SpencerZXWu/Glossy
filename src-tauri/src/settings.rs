@@ -277,6 +277,12 @@ pub struct Settings {
     pub auto_close_secs: u64,
     /// Hide the popup right after the translation was copied.
     pub close_after_copy: bool,
+    /// Start Glossy with Windows.
+    pub autostart: bool,
+    /// Ask GitHub for a newer release.
+    pub check_updates: bool,
+    /// How many translations the history keeps, 0 turns it off.
+    pub history_limit: u32,
     /// Accelerator such as `Ctrl+Alt+C` that translates the clipboard.
     pub hotkey: String,
 }
@@ -304,6 +310,9 @@ impl Default for Settings {
             popup_opacity: DEFAULT_POPUP_OPACITY,
             auto_close_secs: 0,
             close_after_copy: false,
+            autostart: false,
+            check_updates: false,
+            history_limit: 50,
             hotkey: "Ctrl+Alt+C".to_string(),
         }
     }
@@ -378,6 +387,27 @@ impl Settings {
         serde_json::from_value::<Settings>(serde_json::Value::Object(merged))
             .unwrap_or_default()
             .sanitized()
+    }
+
+    /// Reads a settings file written by `export_settings`.
+    ///
+    /// Unlike `parse`, which is meant for Glossy's own file and falls back to
+    /// the defaults for anything unusable, this rejects a file that holds no
+    /// setting at all: importing one would otherwise silently wipe the setup.
+    pub fn import(raw: &str) -> Result<Settings, String> {
+        let text = raw.trim_start_matches('\u{feff}');
+        let Ok(serde_json::Value::Object(stored)) = serde_json::from_str(text) else {
+            return Err("this file is not a JSON settings file".to_string());
+        };
+        let known = serde_json::to_value(Settings::default())
+            .ok()
+            .and_then(|value| value.as_object().cloned())
+            .map(|defaults| defaults.keys().any(|key| stored.contains_key(key)))
+            .unwrap_or(false);
+        if !known {
+            return Err("this file holds no Glossy setting".to_string());
+        }
+        Ok(Self::parse(text))
     }
 
     pub fn save(&self, app: &AppHandle) -> Result<(), String> {
@@ -489,6 +519,7 @@ impl Settings {
         self.popup_width = self.popup_width.clamp(280, 560);
         self.popup_opacity = self.popup_opacity.clamp(50, 100);
         self.auto_close_secs = self.auto_close_secs.min(600);
+        self.history_limit = self.history_limit.min(crate::history::MAX_LIMIT);
         self.hotkey = self.hotkey.trim().to_string();
         self.credentials = self
             .credentials
@@ -788,5 +819,24 @@ mod tests {
         // The file has to be rewritten so the unusable blob stops being read.
         assert!(settings.reveal_credentials());
         assert!(settings.active_credentials().is_empty());
+    }
+
+    #[test]
+    fn imports_a_file_this_app_exported() {
+        let raw = serde_json::to_string_pretty(&Settings::parse(
+            "{\"targetLang\":\"ja\",\"provider\":\"deepl\",\"apiKey\":\"sk-exported\"}",
+        ))
+        .unwrap();
+
+        let imported = Settings::import(&raw).unwrap();
+        assert_eq!(imported.target_lang, "ja");
+        assert_eq!(imported.active_credentials().api_key, "sk-exported");
+    }
+
+    #[test]
+    fn refuses_a_file_that_holds_no_setting() {
+        assert!(Settings::import("not json at all").is_err());
+        assert!(Settings::import("[1, 2, 3]").is_err());
+        assert!(Settings::import("{\"somethingElse\":true}").is_err());
     }
 }
