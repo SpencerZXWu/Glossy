@@ -65,6 +65,15 @@ impl Credentials {
     }
 }
 
+/// The two credential fields under the names they carry in the JSON file, so
+/// protecting and revealing can share one loop body.
+fn credential_fields(credentials: &mut Credentials) -> [(&'static str, &mut String); 2] {
+    [
+        ("appId", &mut credentials.app_id),
+        ("apiKey", &mut credentials.api_key),
+    ]
+}
+
 /// Language the interface itself is drawn in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum UiLanguage {
@@ -313,7 +322,19 @@ impl Settings {
             return Settings::default();
         };
         match std::fs::read_to_string(&path) {
-            Ok(raw) => Self::parse(&raw),
+            Ok(raw) => {
+                let mut settings = Self::parse(&raw);
+                if settings.reveal_credentials() {
+                    // The file held plain text, or a credential this login
+                    // cannot unlock. Both are gone from memory by now, so write
+                    // the result back; failing to do so only means the next save
+                    // is the one that cleans the file up.
+                    if let Err(error) = settings.save(app) {
+                        eprintln!("glossy: cannot rewrite the settings file: {error}");
+                    }
+                }
+                settings
+            }
             Err(_) => Settings::default(),
         }
     }
@@ -364,8 +385,62 @@ impl Settings {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        let json = serde_json::to_string_pretty(&self.protected_for_storage())
+            .map_err(|e| e.to_string())?;
         std::fs::write(&path, json).map_err(|e| e.to_string())
+    }
+
+    /// Replaces the stored API keys with the values they protect.
+    ///
+    /// Returns whether the file has to be written again: it held plain text
+    /// written by an older version, or a credential that this Windows login
+    /// cannot unlock and that was therefore dropped.
+    fn reveal_credentials(&mut self) -> bool {
+        let mut rewrite = false;
+        for (provider, credentials) in self.credentials.iter_mut() {
+            for (field, value) in credential_fields(credentials) {
+                if value.is_empty() {
+                    continue;
+                }
+                if !crate::secrets::is_protected(value) {
+                    rewrite = true;
+                    continue;
+                }
+                match crate::secrets::reveal(value) {
+                    Some(plain) => *value = plain,
+                    None => {
+                        eprintln!(
+                            "glossy: the {field} of `{provider}` was protected for another \
+                             Windows login, enter it again"
+                        );
+                        value.clear();
+                        rewrite = true;
+                    }
+                }
+            }
+        }
+        rewrite
+    }
+
+    /// The copy written to disk, with every credential DPAPI protected.
+    fn protected_for_storage(&self) -> Settings {
+        let mut stored = self.clone();
+        for (provider, credentials) in stored.credentials.iter_mut() {
+            for (field, value) in credential_fields(credentials) {
+                if value.is_empty() || crate::secrets::is_protected(value) {
+                    continue;
+                }
+                match crate::secrets::protect(value) {
+                    Ok(protected) => *value = protected,
+                    // Storing the key unprotected beats losing it; DPAPI is part
+                    // of Windows, so this only happens in a broken environment.
+                    Err(error) => {
+                        eprintln!("glossy: cannot protect the {field} of `{provider}`: {error}")
+                    }
+                }
+            }
+        }
+        stored
     }
 
     /// Credentials saved for the provider that is currently selected.
@@ -642,5 +717,76 @@ mod tests {
         let baidu = settings.credentials.get("baidu").unwrap();
         assert_eq!(baidu.app_id, "2024");
         assert_eq!(baidu.api_key, "secret");
+    }
+
+    fn settings_with_one_key() -> Settings {
+        Settings {
+            provider: Provider::DeepL,
+            credentials: [(
+                "deepl".to_string(),
+                Credentials {
+                    app_id: String::new(),
+                    api_key: "sk-secret".to_string(),
+                },
+            )]
+            .into_iter()
+            .collect(),
+            ..Settings::default()
+        }
+    }
+
+    #[test]
+    fn writes_the_keys_dpapi_protected_and_reads_them_back() {
+        let settings = settings_with_one_key();
+
+        let stored = settings.protected_for_storage();
+
+        let written = &stored.credentials.get("deepl").unwrap().api_key;
+        assert!(crate::secrets::is_protected(written));
+        assert!(!serde_json::to_string(&stored)
+            .unwrap()
+            .contains("sk-secret"));
+
+        // What the rest of the application keeps in memory stays usable.
+        assert_eq!(settings.active_credentials().api_key, "sk-secret");
+
+        let mut reloaded = stored;
+        // Nothing to rewrite: the file is already in its final shape.
+        assert!(!reloaded.reveal_credentials());
+        assert_eq!(reloaded.active_credentials().api_key, "sk-secret");
+    }
+
+    #[test]
+    fn the_next_save_protects_a_key_written_by_an_older_version() {
+        let mut settings = Settings::parse("{\"provider\":\"deepl\",\"apiKey\":\"sk-old\"}");
+        // `parse` only reads the JSON, so the key is still plain text here.
+        assert_eq!(settings.active_credentials().api_key, "sk-old");
+
+        // Which is what makes `load` rewrite the file.
+        assert!(settings.reveal_credentials());
+        assert_eq!(settings.active_credentials().api_key, "sk-old");
+        assert!(crate::secrets::is_protected(
+            &settings
+                .protected_for_storage()
+                .credentials
+                .get("deepl")
+                .unwrap()
+                .api_key
+        ));
+    }
+
+    #[test]
+    fn forgets_a_key_that_belongs_to_another_windows_login() {
+        // Well-formed base64 that DPAPI cannot unlock in this login.
+        let raw = "{\"provider\":\"deepl\",\"credentials\":{\"deepl\":\
+                   {\"apiKey\":\"dpapi:bm90IGEgYmxvYg==\"}}}";
+        let mut settings = Settings::parse(raw);
+        assert!(crate::secrets::is_protected(
+            &settings.active_credentials().api_key
+        ));
+
+        // The file has to be rewritten so the unusable blob stops being read.
+        assert!(settings.reveal_credentials());
+        assert!(settings.active_credentials().is_empty());
     }
 }

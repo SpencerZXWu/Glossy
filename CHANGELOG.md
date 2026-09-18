@@ -95,6 +95,14 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
   drifted away from the cursor and could leave the screen. The start hint now
   keeps its distance from the screen corner there as well.
 
+### Security
+
+- Saved API keys are encrypted with Windows DPAPI (`CryptProtectData`) and tied
+  to the Windows login that entered them, so `settings.json` no longer carries
+  them in clear text. A file written by an older version is protected the first
+  time Glossy starts, and a key that belongs to another login is dropped instead
+  of being sent to the provider.
+
 ## [0.1.0] - 2026-09-17
 
 First public release.

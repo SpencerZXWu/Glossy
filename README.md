@@ -131,9 +131,14 @@ The free tiers differ in what they permit:
 Settings are stored as JSON in `%APPDATA%\com.glossy.translator\settings.json`.
 The `firstRun` flag in that file records that the welcome window was already
 shown; removing it (or the whole file) brings the window back on the next start.
-Translation credentials live in a `credentials` map keyed by provider
-(`{"baidu":{"appId":"…","apiKey":"…"},"zhipu":{"apiKey":"…"}}`), and existing
+Translation credentials live in a `credentials` map keyed by provider, and existing
 single-provider `apiKey`/`appId` values are migrated into that map on first launch.
+Every value in that map is encrypted with Windows DPAPI (`CryptProtectData`,
+current-user scope) before the file is written, so it holds
+`"apiKey": "dpapi:AQAAANCM…"` rather than the key itself and only the Windows login
+that entered it can read it back. A file written by an earlier version is protected
+the first time this build starts; a value that belongs to another login or computer
+cannot be unlocked and is dropped, so the key has to be entered again.
 The ignored-program list is stored as an `ignoredApps` array; a legacy
 comma-separated string is accepted and split on load.
 

@@ -10,6 +10,7 @@ mod instance;
 mod notice;
 mod platform;
 mod popup;
+mod secrets;
 mod selection;
 mod settings;
 mod state;

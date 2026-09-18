@@ -10,16 +10,14 @@ the milestone is closed and the tag is pushed.
 | --- | --- |
 | Version | `0.1.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~7,600 lines: ~4,600 Rust, ~3,000 frontend (plain HTML/CSS/JS), tests and comments included |
-| Tests | 87 Rust tests, no frontend tests; `cargo fmt`, `cargo clippy` and `cargo test` run in CI on `windows-latest` |
+| Tests | 90 Rust tests, no frontend tests; `cargo fmt`, `cargo clippy` and `cargo test` run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, no auto-update, no autostart |
 | Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases |
 
-One item is carried into the plan below because it blocks other work:
-
-1. **Credentials are stored in plaintext.** API keys live in
-   `%APPDATA%\com.glossy.translator\settings.json` as-is. This is the one security
-   defect in the project and is the highest priority fix.
+No defect is carried into the plan below. The last one — API keys sitting in
+`%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
+first item of v0.2.0, which is already in the tree.
 
 ## Versioning policy
 
@@ -56,16 +54,18 @@ Estimated effort: 0.5–1 day.
 
 Goal: from "it runs" to "I leave it running".
 
-| Work item | Details |
-| --- | --- |
-| Encrypt stored credentials | Protect API keys with DPAPI (`CryptProtectData`, current-user scope) before writing. A plaintext settings file is migrated and rewritten on first launch, and exports omit secrets unless confirmed |
-| Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook |
-| Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings |
-| Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy |
-| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed |
-| Import and export settings | JSON file out (with an explicit confirmation when credentials are included) and in, validating through `sanitized()` |
-| Frontend tests | `node --test` coverage for the logic behind `i18n.js`, `render.js` and the classification in `classify.rs`; at least 25 cases |
-| Manual regression list | A pre-release checklist in the README: multiple monitors, 150% scaling, both colour schemes, every provider, the ignore list |
+| Work item | Details | State |
+| --- | --- | --- |
+| Encrypt stored credentials | API keys are protected with DPAPI (`CryptProtectData`, current-user scope) before writing. A settings file written by an older version is migrated and rewritten on the first launch of this build, and a key that belongs to another Windows login is dropped instead of being sent on | done, in `src-tauri/src/secrets.rs` |
+| Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook | planned |
+| Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings | planned |
+| Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy | planned |
+| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed | planned |
+| Import and export settings | JSON file out and in, validating through `sanitized()`. Now that credentials are protected, an export has to confirm before it includes them, and an import has to protect what it brings | planned |
+| Frontend tests | `node --test` coverage for the logic behind `i18n.js`, `render.js` and the classification in `classify.rs`; at least 25 cases | planned |
+| Manual regression list | A pre-release checklist in the README: multiple monitors, 150% scaling, both colour schemes, every provider, the ignore list | planned |
+
+One of the eight items is already in the tree; the remaining seven are open.
 
 Estimated effort: 3–5 days.
 
@@ -115,8 +115,8 @@ Estimated effort: 5–10 days.
 
 ## Priority
 
-When time is short, the order of return on effort is: **v0.1.1 → the credential
-encryption and history work in v0.2.0 → provider fallback in v0.3.0 → v0.4.0**.
+When time is short, the order of return on effort is: **v0.1.1 → the remaining
+v0.2.0 work → provider fallback in v0.3.0 → v0.4.0**.
 Cross-platform support is the only item large enough that it may never be finished,
 so it is deliberately scheduled last; decide on it after v0.3.0 rather than investing
 in it early.
@@ -128,7 +128,7 @@ in it early.
 | The Google endpoint is unofficial | It can start rate-limiting or change protocol at any time, and its terms of use are unclear | A retry across two clients already lives in `google.rs`; provider fallback in v0.3.0 is the real fix |
 | Antivirus flags the low-level mouse hook | Installs and runs get blocked | Code signing in v0.4.0, plus a README section explaining what the hook does and why |
 | macOS and Linux permission models | The port costs more than expected | Kept as its own release, X11 first, Wayland explicitly unsupported |
-| Credential leakage | A readable API key on disk | DPAPI encryption in v0.2.0 |
+| Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
 | Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer itself is still built locally by `scripts/release.ps1`, and a tagged release workflow is the next step |
 
 ## Release process
