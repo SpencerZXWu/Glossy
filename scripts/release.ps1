@@ -3,8 +3,12 @@
     Builds the Windows installer and stages everything needed for a GitHub release.
 
 .DESCRIPTION
-    Reads the version from src-tauri/tauri.conf.json, runs a release build, copies the
-    NSIS installer into release/v<version>/ and writes SHA256SUMS.txt next to it.
+    Checks the version numbers, then runs a release build, copies the NSIS
+    installer into release/v<version>/ and writes SHA256SUMS.txt next to it.
+
+    The version comes from scripts/version.ps1, which reads the authoritative
+    number out of src-tauri/tauri.conf.json and refuses to continue when
+    package.json, package-lock.json, Cargo.toml or Cargo.lock disagree.
 
     RELEASE_NOTES.md is extracted from the matching section of CHANGELOG.md, unless the
     file already exists - hand-written notes are never overwritten without -ForceNotes.
@@ -28,11 +32,6 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-
-function Read-Version {
-    $conf = Get-Content -LiteralPath (Join-Path $root 'src-tauri\tauri.conf.json') -Raw | ConvertFrom-Json
-    return $conf.version
-}
 
 function Get-ChangelogSection {
     param([string]$Version)
@@ -65,16 +64,13 @@ function Stop-RunningApp {
     Start-Sleep -Seconds 1
 }
 
-$version = Read-Version
-if (-not $version) { throw 'Could not read the version from src-tauri/tauri.conf.json.' }
-
-$pkg = (Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | ConvertFrom-Json).version
-$cargoMatch = Select-String -LiteralPath (Join-Path $root 'src-tauri\Cargo.toml') -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
-$cargo = if ($cargoMatch) { $cargoMatch.Matches[0].Groups[1].Value } else { $null }
+$version = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'version.ps1') -Get
+if ($LASTEXITCODE -ne 0 -or -not $version) {
+    throw 'The version numbers do not agree; run scripts\version.ps1 to see which file is off.'
+}
+$version = ([string]$version).Trim()
 
 Write-Host "Version: $version" -ForegroundColor Cyan
-if ($pkg -ne $version) { Write-Warning "package.json says $pkg - the three version numbers must agree." }
-if ($cargo -ne $version) { Write-Warning "src-tauri/Cargo.toml says $cargo - the three version numbers must agree." }
 
 $stage = Join-Path $root ('release\v' + $version)
 New-Item -ItemType Directory -Path $stage -Force | Out-Null

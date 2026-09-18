@@ -1,5 +1,7 @@
 # Glossy
 
+[![CI](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml/badge.svg)](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml)
+
 A lightweight desktop translation popup for Windows. Select text in any
 application with the mouse and Glossy shows a small floating card with the
 translation under the cursor.
@@ -7,6 +9,8 @@ translation under the cursor.
 - **Word or short phrase** → phonetic symbols, part of speech, definitions and one example.
 - **Sentence or paragraph** → a smooth translation into your target language.
 - The source language is detected automatically.
+- A selection that ends with sentence punctuation (`.`, `?`, `!`, `。` …) is
+  always translated as a sentence, however short it is.
 
 ## Install
 
@@ -20,16 +24,28 @@ publisher. To build from source instead, see [Development](#development).
 
 ## Using it
 
-1. Start Glossy: the settings window opens and Glossy starts listening.
-2. In any application, **drag across text** (or **double click a word**) to select it.
-3. The popup appears below the cursor. Drag its header to move it, use the buttons
+1. Start Glossy. The settings window opens on the very first launch only —
+   later launches start quietly in the notification area, and Glossy listens for
+   selections from the moment it starts.
+2. Closing that window does not quit Glossy — it keeps watching for selections
+   in the background. Click the Glossy icon in the notification area (or pick
+   **Open Glossy** from its menu) to bring the window back, and use **Quit** in
+   the same menu to stop Glossy. Starting Glossy while it is already running only
+   shows a short notice. A silent start is announced by a small card in the
+   bottom right corner; it fades away after a few seconds, and clicking it opens
+   the settings window. Windows 11 keeps new notification area icons in the
+   overflow menu (the `^` next to the clock) — drag the icon onto the taskbar, or
+   turn it on under **Settings → Personalization → Taskbar → Other system tray
+   icons**, to keep it visible.
+3. In any application, **drag across text** (or **double click a word**) to select it.
+4. The popup appears below the cursor. Drag its header to move it, use the buttons
    to copy the result or to close it, or click anywhere else to dismiss it.
    The row under the header shows the language pair: hover it and pick either side
    from the dropdowns to translate again with that language, or press the `⇄`
    button to translate the result back into the language it came from. The pair
    resets to *detect the source and use the configured target* for every new
    selection.
-4. Selections shorter than the configured minimum (2 characters by default) are
+5. Selections shorter than the configured minimum (2 characters by default) are
    ignored, and a drag that starts or ends on the popup itself never triggers a
    translation.
 
@@ -113,6 +129,8 @@ The free tiers differ in what they permit:
   OK, ~83 MB int8, ~300 MB RAM). `NLLB-200` is CC-BY-NC-4.0 and must **not** be shipped.
 
 Settings are stored as JSON in `%APPDATA%\com.glossy.translator\settings.json`.
+The `firstRun` flag in that file records that the welcome window was already
+shown; removing it (or the whole file) brings the window back on the next start.
 Translation credentials live in a `credentials` map keyed by provider
 (`{"baidu":{"appId":"…","apiKey":"…"},"zhipu":{"apiKey":"…"}}`), and existing
 single-provider `apiKey`/`appId` values are migrated into that map on first launch.
@@ -162,7 +180,18 @@ captured text only ever goes to the translation provider you selected.
 
 ## Development
 
+### What you need
+
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Node.js | 18 or newer | only for the Tauri CLI; the frontend has no bundler |
+| Rust | stable, `1.77` or newer | the GNU target `x86_64-pc-windows-gnu` — see below |
+| `rustfmt` + `clippy` | same toolchain | `rustup component add rustfmt clippy` |
+| MinGW-w64 | 8.1 or newer | the linker for the GNU target; on `PATH` as `gcc.exe` |
+
 ```powershell
+rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --component clippy
+rustup default stable-x86_64-pc-windows-gnu
 npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
 npm.cmd run tauri build  # release build (installer + .exe)
@@ -170,11 +199,35 @@ npm.cmd run tauri build  # release build (installer + .exe)
 
 `npm.cmd run icon` regenerates `src-tauri/icons` from `assets/`.
 
+`npm.cmd run tauri build` writes the installer to
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe` and the
+standalone binary to `src-tauri\target\release\Glossy.exe`. The NSIS bundler needs
+a network connection the first time it runs, to download its plug-ins.
+
 `scripts\release.ps1` wraps the release build: it stages the installer in
 `release\v<version>\` together with a checksum and the text for the release
 description. Run it as `powershell -ExecutionPolicy Bypass -File
 scripts\release.ps1` — scripts are blocked by the default execution policy, the same
 reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
+
+### Checks
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
+cd src-tauri
+cargo fmt --all --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+```
+
+The version lives in six places (see `scripts\version.ps1`), so never edit them by
+hand: `tauri.conf.json` is authoritative, `scripts\version.ps1 -Set 0.1.2` writes it
+everywhere else, and `scripts\version.ps1 -Get` prints it for scripts such as
+`release.ps1`, which refuses to build when the numbers disagree. The same check runs
+in CI, so a forgotten bump fails the build.
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs all four checks on
+`windows-latest` for every push and pull request.
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -194,7 +247,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 58 tests
+cargo test   # 87 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -203,11 +256,13 @@ cargo test   # 58 tests
 src/                     frontend (plain HTML/CSS/JS, no bundler)
   index.html             settings window + in-app translate card
   popup.html             floating card
+  notice.html            "already running in the background" card
   js/bridge.js           Tauri IPC helpers used by both windows
   js/i18n.js             English/Chinese dictionaries and DOM translation
   js/render.js           shared card renderer (word, sentence, loading, error)
   js/app.js              settings window logic
   js/popup.js            popup window logic
+  js/notice.js           start card logic
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
   selection.rs           global mouse hook, gesture tracking, capture
@@ -215,10 +270,17 @@ src-tauri/src/
   classify.rs            word/phrase vs. sentence detection
   translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
+  notice.rs              start card placement and lifetime
+  tray.rs                notification area icon: open the window, quit
+  instance.rs            named-mutex guard against a second Glossy
+  console.rs             borrows the console of the terminal that started Glossy
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
 scripts/
+  version.ps1            the version number, in one place
   release.ps1            release build + staging for a GitHub release
+.github/workflows/
+  ci.yml                 format, lint, test and version check on every push
 release/
   v<version>/            installer, RELEASE_NOTES.md and checksum of a release
 ```

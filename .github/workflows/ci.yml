@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: stable-x86_64-pc-windows-gnu
+
+jobs:
+  windows:
+    name: Windows (GNU toolchain)
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project is written for the GNU target: src-tauri/Cargo.toml keeps the
+      # library at crate-type = ["rlib"] and build.rs links libresource.a into every
+      # target, both of which are MinGW-specific. The runner image ships MinGW at
+      # C:\mingw64, which is the gcc the GNU toolchain links with.
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal --component clippy --component rustfmt
+          rustup default $env:RUST_TOOLCHAIN
+          rustc --version
+
+      - name: Make sure the MinGW linker is on PATH
+        run: |
+          $gcc = (Get-Command gcc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $gcc) {
+            # The runner image installs MinGW here; later steps see the change
+            # through GITHUB_PATH, this step calls gcc by its full path.
+            $gcc = 'C:\mingw64\bin\gcc.exe'
+            if (-not (Test-Path $gcc)) { throw "No MinGW gcc found at $gcc" }
+            Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $gcc)
+          }
+          & $gcc --version | Select-Object -First 1
+
+      - name: Cache the crates registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: registry-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: registry-${{ runner.os }}-
+
+      # Without this every run recompiles the whole Tauri dependency tree.
+      - name: Cache the build directory
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: target-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: target-${{ runner.os }}-
+
+      # Fails when the version in tauri.conf.json (the one Tauri ships) is not the
+      # one in package.json, package-lock.json, Cargo.toml and Cargo.lock.
+      - name: Version numbers agree
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/version.ps1 -Check
+
+      - name: Formatting
+        working-directory: src-tauri
+        run: cargo fmt --all --check
+
+      - name: Lints
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --locked

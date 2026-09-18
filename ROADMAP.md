@@ -8,21 +8,18 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `0.1.0`, written in three places (`package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`) |
-| Size | ~6,000 lines: ~3,200 Rust, ~2,500 frontend (plain HTML/CSS/JS) |
-| Tests | 58 Rust tests, no frontend tests, no CI |
+| Version | `0.1.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~7,600 lines: ~4,600 Rust, ~3,000 frontend (plain HTML/CSS/JS), tests and comments included |
+| Tests | 87 Rust tests, no frontend tests; `cargo fmt`, `cargo clippy` and `cargo test` run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
-| Distribution | NSIS installer only; no code signing, no auto-update, no single instance, no autostart |
+| Distribution | NSIS installer only; no code signing, no auto-update, no autostart |
 | Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases |
 
-Three items are carried into the plan below because they block other work:
+One item is carried into the plan below because it blocks other work:
 
 1. **Credentials are stored in plaintext.** API keys live in
    `%APPDATA%\com.glossy.translator\settings.json` as-is. This is the one security
    defect in the project and is the highest priority fix.
-2. **The version number is spread over three files**, so a release requires three edits
-   that can drift apart.
-3. **No CI**, so released installers are built by hand and are not reproducible.
 
 ## Versioning policy
 
@@ -40,13 +37,18 @@ Semantic Versioning, with explicit meaning for the `0.x` range:
 
 Goal: a stranger can clone the repository, build it and trust the result.
 
-| Work item | Acceptance criteria |
-| --- | --- |
-| Add `LICENSE` | File present at the root, referenced from the README |
-| Single-source the version | Only `tauri.conf.json` carries the number; CI fails when the other two disagree with it |
-| Add `CHANGELOG.md` | Keep a Changelog format, with a retrospective `0.1.0` section |
-| CI workflow | `cargo fmt --check`, `cargo clippy -- -D warnings` and `cargo test` on a Windows runner for every push and pull request |
-| Build documentation | README covers the required Rust (GNU toolchain) and Node versions, `npm run dev`, `npm run build` and where the installer lands |
+| Work item | Acceptance criteria | State |
+| --- | --- | --- |
+| Add `LICENSE` | File present at the root, referenced from the README | done |
+| Single-source the version | Only `tauri.conf.json` carries the number; `scripts/version.ps1` writes the other five locations, and CI fails when one of them disagrees with it | done |
+| Add `CHANGELOG.md` | Keep a Changelog format, with a retrospective `0.1.0` section | done |
+| CI workflow | `cargo fmt --check`, `cargo clippy -- -D warnings` and `cargo test` on a Windows runner for every push and pull request | done, in `.github/workflows/ci.yml` |
+| Build documentation | README covers the required Rust (GNU toolchain) and Node versions, `npm run dev`, `npm run build` and where the installer lands | done |
+
+All five items are in the tree; the release is waiting for its tag. The work needed
+to get `clippy` and `rustfmt` to pass cleanly — a derived `Default` for the three
+enums in `settings.rs`, one unreachable branch in `default_target_lang`, and a
+`cargo fmt` pass over ten files — is behaviour-preserving.
 
 Estimated effort: 0.5–1 day.
 
@@ -57,7 +59,7 @@ Goal: from "it runs" to "I leave it running".
 | Work item | Details |
 | --- | --- |
 | Encrypt stored credentials | Protect API keys with DPAPI (`CryptProtectData`, current-user scope) before writing. A plaintext settings file is migrated and rewritten on first launch, and exports omit secrets unless confirmed |
-| Single instance and autostart | A second launch focuses the existing window; `tauri-plugin-autostart` backs a settings toggle |
+| Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook |
 | Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings |
 | Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy |
 | Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed |
@@ -127,11 +129,13 @@ in it early.
 | Antivirus flags the low-level mouse hook | Installs and runs get blocked | Code signing in v0.4.0, plus a README section explaining what the hook does and why |
 | macOS and Linux permission models | The port costs more than expected | Kept as its own release, X11 first, Wayland explicitly unsupported |
 | Credential leakage | A readable API key on disk | DPAPI encryption in v0.2.0 |
-| Hand-built releases | Installers cannot be reproduced | CI and a release workflow in v0.1.1 |
+| Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer itself is still built locally by `scripts/release.ps1`, and a tagged release workflow is the next step |
 
 ## Release process
 
-1. Update the version number (from its single source) and `CHANGELOG.md`.
+1. Set the version in its single source and update `CHANGELOG.md`:
+   `powershell -ExecutionPolicy Bypass -File scripts/version.ps1 -Set X.Y.Z` writes all
+   six locations, and `-Check` lists any that drifted apart.
 2. `cargo test`, the frontend tests and CI all pass.
 3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` builds the installer
    and stages it in `release/vX.Y.Z/` with `SHA256SUMS.txt` and the text for the
