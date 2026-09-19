@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const { loadFrontend } = require("./helpers/load-scripts.js");
-const { findByClass, classesOf } = require("./helpers/fake-dom.js");
+const { findByClass, classesOf, descendantsOf } = require("./helpers/fake-dom.js");
 
 function newEnv() {
   const env = loadFrontend();
@@ -260,6 +260,202 @@ test("result renders an example only when one was returned", () => {
   const without = target();
   Glossy.render.result(without, { kind: "word", translation: "fox" });
   assert.equal(findByClass(without, "example"), null);
+});
+
+test("result shows a lookup placeholder for a word card that is still waiting", () => {
+  const node = target();
+  Glossy.render.result(
+    node,
+    { kind: "word", translation: "狐狸", provider: "baidu" },
+    { pending: true },
+  );
+
+  assert.equal(findByClass(node, "pending").textContent, "Looking up the dictionary…");
+  assert.equal(findByClass(node, "pending").getAttribute("aria-live"), "polite");
+  assert.equal(findByClass(node, "phonetic"), null);
+  // The translation and the footer are still drawn around it.
+  assert.equal(findByClass(node, "translation").textContent, "狐狸");
+  assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
+});
+
+test("result localizes the lookup placeholder", () => {
+  const node = target();
+  i18n.set("zh");
+  Glossy.render.result(node, { kind: "word", translation: "fox" }, { pending: true });
+  assert.equal(findByClass(node, "pending").textContent, "词典查询中…");
+  i18n.set("en");
+});
+
+test("result drops the placeholder once any detail arrived", () => {
+  const phonetic = target();
+  Glossy.render.result(
+    phonetic,
+    { kind: "word", translation: "fox", phonetic: "fɒks" },
+    { pending: true },
+  );
+  assert.equal(findByClass(phonetic, "pending"), null);
+
+  const meanings = target();
+  Glossy.render.result(
+    meanings,
+    { kind: "word", translation: "fox", meanings: [{ partOfSpeech: "noun", definitions: ["a sly animal"] }] },
+    { pending: true },
+  );
+  assert.equal(findByClass(meanings, "pending"), null);
+
+  const example = target();
+  Glossy.render.result(
+    example,
+    { kind: "word", translation: "fox", example: "The fox ran." },
+    { pending: true },
+  );
+  assert.equal(findByClass(example, "pending"), null);
+
+  // Meanings that carry no definition do not count as a detail.
+  const hollowed = target();
+  Glossy.render.result(
+    hollowed,
+    { kind: "word", translation: "fox", meanings: [{ definitions: [] }] },
+    { pending: true },
+  );
+  assert.ok(findByClass(hollowed, "pending"));
+});
+
+test("result never shows the placeholder without the pending flag", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "fox" });
+  assert.equal(findByClass(node, "pending"), null);
+
+  const sentence = target();
+  Glossy.render.result(
+    sentence,
+    { kind: "sentence", translation: "狐狸在跑。" },
+    { pending: true },
+  );
+  assert.equal(findByClass(sentence, "pending"), null);
+});
+
+test("result shows the unit conversions of a sentence", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "这个房间有 3.66 米宽。",
+    provider: "google",
+    conversions: [
+      {
+        category: "length",
+        original: "12 ft",
+        converted: "3.66 m",
+        rate: "1 ft = 0.3048 m",
+      },
+    ],
+  });
+
+  const units = findByClass(node, "units");
+  assert.ok(units);
+  assert.equal(findByClass(node, "units-title").textContent, "Units");
+  assert.equal(findByClass(node, "unit-from").textContent, "12 ft");
+  assert.equal(findByClass(node, "unit-arrow").textContent, "≈");
+  assert.equal(findByClass(node, "unit-to").textContent, "3.66 m");
+  assert.equal(findByClass(node, "unit-rate").textContent, "1 ft = 0.3048 m");
+  // The block sits above the provider footer.
+  const order = classesOf(node);
+  assert.ok(order.indexOf("units") < order.indexOf("foot"));
+});
+
+test("result annotates a live currency rate once", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "一共 1430 元。",
+    conversions: [
+      {
+        category: "currency",
+        original: "$200",
+        converted: "¥1,430.00",
+        rate: "1 USD = 7.15 CNY",
+        rateSource: "exchangerate-api.com",
+        rateDate: "2026-02-05",
+      },
+      {
+        category: "currency",
+        original: "$20",
+        converted: "¥143.00",
+        rate: "1 USD = 7.15 CNY",
+        rateSource: "exchangerate-api.com",
+        rateDate: "2026-02-05",
+      },
+    ],
+  });
+
+  const notes = descendantsOf(node, []).filter((child) => child.className === "unit-note");
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].textContent, "Live rate · exchangerate-api.com · 2026-02-05");
+  const rows = descendantsOf(node, []).filter((child) => child.className === "unit");
+  assert.equal(rows.length, 2);
+});
+
+test("result marks a rate that came from the cache instead of the network", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "一共 1430 元。",
+    conversions: [
+      {
+        original: "$200",
+        converted: "¥1,430.00",
+        rate: "1 USD = 7.15 CNY",
+        rateSource: "frankfurter.app",
+        rateDate: "2026-02-04",
+        stale: true,
+      },
+    ],
+  });
+
+  assert.equal(
+    findByClass(node, "unit-note").textContent,
+    "Last known rate · frankfurter.app · 2026-02-04",
+  );
+});
+
+test("result localizes the unit block", () => {
+  const node = target();
+  i18n.set("zh");
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "房间宽 3.66 米。",
+    conversions: [{ original: "12 ft", converted: "3.66 m", rate: "1 ft = 0.3048 m" }],
+  });
+  assert.equal(findByClass(node, "units-title").textContent, "单位换算");
+  assert.equal(findByClass(node, "unit-arrow").textContent, "≈");
+  i18n.set("en");
+});
+
+test("result renders no unit block without conversions", () => {
+  for (const conversions of [undefined, null, [], "nope", [{}], [{ original: "" }]]) {
+    const node = target();
+    Glossy.render.result(node, {
+      kind: "sentence",
+      translation: "Hello",
+      conversions,
+    });
+    assert.equal(findByClass(node, "units"), null, `conversions=${String(conversions)}`);
+  }
+});
+
+test("result writes unit conversions as text, not markup", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "Hello",
+    conversions: [
+      { original: "<b>12 ft</b>", converted: "<img src=x>", rate: "<script>alert(1)</script>" },
+    ],
+  });
+  const html = node.outerHTML;
+  assert.ok(html.includes("&lt;b&gt;12 ft&lt;/b&gt;"));
+  assert.ok(html.includes("&lt;img src=x&gt;"));
+  assert.ok(!html.includes("<script"));
 });
 
 test("result localizes the provider footer", () => {

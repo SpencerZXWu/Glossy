@@ -43,6 +43,10 @@ pub struct TranslationResult {
     pub meanings: Vec<Meaning>,
     pub example: Option<String>,
     pub provider: String,
+    /// Units in the source text that a reader of the target language would not
+    /// expect, annotated with the switch to the units they do.
+    #[serde(default)]
+    pub conversions: Vec<crate::units::Conversion>,
 }
 
 impl TranslationResult {
@@ -57,6 +61,7 @@ impl TranslationResult {
             meanings: Vec::new(),
             example: None,
             provider: provider.to_string(),
+            conversions: Vec::new(),
         }
     }
 
@@ -237,8 +242,18 @@ pub async fn word_details(
     };
 
     dictionary::enrich(client, text, &mut result).await;
-    if let Some(lookup) = lookup {
-        if let Ok(Some(details)) = lookup.await {
+    // The dictionary may already carry everything the free endpoint could add;
+    // waiting for it then only holds the card back. When something is still
+    // missing the card gives the free endpoint a moment, not its whole budget:
+    // a card that renders its translation, phonetics and meanings at once is
+    // worth more than an example that lands a second later. A lookup that runs
+    // on in the background still records that the endpoint is unreachable, so
+    // the next card does not pay for it at all.
+    let complete =
+        result.phonetic.is_some() && !result.meanings.is_empty() && result.example.is_some();
+    if let (Some(lookup), false) = (lookup, complete) {
+        const GRACE: Duration = Duration::from_millis(600);
+        if let Ok(Ok(Some(details))) = tokio::time::timeout(GRACE, lookup).await {
             result.fill_gaps_from(&details);
         }
     }

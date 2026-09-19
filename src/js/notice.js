@@ -20,9 +20,7 @@
 
   /** Follows the colour scheme picked in the settings. */
   function applyTheme(theme) {
-    const root = document.documentElement;
-    if (theme === "light" || theme === "dark") root.dataset.theme = theme;
-    else delete root.dataset.theme;
+    GlossyTheme.apply({ theme });
   }
 
   close.addEventListener("click", (event) => {

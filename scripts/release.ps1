@@ -37,7 +37,7 @@ function Get-ChangelogSection {
     param([string]$Version)
 
     $path = Join-Path $root 'CHANGELOG.md'
-    $lines = @(Get-Content -LiteralPath $path)
+    $lines = @(Get-Content -LiteralPath $path -Encoding UTF8)
     $pattern = '^## \[' + [regex]::Escape($Version) + '\]'
     $start = -1
     $end = $lines.Count

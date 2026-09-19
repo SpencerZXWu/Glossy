@@ -4,7 +4,8 @@
 //! translation, the detected source language, phonetics, a dictionary and an
 //! example sentence in a single request.
 
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::classify::Kind;
 
@@ -61,15 +62,53 @@ pub async fn translate(
     run(client, text, source, target, kind, None).await
 }
 
-/// How long each request of `translate_quickly` may take.
-const QUICK_BUDGET: Duration = Duration::from_secs(3);
+/// How long the whole of `translate_quickly` may take, every client it tries
+/// included.
+///
+/// The extras of a card fill in while the user is already reading the
+/// translation, so the lookup is only worth a moment: a budget per client would
+/// double the wait on a network that cannot reach the endpoint at all.
+const QUICK_BUDGET: Duration = Duration::from_millis(1500);
 
-/// The same lookup, giving up on a request after `QUICK_BUDGET`.
+/// An attempt is not started with less of the budget left than this.
+const MIN_ATTEMPT: Duration = Duration::from_millis(250);
+
+/// How long the quick path is skipped after an attempt came back with nothing.
+///
+/// Without this every card would wait out `QUICK_BUDGET` again on a network
+/// where the endpoint is unreachable or rate limiting, and a card that fills in
+/// its extras from the dictionary alone would still feel slow.
+const QUICK_COOLDOWN: Duration = Duration::from_secs(120);
+
+/// Milliseconds since the Unix epoch when the quick path may be tried again.
+/// `0` while it is healthy.
+static QUICK_DOWN_UNTIL: AtomicU64 = AtomicU64::new(0);
+
+fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+/// Whether the quick path is still inside a cooldown that ends at `until`.
+fn cooling_down(now: u64, until: u64) -> bool {
+    now < until
+}
+
+/// The budget left for one request, or `None` when the lookup has spent it.
+fn attempt_budget(budget: Duration, started: Instant, now: Instant) -> Option<Duration> {
+    let left = budget.saturating_sub(now.saturating_duration_since(started));
+    (left >= MIN_ATTEMPT).then_some(left)
+}
+
+/// The same lookup, giving up after `QUICK_BUDGET`.
 ///
 /// Used for the extras of a card — phonetic symbols, meanings, an example —
 /// which fill in while the user is already reading the translation: an endpoint
 /// that is slow or unreachable on this network must not keep them waiting, and
-/// whatever has not arrived is simply left out.
+/// whatever has not arrived is simply left out. A lookup that failed is
+/// remembered for `QUICK_COOLDOWN`, so the cards after it answer at once.
 pub async fn translate_quickly(
     client: &reqwest::Client,
     text: &str,
@@ -77,7 +116,19 @@ pub async fn translate_quickly(
     target: &str,
     kind: Kind,
 ) -> Result<TranslationResult, String> {
-    run(client, text, source, target, kind, Some(QUICK_BUDGET)).await
+    if cooling_down(now_millis(), QUICK_DOWN_UNTIL.load(Ordering::Relaxed)) {
+        return Err("Google Translate is unavailable right now; skipping the dictionary lookup."
+            .to_string());
+    }
+
+    let result = run(client, text, source, target, kind, Some(QUICK_BUDGET)).await;
+    let until = if result.is_ok() {
+        0
+    } else {
+        now_millis().saturating_add(QUICK_COOLDOWN.as_millis() as u64)
+    };
+    QUICK_DOWN_UNTIL.store(until, Ordering::Relaxed);
+    result
 }
 
 async fn run(
@@ -88,9 +139,19 @@ async fn run(
     kind: Kind,
     budget: Option<Duration>,
 ) -> Result<TranslationResult, String> {
+    let started = Instant::now();
     let mut failure = None;
     for name in CLIENTS {
-        match request(client, name, text, source, target, kind, budget).await {
+        let left = match budget {
+            // The clients share one budget: a fallback is only tried while
+            // something of it is left.
+            Some(budget) => match attempt_budget(budget, started, Instant::now()) {
+                Some(left) => Some(left),
+                None => break,
+            },
+            None => None,
+        };
+        match request(client, name, text, source, target, kind, left).await {
             Ok(result) => return Ok(result),
             Err(error) => failure = Some(error),
         }
@@ -378,6 +439,39 @@ mod tests {
     #[test]
     fn prefers_the_client_that_is_not_throttled() {
         assert_eq!(CLIENTS[0], "dict-chrome-ex");
+    }
+
+    #[test]
+    fn shares_one_budget_between_the_clients() {
+        let started = Instant::now();
+
+        // A fresh lookup hands the whole budget to the first client.
+        assert_eq!(
+            attempt_budget(QUICK_BUDGET, started, started),
+            Some(QUICK_BUDGET)
+        );
+
+        // What the first client used is gone from the second one's budget.
+        let spent = started + Duration::from_millis(400);
+        assert_eq!(
+            attempt_budget(QUICK_BUDGET, started, spent),
+            Some(QUICK_BUDGET - Duration::from_millis(400))
+        );
+
+        // A budget that is spent, or nearly spent, is not worth a request.
+        let spent = started + QUICK_BUDGET - Duration::from_millis(10);
+        assert_eq!(attempt_budget(QUICK_BUDGET, started, spent), None);
+        let spent = started + QUICK_BUDGET;
+        assert_eq!(attempt_budget(QUICK_BUDGET, started, spent), None);
+    }
+
+    #[test]
+    fn a_failed_lookup_stays_in_cooldown_until_its_deadline() {
+        assert!(cooling_down(1_000, 1_001));
+        assert!(!cooling_down(1_001, 1_001));
+        assert!(!cooling_down(1_002, 1_001));
+        // Nothing is remembered before the first failure.
+        assert!(!cooling_down(1_000, 0));
     }
 
     #[test]

@@ -28,6 +28,7 @@
     popupOpacity: $("popupOpacity"),
     autoCloseSecs: $("autoCloseSecs"),
     closeAfterCopy: $("closeAfterCopy"),
+    unitsEnabled: $("unitsEnabled"),
     targetLang: $("targetLang"),
     provider: $("provider"),
     apiIdField: $("apiIdField"),
@@ -120,6 +121,8 @@
   let sampleText = "";
   /** Translations the backend remembers, newest first. */
   let history = [];
+  /** `"mica"` once the backend reports a backdrop behind the window. */
+  let backdrop = "none";
 
   const COPY_ICON = els.demoCopy.innerHTML;
   const DONE_ICON =
@@ -128,17 +131,48 @@
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/></svg>';
 
   /**
-   * Applies the chosen colour scheme. "system" hands back to the CSS
-   * `prefers-color-scheme` rules.
+   * Applies the chosen colour scheme. "system" is resolved against the OS
+   * setting by js/theme.js, which is the only place that touches
+   * `data-theme`.
    */
   function applyTheme(theme) {
-    const root = document.documentElement;
-    if (theme === "light" || theme === "dark") root.dataset.theme = theme;
-    else delete root.dataset.theme;
+    const next = themeOr(theme);
+    GlossyTheme.apply({ theme: next, backdrop });
+    // Windows draws the title bar itself, so it needs telling separately.
+    if (Glossy.live) {
+      Glossy.invoke("set_window_theme", { label: "main", theme: next }).catch((error) => {
+        console.warn("Glossy could not restyle its title bar:", error);
+      });
+    }
   }
 
   function themeOr(theme) {
     return theme === "light" || theme === "dark" ? theme : "system";
+  }
+
+  /**
+   * Asks the backend whether a blurred backdrop sits behind the window and
+   * remembers the answer for `applyTheme`.
+   *
+   * The window starts loading before the Rust `setup` hook has laid the effect
+   * behind it, so the first answer only says "not decided yet"; the backend is
+   * polled until it has an answer, which is normally within one attempt.
+   */
+  async function resolveBackdrop() {
+    if (!Glossy.live) return;
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      let info = null;
+      try {
+        info = await Glossy.invoke("surface_info");
+      } catch (error) {
+        info = null;
+      }
+      if (info && info.ready) {
+        backdrop = info.backdrop ? "mica" : "none";
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   }
 
   function numberOr(value, fallback) {
@@ -541,6 +575,7 @@
     els.popupOpacity.value = String(pick(OPACITIES, next.popupOpacity, 100));
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
+    els.unitsEnabled.checked = next.unitsEnabled !== false;
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
     els.checkUpdates.checked = !!next.checkUpdates;
     applyTheme(els.theme.value);
@@ -573,6 +608,7 @@
       popupOpacity: numberOr(els.popupOpacity.value, 100),
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
+      unitsEnabled: els.unitsEnabled.checked,
       historyLimit: numberOr(els.historyLimit.value, 50),
       checkUpdates: els.checkUpdates.checked,
       targetLang: els.targetLang.value,
@@ -687,6 +723,12 @@
     if (!result || result.kind !== "word") return;
     if (result.phonetic && (result.meanings || []).length && result.example) return;
 
+    const waiting = { ...result, phonetic: null, meanings: [], example: null };
+    Glossy.render.result(els.demoResult, waiting, {
+      showOriginal: els.showOriginal.checked,
+      pending: true,
+    });
+
     let details = null;
     try {
       details = await Glossy.invoke("word_details", {
@@ -695,18 +737,20 @@
         targetLang: result.targetLang || null,
       });
     } catch (error) {
-      return;
+      details = null;
     }
     if (mine !== demoTicket || !demoResult) return;
-    if (!details || (!details.phonetic && !(details.meanings || []).length && !details.example)) {
-      return;
-    }
+
     demoResult = {
       ...demoResult,
-      phonetic: demoResult.phonetic || details.phonetic || null,
-      meanings: (demoResult.meanings || []).length ? demoResult.meanings : details.meanings || [],
-      example: demoResult.example || details.example || null,
+      phonetic: demoResult.phonetic || (details && details.phonetic) || null,
+      meanings: (demoResult.meanings || []).length
+        ? demoResult.meanings
+        : (details && details.meanings) || [],
+      example: demoResult.example || (details && details.example) || null,
     };
+    // Drawn either way, so the card loses its placeholder when the lookups have
+    // nothing to add.
     Glossy.render.result(els.demoResult, demoResult, { showOriginal: els.showOriginal.checked });
   }
 
@@ -893,6 +937,7 @@
     els.popupOpacity,
     els.autoCloseSecs,
     els.closeAfterCopy,
+    els.unitsEnabled,
     els.historyLimit,
     els.checkUpdates,
   ].forEach((element) => {
@@ -981,6 +1026,9 @@
   window.addEventListener("beforeunload", flushSave);
 
   (async function start() {
+    // Resolved before the settings paint the window, so the effect is in place
+    // from the first frame on.
+    await resolveBackdrop();
     try {
       apply(await Glossy.readSettings());
     } catch (error) {

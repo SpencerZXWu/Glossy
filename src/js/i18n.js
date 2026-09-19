@@ -88,6 +88,10 @@
     "opacity.50": "50 % · see-through",
     "option.closeAfterCopy": "Close the popup right after the translation is copied",
 
+    "panel.units": "Units",
+    "option.units": "Convert measurements and money the target language does not use",
+    "units.hint": "A measurement or an amount of money that reads the way the source language writes it is shown again the way the target language writes it, with the conversion rate. Currency rates are looked up live.",
+
     "panel.language": "Language and provider",
     "field.targetLang": "Translate into",
     "field.provider": "Translation provider",
@@ -110,13 +114,13 @@
     "provider.hint.google":
       "The free public Google endpoint. Phonetics, parts of speech, definitions and an example come from the same call. No key needed.",
     "provider.hint.baidu":
-      "Paste the APP ID and the 密钥 from fanyi-api.baidu.com. The free tier gives 50,000 characters per month, or 1,000,000 after the free 个人认证. Reachable from mainland China.",
+      "Paste the APP ID and the 密钥 from fanyi-api.baidu.com. The free tier gives 50,000 characters per month, or 1,000,000 after the free 个人认证. Reachable from mainland China, but the API returns the translation only: phonetic symbols and parts of speech need Zhipu GLM, which brings them along in the same call.",
     "provider.hint.zhipu":
       "Paste a Zhipu (open.bigmodel.cn) API key. The free <code>glm-4.7-flash</code> model returns the translation, phonetics, definitions and an example in one call, and it is reachable from mainland China.",
     "provider.hint.deepl":
       "Paste a DeepL API key. Keys ending in <code>:fx</code> use the free endpoint.",
     "provider.hint.openai":
-      "Paste an OpenAI API key. Word details are filled in from the free provider.",
+      "Paste an OpenAI API key. Phonetic symbols, parts of speech and an example come back in the same call.",
 
     "panel.demo": "Translate",
     "demo.hint":
@@ -190,6 +194,14 @@
     "render.retry": "Try again",
     "render.empty": "No translation returned.",
     "render.failed": "Translation failed.",
+    "render.lookup": "Looking up the dictionary…",
+
+    "units.title": "Units",
+    "units.approx": "≈",
+    "units.rate": "Live rate",
+    "units.stale": "Last known rate",
+    "units.source.exchangerateApi": "exchangerate-api.com",
+    "units.source.frankfurter": "frankfurter.app",
   };
 
   const CHINESE = {
@@ -273,6 +285,10 @@
     "opacity.50": "50 % · 半透明",
     "option.closeAfterCopy": "复制译文后立即关闭弹窗",
 
+    "panel.units": "单位换算",
+    "option.units": "把译文语言不常用的计量与货币换算过来",
+    "units.hint": "原文中按源语言习惯书写、而译文语言不常用的计量或货币，会按译文语言的习惯再写一遍并注明换算率，货币汇率实时查询。",
+
     "panel.language": "语言与翻译渠道",
     "field.targetLang": "翻译为",
     "field.provider": "翻译渠道",
@@ -295,13 +311,13 @@
     "provider.hint.google":
       "免费的 Google 公共接口：音标、词性、释义和例句都在同一次请求里返回，无需密钥。",
     "provider.hint.baidu":
-      "在 fanyi-api.baidu.com 申请后，把 APP ID 和密钥填在这里。免费版每月 5 万字符，完成个人认证后每月 100 万字符，国内可直接访问。",
+      "在 fanyi-api.baidu.com 申请后，把 APP ID 和密钥填在这里。免费版每月 5 万字符，完成个人认证后每月 100 万字符，国内可直接访问。不过这个接口只返回译文：音标和词性需要智谱 GLM，它会在同一次请求里一起返回。",
     "provider.hint.zhipu":
       "填入智谱（open.bigmodel.cn）的 API Key。免费的 <code>glm-4.7-flash</code> 模型一次返回译文、音标、释义和例句，国内可直接访问。",
     "provider.hint.deepl":
       "填入 DeepL API Key。以 <code>:fx</code> 结尾的密钥会使用免费接口。",
     "provider.hint.openai":
-      "填入 OpenAI API Key。单词的详细信息会从免费渠道补充。",
+      "填入 OpenAI API Key。音标、词性和例句会在同一次请求里一起返回。",
 
     "panel.demo": "翻译",
     "demo.hint":
@@ -374,6 +390,14 @@
     "render.retry": "重试",
     "render.empty": "没有返回译文。",
     "render.failed": "翻译失败。",
+    "render.lookup": "词典查询中…",
+
+    "units.title": "单位换算",
+    "units.approx": "≈",
+    "units.rate": "实时汇率",
+    "units.stale": "离线，最后一次已知汇率",
+    "units.source.exchangerateApi": "exchangerate-api.com",
+    "units.source.frankfurter": "frankfurter.app",
   };
 
   /** Language names shown in the target-language list. */

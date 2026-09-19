@@ -30,6 +30,7 @@
     popupOpacity: 100,
     autoCloseSecs: 0,
     closeAfterCopy: false,
+    unitsEnabled: true,
     hotkey: "Ctrl+Alt+C",
     uiLang: "system",
   };
@@ -45,6 +46,26 @@
   function stripTags(value) {
     return String(value || "").replace(/<\/?[^>]+>/g, "");
   }
+
+  /** A conversion of each kind, the way the backend sends them. */
+  const MOCK_CONVERSIONS = [
+    {
+      category: "length",
+      original: "12 ft",
+      converted: "3.66 m",
+      rate: "1 ft = 0.3048 m",
+      stale: false,
+    },
+    {
+      category: "currency",
+      original: "$200",
+      converted: "¥1,430.00",
+      rate: "1 USD = 7.15 CNY",
+      rateSource: "exchangerate-api.com",
+      rateDate: "2026-02-05",
+      stale: false,
+    },
+  ];
 
   function mockTranslate(text, overrides) {
     const source = String(text || "").trim();
@@ -68,6 +89,7 @@
           { partOfSpeech: "adjective", definitions: ["跑动的", "流动的"] },
         ],
         example: "marathon " + source,
+        conversions: [],
       };
     }
     return {
@@ -77,6 +99,8 @@
       phonetic: null,
       meanings: [],
       example: null,
+      // What the backend annotates on a sentence that mixes units and money.
+      conversions: settings.unitsEnabled === false ? [] : MOCK_CONVERSIONS,
     };
   }
 
@@ -106,6 +130,9 @@
       case "check_for_update":
         // The browser preview has no release feed to ask.
         return null;
+      case "surface_info":
+        // Nothing is drawn behind a browser tab.
+        return { backdrop: false, ready: true };
       case "install_update":
         return null;
       case "translate_text":

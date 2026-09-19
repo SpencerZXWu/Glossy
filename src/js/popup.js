@@ -89,9 +89,8 @@
   /** Pushes the look-and-feel settings into the stylesheet. */
   function applyAppearance() {
     const root = document.documentElement;
-    const theme = preferences.theme;
-    if (theme === "light" || theme === "dark") root.dataset.theme = theme;
-    else delete root.dataset.theme;
+
+    GlossyTheme.apply({ theme: preferences.theme });
 
     const scale = Number(preferences.fontScale);
     root.style.setProperty("--popup-font", String((Number.isFinite(scale) && scale > 0 ? scale : 100) / 100));
@@ -321,10 +320,18 @@
    *
    * The translation comes from the provider and is on screen already; phonetic
    * symbols, meanings and an example need the dictionary and the free endpoint,
-   * which are slow and sometimes have nothing. The card therefore updates in
-   * place, and stays as it is when there is nothing to add. */
+   * which are slow and sometimes have nothing. The card therefore says that the
+   * lookups are running, and updates in place when they answer — staying a bare
+   * translation when they have nothing to add. */
   async function refine(result, mine) {
     if (!result || result.kind !== "word" || !needsDetails(result)) return;
+
+    const waiting = { ...result, phonetic: null, meanings: [], example: null };
+    Glossy.render.result(content, waiting, {
+      showOriginal: preferences.showOriginal,
+      pending: true,
+    });
+    await place(false);
 
     let details = null;
     try {
@@ -334,18 +341,21 @@
         targetLang: result.targetLang || null,
       });
     } catch (error) {
-      return;
+      details = null;
     }
     // A newer selection, or a card the user closed, has taken over.
-    if (!details || mine !== ticket || !current) return;
-    if (!details.phonetic && !(details.meanings || []).length && !details.example) return;
+    if (mine !== ticket || !current) return;
 
     current = {
       ...current,
-      phonetic: current.phonetic || details.phonetic || null,
-      meanings: (current.meanings || []).length ? current.meanings : details.meanings || [],
-      example: current.example || details.example || null,
+      phonetic: current.phonetic || (details && details.phonetic) || null,
+      meanings: (current.meanings || []).length
+        ? current.meanings
+        : (details && details.meanings) || [],
+      example: current.example || (details && details.example) || null,
     };
+    // Drawn either way: the card has to lose its placeholder even when the
+    // lookups came back with nothing.
     Glossy.render.result(content, current, { showOriginal: preferences.showOriginal });
     await place(false);
   }

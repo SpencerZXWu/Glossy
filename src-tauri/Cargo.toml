@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "0.2.1"
+version = "0.3.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"
@@ -42,6 +42,8 @@ windows = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 md-5 = "0.10.6"
+tokio = { version = "1", features = ["time"] }
+window-vibrancy = "0.6"
 
 [profile.release]
 codegen-units = 1

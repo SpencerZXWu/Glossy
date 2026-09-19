@@ -16,8 +16,10 @@ mod secrets;
 mod selection;
 mod settings;
 mod state;
+mod surface;
 mod translate;
 mod tray;
+mod units;
 mod updater;
 
 use std::sync::Arc;
@@ -140,12 +142,34 @@ async fn translate_text(
         source: source_lang,
         target: target_lang,
     };
-    let result = translate::translate(&text, &settings, &languages).await?;
+    let mut result = translate::translate(&text, &settings, &languages).await?;
+    attach_conversions(&app, &settings, &mut result).await;
     history::record(&app, &result, settings.history_limit);
     // The application window keeps its own copy of the history; it reloads on
     // this so a translation made while it was open shows up without a restart.
     let _ = app.emit("glossy://history", ());
     Ok(result)
+}
+
+/// Adds the unit conversions of a translation to its result.
+///
+/// Best effort: the card is complete without them, so a failure (or a machine
+/// that is offline) simply leaves the list empty.
+async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut TranslationResult) {
+    if !settings.units_enabled {
+        return;
+    }
+    let Ok(client) = translate::client() else {
+        return;
+    };
+    let cache = app.path().app_config_dir().ok();
+    result.conversions = units::conversions(
+        client,
+        &result.source_text,
+        &result.target_lang,
+        cache.as_deref(),
+    )
+    .await;
 }
 
 /// The dictionary style extra of a word: phonetic symbols, meanings and one
@@ -192,10 +216,21 @@ fn history_remove(app: AppHandle, id: u64) {
 
 /// Puts an old translation back into the floating card, anchored to the cursor.
 #[tauri::command]
-fn history_reopen(app: AppHandle, state: State<'_, Arc<AppState>>, id: u64) -> Result<(), String> {
+async fn history_reopen(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    id: u64,
+) -> Result<(), String> {
     let entry = history::get(id).ok_or("that translation is no longer in the history")?;
+    let mut result = entry.result;
+    // Entries recorded before the unit feature existed (or while it was
+    // switched off) have nothing to show, so they are filled in on the way out.
+    if result.conversions.is_empty() {
+        let settings = state.settings();
+        attach_conversions(&app, &settings, &mut result).await;
+    }
     let (x, y) = platform::cursor_pos();
-    popup::reveal_result(&app, &state, entry.result, (x as f64, y as f64));
+    popup::reveal_result(&app, &state, result, (x as f64, y as f64));
     Ok(())
 }
 
@@ -325,6 +360,11 @@ pub fn run() {
             let state = Arc::new(AppState::new(settings));
             app.manage(Arc::clone(&state));
 
+            // Only the settings window has a frame and a desktop behind it. Both
+            // calls are best effort: they change how it looks, nothing else.
+            surface::prepare(&handle, MAIN_LABEL, state.settings().theme);
+
+
             history::load(&handle, state.settings().history_limit);
 
             if let Err(error) = tray::install(&handle, language) {
@@ -407,6 +447,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings,
             save_settings,
+            surface::surface_info,
+            surface::set_window_theme,
             export_settings,
             import_settings,
             translate_text,

@@ -4,41 +4,17 @@
   --popup-font: 1;
   /* Opacity of the whole card, set from the settings. */
   --popup-opacity: 1;
-  --bg: #ffffff;
-  --bg-soft: #f5f6f8;
-  --fg: #14161a;
-  --fg-soft: #4a5160;
-  --muted: #8b93a2;
-  --line: rgba(15, 23, 42, 0.09);
-  --accent: #2f6bff;
-  --accent-soft: rgba(47, 107, 255, 0.1);
-  --shadow: 0 14px 34px rgba(12, 20, 38, 0.18), 0 2px 6px rgba(12, 20, 38, 0.08);
-}
-
-:root[data-theme="dark"] {
-  --bg: #1c1f26;
-  --bg-soft: #262a33;
-  --fg: #eceef3;
-  --fg-soft: #c3c8d4;
-  --muted: #8b93a2;
-  --line: rgba(255, 255, 255, 0.1);
-  --accent: #7ba2ff;
-  --accent-soft: rgba(123, 162, 255, 0.16);
-  --shadow: 0 14px 34px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1c1f26;
-    --bg-soft: #262a33;
-    --fg: #eceef3;
-    --fg-soft: #c3c8d4;
-    --muted: #8b93a2;
-    --line: rgba(255, 255, 255, 0.1);
-    --accent: #7ba2ff;
-    --accent-soft: rgba(123, 162, 255, 0.16);
-    --shadow: 0 14px 34px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
-  }
+  /* Local names kept from before the token layer; the values live in tokens.css. */
+  --bg: var(--g-surface-flyout);
+  --bg-soft: var(--g-surface-sunken);
+  --fg: var(--g-text-primary);
+  --fg-soft: var(--g-text-secondary);
+  --muted: var(--g-text-tertiary);
+  --line: var(--g-stroke-subtle);
+  --accent: var(--g-accent);
+  --accent-soft: var(--g-accent-soft);
+  --shadow: var(--g-shadow-flyout);
+  --radius: var(--g-radius-xl);
 }
 
 * {
@@ -55,7 +31,7 @@ body {
 
 body {
   padding: 10px;
-  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-family: var(--g-font-ui);
   font-size: calc(13px * var(--popup-font));
   line-height: 1.55;
   color: var(--fg);
@@ -78,7 +54,7 @@ body.dragging {
   flex-direction: column;
   background: var(--bg);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--g-radius-xl);
   box-shadow: var(--shadow);
   opacity: var(--popup-opacity, 1);
   overflow: hidden;
@@ -233,7 +209,7 @@ body.dragging .card {
 }
 
 .icon-button.done {
-  color: #17a673;
+  color: var(--g-ok);
 }
 
 .icon-button[data-state="on"] {
@@ -262,8 +238,28 @@ body.dragging .card {
 .phonetic {
   color: var(--muted);
   font-size: calc(12px * var(--popup-font));
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--g-font-ui);
   margin-bottom: 8px;
+}
+
+/* Stand-in for the extras a word card is still looking up. */
+.pending {
+  color: var(--muted);
+  font-size: calc(11.5px * var(--popup-font));
+  margin-bottom: 8px;
+  animation: pending-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pending-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending {
+    animation: none;
+  }
 }
 
 .meanings {
@@ -315,6 +311,53 @@ body.dragging .card {
   font-size: calc(15px * var(--popup-font));
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* Conversion of a unit or an amount of money the reader would not use. */
+.units {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.units-title {
+  color: var(--muted);
+  font-size: calc(10px * var(--popup-font));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.unit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: calc(13px * var(--popup-font));
+  font-variant-numeric: tabular-nums;
+}
+
+.unit-from {
+  color: var(--fg-soft);
+}
+
+.unit-arrow {
+  color: var(--muted);
+}
+
+.unit-to {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.unit-rate,
+.unit-note {
+  color: var(--muted);
+  font-size: calc(11px * var(--popup-font));
+  font-variant-numeric: tabular-nums;
 }
 
 .foot {
@@ -371,17 +414,7 @@ body.dragging .card {
 }
 
 .error .message {
-  color: #d1453b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .error .message {
-    color: #ff8a80;
-  }
-}
-
-:root[data-theme="dark"] .error .message {
-  color: #ff8a80;
+  color: var(--g-bad);
 }
 
 .ghost-button {

@@ -256,6 +256,9 @@ pub struct Settings {
     pub show_original: bool,
     /// Shortest selection (in characters) that still opens the popup.
     pub min_selection_len: usize,
+    /// Convert units in the selection that the reader of the target language
+    /// would not use, and annotate the converted value.
+    pub units_enabled: bool,
     /// Programs that never trigger a translation.
     #[serde(default, deserialize_with = "string_or_list")]
     pub ignored_apps: Vec<String>,
@@ -301,6 +304,7 @@ impl Default for Settings {
             restore_clipboard: true,
             show_original: true,
             min_selection_len: MIN_SELECTION_LEN,
+            units_enabled: true,
             ignored_apps: Vec::new(),
             ui_lang: UiLanguage::default(),
             first_run: true,

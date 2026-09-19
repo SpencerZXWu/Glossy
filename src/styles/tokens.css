@@ -1,0 +1,230 @@
+/* Glossy design language.
+ *
+ * This is the only stylesheet that may hold a literal colour, radius, shadow or
+ * duration. The three surface sheets (app.css, popup.css, notice.css) import it
+ * and then alias the shared tokens onto the local names their rules already
+ * use, so a change here reaches every window at once.
+ *
+ * Layers, outermost first: primitive ramp, semantic token, then the local
+ * alias in the surface sheet. Nothing below the semantic layer may be
+ * referenced by a component rule.
+ *
+ * The palette follows Windows 11 / WinUI: light comes from
+ * SolidBackgroundFillColorBase and the text/stroke fill colours, dark is the
+ * same set inverted. Surfaces stay translucent where a window backdrop (Mica)
+ * can show through them; the values are also legible on their own when the
+ * backdrop is off.
+ */
+
+:root {
+  /* ------------------------------------------------------------- type */
+
+  --g-font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
+    "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --g-font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  --g-fs-caption: 12px;
+  --g-lh-caption: 16px;
+  --g-fs-body-sm: 13px;
+  --g-lh-body-sm: 18px;
+  --g-fs-body: 14px;
+  --g-lh-body: 20px;
+  --g-fs-title: 17px;
+  --g-lh-title: 24px;
+  --g-fs-subtitle: 20px;
+  --g-lh-subtitle: 28px;
+  --g-fs-display: 28px;
+  --g-lh-display: 36px;
+
+  --g-fw-regular: 400;
+  --g-fw-medium: 550;
+  --g-fw-semibold: 600;
+  --g-fw-bold: 700;
+
+  --g-tracking-caps: 0.06em;
+
+  /* ------------------------------------------------------------ space */
+
+  --g-space-1: 2px;
+  --g-space-2: 4px;
+  --g-space-3: 6px;
+  --g-space-4: 8px;
+  --g-space-5: 10px;
+  --g-space-6: 12px;
+  --g-space-7: 14px;
+  --g-space-8: 16px;
+  --g-space-9: 20px;
+  --g-space-10: 24px;
+  --g-space-11: 28px;
+  --g-space-12: 32px;
+
+  /* ----------------------------------------------------------- radius */
+
+  --g-radius-xs: 3px;
+  --g-radius-sm: 4px;
+  --g-radius-md: 6px;
+  --g-radius-lg: 8px;
+  --g-radius-xl: 12px;
+  --g-radius-pill: 999px;
+
+  /* --------------------------------------------------------- controls */
+
+  /* Spacing knobs a density setting can move without touching a rule. */
+  --g-control-pad-y: 8px;
+  --g-control-pad-x: 10px;
+  --g-panel-pad: 18px;
+  --g-panel-gap: 14px;
+  --g-hit-size: 24px;
+
+  /* ----------------------------------------------------------- motion */
+
+  --g-dur-fast: 90ms;
+  --g-dur-base: 150ms;
+  --g-dur-slow: 240ms;
+  --g-ease-standard: cubic-bezier(0.33, 0, 0.67, 1);
+  --g-ease-decelerate: cubic-bezier(0.1, 0.9, 0.2, 1);
+  --g-ease-accelerate: cubic-bezier(0.7, 0, 1, 0.5);
+
+  /* ------------------------------------------------------------ focus */
+
+  --g-focus-width: 2px;
+  --g-focus-offset: 2px;
+
+  /* ----------------------------------------------------------- layers */
+
+  --g-z-sticky: 10;
+  --g-z-overlay: 100;
+  --g-z-toast: 200;
+}
+
+/* ------------------------------------------------------------- light */
+
+:root {
+  color-scheme: light;
+
+  --g-surface-window: #f3f3f3;
+  --g-surface-sunken: #eeeeee;
+  --g-surface-card: rgba(255, 255, 255, 0.7);
+  --g-surface-solid: #ffffff;
+  --g-surface-flyout: rgba(252, 252, 252, 0.9);
+  --g-surface-control: rgba(255, 255, 255, 0.7);
+  --g-surface-hover: rgba(0, 0, 0, 0.037);
+  --g-surface-pressed: rgba(0, 0, 0, 0.024);
+  --g-surface-selected: rgba(0, 0, 0, 0.06);
+
+  --g-text-primary: rgba(0, 0, 0, 0.8956);
+  --g-text-secondary: rgba(0, 0, 0, 0.6063);
+  --g-text-tertiary: rgba(0, 0, 0, 0.4458);
+  --g-text-disabled: rgba(0, 0, 0, 0.3614);
+
+  --g-stroke-subtle: rgba(0, 0, 0, 0.0578);
+  --g-stroke-default: rgba(0, 0, 0, 0.0803);
+  --g-stroke-strong: rgba(0, 0, 0, 0.4458);
+
+  --g-accent: #0f6cbd;
+  --g-accent-hover: #115ea3;
+  --g-accent-pressed: #0c3b5e;
+  --g-accent-soft: rgba(15, 108, 189, 0.1);
+  --g-on-accent: #ffffff;
+
+  --g-ok: #0f7b0f;
+  --g-ok-soft: rgba(15, 123, 15, 0.14);
+  --g-warn: #9d5d00;
+  --g-warn-soft: rgba(157, 93, 0, 0.14);
+  --g-bad: #c42b1c;
+  --g-bad-soft: rgba(196, 43, 28, 0.14);
+
+  --g-scrim: rgba(0, 0, 0, 0.3);
+
+  --g-knob: #ffffff;
+  --g-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  --g-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --g-shadow-flyout: 0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 8px 16px rgba(0, 0, 0, 0.14);
+  --g-shadow-dialog: 0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 32px 64px rgba(0, 0, 0, 0.24);
+  --g-shadow-toast: 0 0 0 1px rgba(0, 0, 0, 0.05),
+    0 8px 20px rgba(0, 0, 0, 0.16);
+
+  --g-logo-gradient: linear-gradient(140deg, var(--g-accent), #7f5bff);
+}
+
+/* -------------------------------------------------------------- dark */
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --g-surface-window: #202020;
+  --g-surface-sunken: #1c1c1c;
+  --g-surface-card: rgba(255, 255, 255, 0.061);
+  --g-surface-solid: #2b2b2b;
+  --g-surface-flyout: rgba(44, 44, 44, 0.9);
+  --g-surface-control: rgba(255, 255, 255, 0.061);
+  --g-surface-hover: rgba(255, 255, 255, 0.061);
+  --g-surface-pressed: rgba(255, 255, 255, 0.041);
+  --g-surface-selected: rgba(255, 255, 255, 0.083);
+
+  --g-text-primary: #ffffff;
+  --g-text-secondary: rgba(255, 255, 255, 0.786);
+  --g-text-tertiary: rgba(255, 255, 255, 0.5442);
+  --g-text-disabled: rgba(255, 255, 255, 0.3628);
+
+  --g-stroke-subtle: rgba(255, 255, 255, 0.0693);
+  --g-stroke-default: rgba(255, 255, 255, 0.0939);
+  --g-stroke-strong: rgba(255, 255, 255, 0.5442);
+
+  --g-accent: #60cdff;
+  --g-accent-hover: #6fd4ff;
+  --g-accent-pressed: #4fbfe8;
+  --g-accent-soft: rgba(96, 205, 255, 0.16);
+  --g-on-accent: #000000;
+
+  --g-ok: #6ccb5f;
+  --g-ok-soft: rgba(108, 203, 95, 0.16);
+  --g-warn: #fce100;
+  --g-warn-soft: rgba(252, 225, 0, 0.16);
+  --g-bad: #ff99a4;
+  --g-bad-soft: rgba(255, 153, 164, 0.16);
+
+  --g-scrim: rgba(0, 0, 0, 0.55);
+
+  --g-knob: #f3f3f3;
+  --g-shadow-knob: 0 1px 3px rgba(0, 0, 0, 0.5);
+
+  --g-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28), 0 2px 4px rgba(0, 0, 0, 0.24);
+  --g-shadow-flyout: 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 8px 16px rgba(0, 0, 0, 0.46);
+  --g-shadow-dialog: 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 32px 64px rgba(0, 0, 0, 0.6);
+  --g-shadow-toast: 0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 8px 20px rgba(0, 0, 0, 0.5);
+
+  --g-logo-gradient: linear-gradient(140deg, var(--g-accent), #9b7bff);
+}
+
+/* ----------------------------------------------------------- density */
+
+:root[data-density="compact"] {
+  --g-control-pad-y: 5px;
+  --g-control-pad-x: 8px;
+  --g-panel-pad: 13px;
+  --g-panel-gap: 10px;
+}
+
+:root[data-density="relaxed"] {
+  --g-control-pad-y: 10px;
+  --g-control-pad-x: 12px;
+  --g-panel-pad: 22px;
+  --g-panel-gap: 18px;
+}
+
+/* ------------------------------------------------------------ motion */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --g-dur-fast: 0ms;
+    --g-dur-base: 0ms;
+    --g-dur-slow: 0ms;
+  }
+}

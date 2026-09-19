@@ -4,7 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Glossy</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
     <link rel="stylesheet" href="styles/app.css" />
+    <script src="js/theme.js"></script>
   </head>
   <body>
     <div class="shell">
@@ -134,6 +136,18 @@
           <div class="options">
             <label class="check"><input type="checkbox" id="closeAfterCopy" /><span data-i18n="option.closeAfterCopy">Close the popup right after the translation is copied</span></label>
           </div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.units">Units</h2>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="unitsEnabled" /><span data-i18n="option.units">Convert measurements and money the target language does not use</span></label>
+          </div>
+          <p class="hint" data-i18n="units.hint">
+            A measurement or an amount of money that reads the way the source language writes it
+            is shown again the way the target language writes it, with the conversion rate.
+            Currency rates are looked up live.
+          </p>
         </section>
 
         <section class="panel">

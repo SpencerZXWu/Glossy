@@ -1,49 +1,31 @@
+/* Local names kept from before the token layer; the values live in tokens.css.
+   Here --bg is the window itself and --panel is a card sitting on it. */
 :root {
-  --bg: #f4f5f8;
-  --bg-soft: #e8ebf1;
-  --panel: #ffffff;
-  --fg: #14161a;
-  --fg-soft: #4a5160;
-  --muted: #8b93a2;
-  --line: rgba(15, 23, 42, 0.1);
-  --accent: #2f6bff;
-  --accent-soft: rgba(47, 107, 255, 0.1);
-  --ok: #17a673;
-  --bad: #d1453b;
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --bg: var(--g-surface-window);
+  --bg-soft: var(--g-surface-sunken);
+  --panel: var(--g-surface-card);
+  --fg: var(--g-text-primary);
+  --fg-soft: var(--g-text-secondary);
+  --muted: var(--g-text-tertiary);
+  --line: var(--g-stroke-subtle);
+  --accent: var(--g-accent);
+  --accent-soft: var(--g-accent-soft);
+  --ok: var(--g-ok);
+  --bad: var(--g-bad);
+  --radius: var(--g-radius-lg);
+  --shadow: var(--g-shadow-card);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #14161b;
-    --bg-soft: #23272f;
-    --panel: #1c1f26;
-    --fg: #eceef3;
-    --fg-soft: #c3c8d4;
-    --muted: #8b93a2;
-    --line: rgba(255, 255, 255, 0.1);
-    --accent: #7ba2ff;
-    --accent-soft: rgba(123, 162, 255, 0.16);
-    --ok: #3ddc97;
-    --bad: #ff8a80;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
-  }
+/* On a Mica backdrop the window belongs to the system, so the page stops
+   painting the window colour and falls back to the translucent fills WinUI
+   uses for layers and controls. Without a backdrop these rules never match and
+   everything keeps its own opaque colour. */
+:root[data-backdrop="mica"] {
+  --bg: var(--g-surface-control);
 }
 
-:root[data-theme="dark"] {
-  --bg: #14161b;
-  --bg-soft: #23272f;
-  --panel: #1c1f26;
-  --fg: #eceef3;
-  --fg-soft: #c3c8d4;
-  --muted: #8b93a2;
-  --line: rgba(255, 255, 255, 0.1);
-  --accent: #7ba2ff;
-  --accent-soft: rgba(123, 162, 255, 0.16);
-  --ok: #3ddc97;
-  --bad: #ff8a80;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+:root[data-backdrop="mica"] body {
+  background: transparent;
 }
 
 * {
@@ -65,7 +47,7 @@ body {
 body {
   background: var(--bg);
   color: var(--fg);
-  font: 13.5px/1.55 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font: var(--g-fs-body) / 1.55 var(--g-font-ui);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -99,8 +81,8 @@ body {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(140deg, var(--accent), #7f5bff);
-  color: #fff;
+  background: var(--g-logo-gradient);
+  color: var(--g-on-accent);
   font-weight: 700;
   font-size: 16px;
   box-shadow: 0 4px 12px var(--accent-soft);
@@ -137,12 +119,12 @@ body {
   height: 7px;
   border-radius: 50%;
   background: var(--ok);
-  box-shadow: 0 0 0 3px rgba(23, 166, 115, 0.15);
+  box-shadow: 0 0 0 3px var(--g-ok-soft);
 }
 
 .status[data-tone="bad"] .dot {
   background: var(--bad);
-  box-shadow: 0 0 0 3px rgba(209, 69, 59, 0.15);
+  box-shadow: 0 0 0 3px var(--g-bad-soft);
 }
 
 .status[data-tone="off"] .dot {
@@ -284,13 +266,17 @@ main::-webkit-scrollbar-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--g-knob);
+  box-shadow: var(--g-shadow-knob);
   transition: transform 140ms ease;
 }
 
 .switch:checked {
   background: var(--accent);
+}
+
+.switch:checked::after {
+  background: var(--g-on-accent);
 }
 
 .switch:checked::after {
@@ -368,7 +354,7 @@ main::-webkit-scrollbar-thumb {
 
 .chip-remove:hover {
   background: var(--bad);
-  color: #fff;
+  color: var(--g-on-accent);
 }
 
 .picker {
@@ -596,6 +582,26 @@ input:focus-visible {
   margin-bottom: 8px;
 }
 
+/* Stand-in for the extras a word card is still looking up. */
+.pending {
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-bottom: 8px;
+  animation: pending-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pending-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pending {
+    animation: none;
+  }
+}
+
 .meanings {
   display: flex;
   flex-direction: column;
@@ -644,6 +650,53 @@ input:focus-visible {
   font-size: 15px;
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* Conversion of a unit or an amount of money the reader would not use. */
+.units {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.units-title {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.unit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit-from {
+  color: var(--fg-soft);
+}
+
+.unit-arrow {
+  color: var(--muted);
+}
+
+.unit-to {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.unit-rate,
+.unit-note {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .foot {
@@ -810,7 +863,7 @@ input:focus-visible {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--g-scrim);
 }
 
 .confirm[hidden] {
@@ -850,7 +903,7 @@ input:focus-visible {
   border: 1px solid transparent;
   border-radius: 9px;
   background: var(--accent);
-  color: #fff;
+  color: var(--g-on-accent);
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;

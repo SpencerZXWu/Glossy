@@ -228,6 +228,7 @@ mod tests {
             meanings: Vec::new(),
             example: None,
             provider: "google".to_string(),
+            conversions: Vec::new(),
         }
     }
 

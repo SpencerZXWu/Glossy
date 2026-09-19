@@ -166,6 +166,7 @@
       }
 
       const meanings = Array.isArray(data.meanings) ? data.meanings : [];
+      let shownMeanings = false;
       if (meanings.length) {
         const list = node("div", "meanings");
         meanings.forEach((meaning) => {
@@ -176,17 +177,78 @@
           row.appendChild(node("span", "defs", definitions.join(" · ")));
           list.appendChild(row);
         });
-        if (list.childNodes.length) target.appendChild(list);
+        if (list.childNodes.length) {
+          target.appendChild(list);
+          shownMeanings = true;
+        }
       }
 
       if (data.example) {
         target.appendChild(node("div", "example", String(data.example)));
       }
+
+      // The dictionary lookups a word card needs answer seconds later, so the
+      // card says that they are running instead of looking finished.
+      if (opts.pending && !phonetic && !data.example && !shownMeanings) {
+        const waiting = node("div", "pending", Glossy.i18n.t("render.lookup"));
+        waiting.setAttribute("aria-live", "polite");
+        target.appendChild(waiting);
+      }
     }
+
+    units(target, data.conversions);
 
     const parts = [];
     if (data.provider) parts.push(Glossy.i18n.providerName(data.provider));
     if (parts.length) target.appendChild(node("div", "foot", parts.join(" · ")));
+  }
+
+  /** The source of a live currency rate, spelled the way the interface does. */
+  function rateSource(name) {
+    if (name === "exchangerate-api.com") return Glossy.i18n.t("units.source.exchangerateApi");
+    if (name === "frankfurter.app") return Glossy.i18n.t("units.source.frankfurter");
+    return String(name);
+  }
+
+  /** One line of unit conversions, or nothing when the result carries none. */
+  function units(target, value) {
+    const conversions = Array.isArray(value) ? value : [];
+    const rows = conversions.filter(
+      (item) => item && (item.original || item.converted),
+    );
+    if (!rows.length) return;
+
+    const block = node("div", "units");
+    block.appendChild(node("div", "units-title", Glossy.i18n.t("units.title")));
+    let previousNote = "";
+    rows.forEach((item) => {
+      const row = node("div", "unit");
+      row.appendChild(node("span", "unit-from", String(item.original || "")));
+      row.appendChild(node("span", "unit-arrow", Glossy.i18n.t("units.approx")));
+      row.appendChild(node("span", "unit-to", String(item.converted || "")));
+      block.appendChild(row);
+      if (item.rate) {
+        block.appendChild(node("div", "unit-rate", String(item.rate)));
+      }
+      // Every amount in one card shares a single exchange rate, so the note
+      // under the first row is the note for all of them.
+      const note = rateNote(item);
+      if (note && note !== previousNote) {
+        previousNote = note;
+        block.appendChild(node("div", "unit-note", note));
+      }
+    });
+    target.appendChild(block);
+  }
+
+  function rateNote(item) {
+    if (!item.rateSource && !item.rateDate) return "";
+    const label = item.stale
+      ? Glossy.i18n.t("units.stale")
+      : Glossy.i18n.t("units.rate");
+    return [label, rateSource(item.rateSource || ""), item.rateDate || ""]
+      .filter(Boolean)
+      .join(" · ");
   }
 
   Glossy.languageName = languageName;

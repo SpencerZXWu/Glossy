@@ -8,6 +8,10 @@ translation under the cursor.
 
 - **Word or short phrase** → phonetic symbols, part of speech, definitions and one example.
 - **Sentence or paragraph** → a smooth translation into your target language.
+- **A measurement or an amount** written in a unit your target language does not
+  use → the converted value and the conversion rate, right in the card
+  (`12 ft ≈ 3.66 m`). Currency rates are looked up live; every other unit is
+  built into the app. Can be switched off in the settings.
 - The source language is detected automatically.
 - A selection that ends with sentence punctuation (`.`, `?`, `!`, `。` …) is
   always translated as a sentence, however short it is.
@@ -67,6 +71,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | Translate a word on double click | Enables the double-click gesture. |
 | Put the clipboard back after reading a selection | Restores your previous clipboard content after Glossy copied the selection. |
 | Show the original text in the popup | Hides the source line in the card when off. |
+| Convert units and currency | When the original measures something in a unit your target language does not use — feet, pounds, °F, a foreign amount — the card adds the converted value and the rate underneath (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). Length, mass, volume, speed, area and temperature convert inside their category, and the target unit is the one a person would write; the target currency follows the target language (`zh-CN` → CNY, `en` → USD). Currency rates come from `open.er-api.com` (ECB as a fallback) and are cached for six hours; everything else is built into the app. Off means no conversion and no rate request. |
 | Shortest selection to translate | Character count below which a selection is ignored (`1`–`40`, default `2`). |
 | Global hotkey | Accelerator that translates the clipboard content, e.g. `Ctrl+Alt+C`. Clear the field to switch it off. The line under the field shows the registered combination or why Windows refused it. |
 | Never translate in these programs | A list of process names (`idea64.exe`, `mstsc`) in which selection capture is skipped. Add one by typing it (the `.exe` suffix is optional — the `Add` button normalises it), by choosing it from the dropdown of currently running programs, or by pressing `Pick with the mouse` and clicking the window to ignore. Each entry has an `×` to remove it; duplicates are dropped case-insensitively. |
@@ -223,7 +228,7 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 71 frontend tests
+node --test                                                          # 81 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -314,7 +319,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 100 tests; see "Checks" above for lint and format runs
+cargo test   # 128 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -327,17 +332,21 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
   js/bridge.js           Tauri IPC helpers used by both windows
   js/i18n.js             English/Chinese dictionaries and DOM translation
   js/render.js           shared card renderer (word, sentence, loading, error)
+  js/theme.js            resolves system/light/dark for every window
   js/app.js              settings window logic
   js/popup.js            popup window logic
   js/notice.js           start card logic
+  styles/tokens.css      the only place a colour, radius, shadow or duration is written
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
   selection.rs           global mouse hook, gesture tracking, capture
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
+  units/                 unit and currency conversion for the card
   translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
+  surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
   autostart.rs           the login item and the --autostart marker
   updater.rs             the release feed behind the Updates section
