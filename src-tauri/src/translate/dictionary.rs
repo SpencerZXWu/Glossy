@@ -11,8 +11,10 @@ use super::TranslationResult;
 const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en/";
 
 /// This endpoint is a best effort extra, so it must never hold back a popup for
-/// long: the shared client would otherwise wait its full timeout.
-const TIMEOUT: Duration = Duration::from_secs(4);
+/// long: the shared client would otherwise wait its full timeout. The lookup
+/// runs after the card is already showing, so it can afford to sit out the
+/// endpoint's slower answers, which are as long as twenty seconds.
+const TIMEOUT: Duration = Duration::from_secs(8);
 
 const MAX_MEANINGS: usize = 4;
 const MAX_DEFINITIONS: usize = 4;

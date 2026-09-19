@@ -674,10 +674,40 @@
       Glossy.render.result(els.demoResult, result, { showOriginal: els.showOriginal.checked });
       if (result.sourceText) els.demoHeadword.textContent = String(result.sourceText);
       showLanguages(result);
+      refineDemo(result, mine);
     } catch (error) {
       if (mine !== demoTicket) return;
       Glossy.render.error(els.demoResult, Glossy.errorMessage(error), () => runDemo(text));
     }
+  }
+
+  /** Grows the demo card into the full word entry once the lookups have
+      answered, the same way the floating popup does. */
+  async function refineDemo(result, mine) {
+    if (!result || result.kind !== "word") return;
+    if (result.phonetic && (result.meanings || []).length && result.example) return;
+
+    let details = null;
+    try {
+      details = await Glossy.invoke("word_details", {
+        text: result.sourceText || text,
+        sourceLang: demoPair.source === AUTO ? null : demoPair.source,
+        targetLang: result.targetLang || null,
+      });
+    } catch (error) {
+      return;
+    }
+    if (mine !== demoTicket || !demoResult) return;
+    if (!details || (!details.phonetic && !(details.meanings || []).length && !details.example)) {
+      return;
+    }
+    demoResult = {
+      ...demoResult,
+      phonetic: demoResult.phonetic || details.phonetic || null,
+      meanings: (demoResult.meanings || []).length ? demoResult.meanings : details.meanings || [],
+      example: demoResult.example || details.example || null,
+    };
+    Glossy.render.result(els.demoResult, demoResult, { showOriginal: els.showOriginal.checked });
   }
 
   async function copyDemo() {
@@ -938,6 +968,10 @@
 
   // A pending change is written before the window goes away, whichever way it
   // goes away: hidden by the close button, minimized, or unloaded.
+  // A translation made anywhere else — the popup, the hotkey — lands in the
+  // history while this window may be open, so the list reloads on the signal
+  // instead of waiting for the next start.
+  Glossy.listen("glossy://history", loadHistory);
   Glossy.listen("glossy://flush-settings", flushSave);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) flushSave();

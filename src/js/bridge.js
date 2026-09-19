@@ -112,6 +112,12 @@
         await new Promise((resolve) => setTimeout(resolve, 350));
         if (!String(input.text || "").trim()) throw new Error("nothing selected");
         return mockTranslate(input.text, input);
+      case "word_details":
+        return {
+          phonetic: "ˈrəniNG",
+          meanings: [{ partOfSpeech: "noun", definitions: ["赛跑", "跑步"] }],
+          example: "marathon " + String(input.text || "").trim(),
+        };
       case "capture_status":
         return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
       case "running_apps":

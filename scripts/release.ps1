@@ -85,9 +85,12 @@ if (-not $SkipBuild) {
 }
 
 $bundleDir = Join-Path $root 'src-tauri\target\release\bundle\nsis'
-$installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter '*-setup.exe' -ErrorAction SilentlyContinue)
+# Only what this version built: an installer left behind by an earlier build sits
+# in the same directory and must not be staged into the new release folder.
+$installers = @(Get-ChildItem -LiteralPath $bundleDir -Filter '*-setup.exe' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "Glossy_$($version)_*" })
 if ($installers.Count -eq 0) {
-    throw "No installer found in $bundleDir. Run without -SkipBuild first."
+    throw "No installer for $version found in $bundleDir. Run without -SkipBuild first."
 }
 
 $staged = @()

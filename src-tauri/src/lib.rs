@@ -142,7 +142,35 @@ async fn translate_text(
     };
     let result = translate::translate(&text, &settings, &languages).await?;
     history::record(&app, &result, settings.history_limit);
+    // The application window keeps its own copy of the history; it reloads on
+    // this so a translation made while it was open shows up without a restart.
+    let _ = app.emit("glossy://history", ());
     Ok(result)
+}
+
+/// The dictionary style extra of a word: phonetic symbols, meanings and one
+/// example.
+///
+/// Called by the card after it already shows the translation, because both
+/// sources answer slowly and the card must not wait for them. The details are
+/// also written into the stored history entry, so reopening it shows the same
+/// card.
+#[tauri::command]
+async fn word_details(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    text: String,
+    source_lang: Option<String>,
+    target_lang: Option<String>,
+) -> Result<translate::WordDetails, String> {
+    let settings = state.settings();
+    let languages = translate::Languages {
+        source: source_lang,
+        target: target_lang,
+    };
+    let details = translate::word_details(&text, &settings, &languages).await?;
+    history::patch_details(&app, text.trim(), &details);
+    Ok(details)
 }
 
 /// Every translation this session (and the previous ones) remembers, newest
@@ -382,6 +410,7 @@ pub fn run() {
             export_settings,
             import_settings,
             translate_text,
+            word_details,
             show_popup,
             popup_present,
             popup_resize,

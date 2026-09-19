@@ -77,6 +77,25 @@ impl TranslationResult {
     }
 }
 
+/// The dictionary style extra of a word: phonetic symbols, meanings and one
+/// example. Fetched apart from the translation, because both sources for them
+/// answer in anything from half a second to twenty, and a popup that waits for
+/// them stays empty for that long.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WordDetails {
+    pub phonetic: Option<String>,
+    pub meanings: Vec<Meaning>,
+    pub example: Option<String>,
+}
+
+impl WordDetails {
+    /// Whether the lookup came back with nothing worth sending to the card.
+    pub fn is_empty(&self) -> bool {
+        self.phonetic.is_none() && self.meanings.is_empty() && self.example.is_none()
+    }
+}
+
 /// Language pair chosen for one translation. Both sides are optional: an absent
 /// (or `auto`) source is detected by the provider, and an absent target follows
 /// the settings.
@@ -123,7 +142,10 @@ pub fn client() -> Result<&'static reqwest::Client, String> {
         .map_err(|error| error.clone())
 }
 
-/// Translates `text` according to `settings`, filling in word details when possible.
+/// Translates `text` according to `settings`.
+///
+/// The answer arrives as soon as the provider has it; the word details go
+/// through `word_details`, so nothing here waits for the slow public lookups.
 pub async fn translate(
     text: &str,
     settings: &Settings,
@@ -163,23 +185,69 @@ pub async fn translate(
         }
     }
 
-    if kind == Kind::Word {
-        // The local dictionary is free and fast, so try it before spending a
-        // request on the free endpoint.
-        dictionary::enrich(client, text, &mut result).await;
-
-        let incomplete =
-            result.phonetic.is_none() || result.meanings.is_empty() || result.example.is_none();
-        if incomplete && settings.provider != Provider::Google {
-            if let Ok(details) = google::translate(client, text, source, &target, kind).await {
-                result.fill_gaps_from(&details);
-            }
-        }
-    }
+    // Phonetic symbols, meanings and an example are looked up separately, by
+    // `word_details`, so that the card can show the translation straight away.
 
     result.kind = kind.as_str().to_string();
     result.target_lang = target;
     Ok(result)
+}
+
+/// The dictionary style extra of a word, looked up on demand after the card
+/// already shows the translation.
+///
+/// Best effort throughout: a selection that is not a word, or a lookup where
+/// both sources come back with nothing, answers with an empty result instead of
+/// an error, because the card is complete without it.
+pub async fn word_details(
+    text: &str,
+    settings: &Settings,
+    languages: &Languages,
+) -> Result<WordDetails, String> {
+    let text = text.trim();
+    if text.is_empty() || classify::classify(text) != Kind::Word {
+        return Ok(WordDetails::default());
+    }
+
+    let client = client()?;
+    let source = languages.source_code();
+    let target = match languages.target_code() {
+        Some(code) => code.to_string(),
+        None => effective_target(text, &settings.target_lang),
+    };
+
+    let mut result = TranslationResult::new(Kind::Word, "", text, &target);
+
+    // The dictionary and the free endpoint answer independently, and the free
+    // endpoint alone carries an example, so both are asked at once: together
+    // they must not take longer than the slower of the two. The free endpoint
+    // gets a short budget because on some networks it is simply unreachable,
+    // and whatever has not arrived by then is left out.
+    let lookup = if settings.provider == Provider::Google {
+        None
+    } else {
+        let client = client.clone();
+        let word = text.to_string();
+        let source = source.to_string();
+        Some(tauri::async_runtime::spawn(async move {
+            google::translate_quickly(&client, &word, &source, &target, Kind::Word)
+                .await
+                .ok()
+        }))
+    };
+
+    dictionary::enrich(client, text, &mut result).await;
+    if let Some(lookup) = lookup {
+        if let Ok(Some(details)) = lookup.await {
+            result.fill_gaps_from(&details);
+        }
+    }
+
+    Ok(WordDetails {
+        phonetic: result.phonetic,
+        meanings: result.meanings,
+        example: result.example,
+    })
 }
 
 async fn call_provider(

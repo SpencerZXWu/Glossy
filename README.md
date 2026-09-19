@@ -314,7 +314,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 97 tests; see "Checks" above for lint and format runs
+cargo test   # 100 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout

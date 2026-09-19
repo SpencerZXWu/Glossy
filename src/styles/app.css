@@ -392,6 +392,7 @@ main::-webkit-scrollbar-thumb {
 select,
 textarea,
 input[type="password"],
+input[type="search"],
 input[type="text"],
 input[type="number"] {
   width: 100%;

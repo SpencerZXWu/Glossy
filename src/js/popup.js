@@ -302,6 +302,7 @@
       showLanguages(result);
       await place(false);
       scheduleAutoClose();
+      refine(result, mine);
     } catch (error) {
       if (mine !== ticket) return;
       document.body.dataset.state = "error";
@@ -309,6 +310,44 @@
       await place(false);
       scheduleAutoClose();
     }
+  }
+
+  /** Whether a word card is still missing something the lookups can add. */
+  function needsDetails(result) {
+    return !result.phonetic || !(result.meanings || []).length || !result.example;
+  }
+
+  /** Grows a word card into the full entry once the lookups have answered.
+   *
+   * The translation comes from the provider and is on screen already; phonetic
+   * symbols, meanings and an example need the dictionary and the free endpoint,
+   * which are slow and sometimes have nothing. The card therefore updates in
+   * place, and stays as it is when there is nothing to add. */
+  async function refine(result, mine) {
+    if (!result || result.kind !== "word" || !needsDetails(result)) return;
+
+    let details = null;
+    try {
+      details = await Glossy.invoke("word_details", {
+        text,
+        sourceLang: pair.source === AUTO ? null : pair.source,
+        targetLang: result.targetLang || null,
+      });
+    } catch (error) {
+      return;
+    }
+    // A newer selection, or a card the user closed, has taken over.
+    if (!details || mine !== ticket || !current) return;
+    if (!details.phonetic && !(details.meanings || []).length && !details.example) return;
+
+    current = {
+      ...current,
+      phonetic: current.phonetic || details.phonetic || null,
+      meanings: (current.meanings || []).length ? current.meanings : details.meanings || [],
+      example: current.example || details.example || null,
+    };
+    Glossy.render.result(content, current, { showOriginal: preferences.showOriginal });
+    await place(false);
   }
 
   /** Shows a translation the history already has, without asking the provider
@@ -331,6 +370,9 @@
     await place(!pinned);
     if (mine !== ticket) return;
     scheduleAutoClose();
+    // An entry stored before the details were looked up grows into the full
+    // card here as well.
+    refine(result, mine);
   }
 
   async function copyResult() {

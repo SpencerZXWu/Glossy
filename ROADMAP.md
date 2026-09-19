@@ -10,10 +10,10 @@ the milestone is closed and the tag is pushed.
 | --- | --- |
 | Version | `0.2.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~9,800 lines: ~5,400 Rust, ~3,700 frontend (plain HTML/CSS/JS) and ~800 test lines, comments included |
-| Tests | 97 Rust tests and 71 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Tests | 100 Rust tests and 71 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
-| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.0` staged in `release/v0.2.0/` |
+| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the

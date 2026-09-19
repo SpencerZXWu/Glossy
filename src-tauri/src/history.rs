@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
-use crate::translate::TranslationResult;
+use crate::translate::{TranslationResult, WordDetails};
 
 /// Largest history the settings can ask for.
 pub const MAX_LIMIT: u32 = 500;
@@ -96,6 +96,50 @@ fn remember(entries: &mut Vec<Entry>, entry: Entry, limit: u32) {
     }
     entries.insert(0, entry);
     entries.truncate(limit as usize);
+}
+
+/// Fills the details of the newest word entry that matches `source_text`.
+///
+/// The card is recorded the moment the translation lands, before the phonetic
+/// symbols, meanings and example have been looked up. Reopening that entry is
+/// meant to show the same card the popup ended up with, so the details are
+/// written into the stored entry as well.
+pub fn patch_details(app: &AppHandle, source_text: &str, details: &WordDetails) {
+    if details.is_empty() {
+        return;
+    }
+    let filled = match ENTRIES.lock() {
+        Ok(mut guard) => fill_details(&mut guard, source_text, details),
+        Err(_) => false,
+    };
+    if filled {
+        store(app);
+    }
+}
+
+/// Copies `details` into the newest word entry for `source_text`, leaving
+/// everything the entry already holds alone. Answers whether anything changed.
+fn fill_details(entries: &mut [Entry], source_text: &str, details: &WordDetails) -> bool {
+    let Some(entry) = entries
+        .iter_mut()
+        .find(|entry| entry.result.kind == "word" && entry.result.source_text == source_text)
+    else {
+        return false;
+    };
+    let mut filled = false;
+    if entry.result.phonetic.is_none() && details.phonetic.is_some() {
+        entry.result.phonetic = details.phonetic.clone();
+        filled = true;
+    }
+    if entry.result.meanings.is_empty() && !details.meanings.is_empty() {
+        entry.result.meanings = details.meanings.clone();
+        filled = true;
+    }
+    if entry.result.example.is_none() && details.example.is_some() {
+        entry.result.example = details.example.clone();
+        filled = true;
+    }
+    filled
 }
 
 /// Entries from newest to oldest.
@@ -245,5 +289,64 @@ mod tests {
         assert_eq!(parsed.id, 7);
         assert_eq!(parsed.result.phonetic.as_deref(), Some("/ˈrʌnɪŋ/"));
         assert_eq!(parsed.result.example.as_deref(), Some("He is running."));
+    }
+
+    #[test]
+    fn late_details_reach_the_newest_card_of_that_word() {
+        let mut word = result("ephemeral", "短暂的");
+        word.kind = "word".to_string();
+        let mut entries = vec![entry(2, &word), entry(1, &word)];
+        let details = details();
+
+        assert!(fill_details(&mut entries, "ephemeral", &details));
+        assert_eq!(entries[0].result.phonetic.as_deref(), Some("/ɪˈfem.ər.əl/"));
+        assert_eq!(
+            entries[0].result.example.as_deref(),
+            Some("an ephemeral joy")
+        );
+        assert_eq!(entries[0].result.meanings.len(), 1);
+        // Only the newest card of that word is touched.
+        assert!(entries[1].result.phonetic.is_none());
+        // Nothing is left to add the second time around.
+        assert!(!fill_details(&mut entries, "ephemeral", &details));
+    }
+
+    #[test]
+    fn late_details_never_touch_another_card() {
+        let mut sentence = result("ephemeral", "短暂的");
+        sentence.kind = "sentence".to_string();
+        let mut entries = vec![entry(1, &sentence)];
+
+        assert!(!fill_details(&mut entries, "ephemeral", &details()));
+        assert!(!fill_details(&mut entries, "resilient", &details()));
+        assert!(entries[0].result.phonetic.is_none());
+    }
+
+    #[test]
+    fn late_details_keep_what_the_card_already_showed() {
+        let mut word = result("ephemeral", "短暂的");
+        word.kind = "word".to_string();
+        word.phonetic = Some("/from the dictionary/".to_string());
+        word.example = Some("kept".to_string());
+        let mut entries = vec![entry(1, &word)];
+
+        assert!(fill_details(&mut entries, "ephemeral", &details()));
+        assert_eq!(
+            entries[0].result.phonetic.as_deref(),
+            Some("/from the dictionary/")
+        );
+        assert_eq!(entries[0].result.example.as_deref(), Some("kept"));
+        assert_eq!(entries[0].result.meanings.len(), 1);
+    }
+
+    fn details() -> WordDetails {
+        WordDetails {
+            phonetic: Some("/ɪˈfem.ər.əl/".to_string()),
+            meanings: vec![crate::translate::Meaning {
+                part_of_speech: "adjective".to_string(),
+                definitions: vec!["lasting a very short time".to_string()],
+            }],
+            example: Some("an ephemeral joy".to_string()),
+        }
     }
 }

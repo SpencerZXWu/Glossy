@@ -4,6 +4,8 @@
 //! translation, the detected source language, phonetics, a dictionary and an
 //! example sentence in a single request.
 
+use std::time::Duration;
+
 use crate::classify::Kind;
 
 use super::{Meaning, TranslationResult};
@@ -56,9 +58,39 @@ pub async fn translate(
     target: &str,
     kind: Kind,
 ) -> Result<TranslationResult, String> {
+    run(client, text, source, target, kind, None).await
+}
+
+/// How long each request of `translate_quickly` may take.
+const QUICK_BUDGET: Duration = Duration::from_secs(3);
+
+/// The same lookup, giving up on a request after `QUICK_BUDGET`.
+///
+/// Used for the extras of a card — phonetic symbols, meanings, an example —
+/// which fill in while the user is already reading the translation: an endpoint
+/// that is slow or unreachable on this network must not keep them waiting, and
+/// whatever has not arrived is simply left out.
+pub async fn translate_quickly(
+    client: &reqwest::Client,
+    text: &str,
+    source: &str,
+    target: &str,
+    kind: Kind,
+) -> Result<TranslationResult, String> {
+    run(client, text, source, target, kind, Some(QUICK_BUDGET)).await
+}
+
+async fn run(
+    client: &reqwest::Client,
+    text: &str,
+    source: &str,
+    target: &str,
+    kind: Kind,
+    budget: Option<Duration>,
+) -> Result<TranslationResult, String> {
     let mut failure = None;
     for name in CLIENTS {
-        match request(client, name, text, source, target, kind).await {
+        match request(client, name, text, source, target, kind, budget).await {
             Ok(result) => return Ok(result),
             Err(error) => failure = Some(error),
         }
@@ -73,10 +105,14 @@ async fn request(
     source: &str,
     target: &str,
     kind: Kind,
+    budget: Option<Duration>,
 ) -> Result<TranslationResult, String> {
     let url = endpoint(name, text, source, target, kind == Kind::Word);
-    let response = client
-        .get(&url)
+    let mut call = client.get(&url);
+    if let Some(budget) = budget {
+        call = call.timeout(budget);
+    }
+    let response = call
         .send()
         .await
         .map_err(|error| format!("Could not reach Google Translate: {error}"))?;
