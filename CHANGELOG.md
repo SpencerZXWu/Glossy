@@ -8,6 +8,8 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-09-20
+
 ### Added
 
 - **Baidu and Youdao as channels of their own, still with nothing to set up.**
@@ -52,6 +54,14 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
   Running your own deployment is a one-line change of `DEFAULT_ENDPOINT` in
   `src-tauri/src/translate/cloud.rs`; a build made without one still honors the
   setting.
+
+### Fixed
+
+- A second launch of Glossy now shows the same starting hint in the corner of the
+  screen that a start of its own would, instead of an unstyled Windows dialog. The
+  running instance is told through a named event and answers by opening the settings
+  window when it is already on screen, or by showing the hint when it is not; the
+  dialog is left only for the case where nothing answers at all.
 
 ## [1.0.1] - 2026-09-20
 

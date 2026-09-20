@@ -355,16 +355,38 @@ fn pick_app() {
     selection::arm_pick();
 }
 
+/// Shows what a start of Glossy shows: the settings window when it is already
+/// open, and otherwise the hint in the corner of the screen that says Glossy is
+/// up.
+fn show_launch_surface(handle: &AppHandle) {
+    let open = handle
+        .get_webview_window(MAIN_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    if open {
+        tray::show_main(handle);
+    } else {
+        notice::show(handle);
+    }
+}
+
 pub fn run() {
     // Two instances would install two mouse hooks and race over one popup.
     let _guard = match instance::claim() {
-        instance::Claim::First(guard) => Some(guard),
+        instance::Claim::First(guard) => Some(Arc::new(guard)),
         instance::Claim::Taken => {
-            instance::report_already_running();
+            // The running instance answers by showing what a start of its own
+            // shows; only a launch nobody answers has to speak for itself.
+            if !instance::announce_launch() {
+                instance::report_already_running();
+            }
             return;
         }
         instance::Claim::Unavailable => None,
     };
+    // A later launch reaches this process through the guard, so the watcher
+    // needs a handle on it that outlives `run`.
+    let watcher = _guard.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_autostart::init(
@@ -397,6 +419,18 @@ pub fn run() {
 
             if let Err(error) = tray::install(&handle, language) {
                 eprintln!("Glossy could not add its notification area icon: {error}");
+            }
+
+            // A second launch asks this instance to show itself, which it does
+            // the same way a start of its own would. Registered once the icon
+            // exists, so there is something to focus either way.
+            if let Some(guard) = watcher {
+                let handle = handle.clone();
+                guard.watch(move || {
+                    let handle = handle.clone();
+                    let shown = handle.clone();
+                    let _ = handle.run_on_main_thread(move || show_launch_surface(&shown));
+                });
             }
 
             if let Some(popup) = app.get_webview_window(POPUP_LABEL) {
