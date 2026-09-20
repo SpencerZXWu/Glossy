@@ -8,12 +8,12 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `0.3.2`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~12,400 lines: ~7,200 Rust, ~4,300 frontend (plain HTML/CSS/JS) and ~970 frontend test lines, comments included |
+| Version | `0.3.3`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~12,700 lines: ~7,300 Rust, ~4,400 frontend (plain HTML/CSS/JS) and ~970 frontend test lines, comments included |
 | Tests | 132 Rust tests and 81 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
-| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/`, `v0.3.0` in `release/v0.3.0/`, `v0.3.1` in `release/v0.3.1/`, `v0.3.2` in `release/v0.3.2/` |
+| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/`, `v0.3.0` in `release/v0.3.0/`, `v0.3.1` in `release/v0.3.1/`, `v0.3.2` in `release/v0.3.2/`, `v0.3.3` in `release/v0.3.3/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the

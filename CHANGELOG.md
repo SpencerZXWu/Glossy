@@ -8,6 +8,8 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-09-20
+
 ### Added
 
 - The translate box that the settings window already carried now sits at the top
@@ -287,7 +289,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.3.0
