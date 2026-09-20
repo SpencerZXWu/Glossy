@@ -131,6 +131,20 @@ if (-not $SkipBuild) {
     if ($LASTEXITCODE -ne 0) { throw "The release build failed with exit code $LASTEXITCODE." }
 }
 
+# The GNU toolchain links WebView2Loader.dll dynamically, so the installer has to
+# carry it next to glossy.exe. build.rs stages the file and bundle.resources ships
+# it; catch a missing or unslotted resource here rather than in a user's error box.
+$loader = Join-Path $root 'src-tauri\resources\WebView2Loader.dll'
+if (-not (Test-Path -LiteralPath $loader)) {
+    throw 'src-tauri\resources\WebView2Loader.dll was not staged by build.rs; the installer would not start.'
+}
+
+$nsi = Join-Path $root 'src-tauri\target\release\nsis\x64\installer.nsi'
+if ((Test-Path -LiteralPath $nsi) -and
+    -not (Select-String -LiteralPath $nsi -SimpleMatch 'oname=WebView2Loader.dll' -Quiet)) {
+    throw 'The generated installer.nsi does not install WebView2Loader.dll; check bundle.resources in tauri.conf.json.'
+}
+
 $bundleDir = Join-Path $root 'src-tauri\target\release\bundle\nsis'
 # Only what this version built: an installer left behind by an earlier build sits
 # in the same directory and must not be staged into the new release folder.

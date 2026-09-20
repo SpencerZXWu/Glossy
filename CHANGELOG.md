@@ -8,6 +8,22 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-20
+
+### Fixed
+
+- The installer now ships `WebView2Loader.dll`, so a freshly installed Glossy
+  starts instead of failing at launch with the Windows error "WebView2Loader.dll
+  was not found" (`由于找不到 WebView2Loader.dll，无法继续执行代码`). The GNU
+  toolchain Glossy is built with links that DLL dynamically, and `tauri-build`
+  copies it next to `glossy.exe` for local runs only, so the previous installers
+  carried nothing but the executable. `build.rs` now stages the DLL from the
+  `webview2-com-sys` build output into `src-tauri/resources/` and
+  `bundle.resources` ships it, which installs it flat into the app folder beside
+  the executable. `scripts/release.ps1` refuses to stage a release when the
+  staged DLL is missing or the generated installer does not include it, so this
+  cannot ship silently again.
+
 ### Changed
 
 - The README is written in the same three languages as the release notes, in the
@@ -260,7 +276,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.2.0

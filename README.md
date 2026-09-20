@@ -320,6 +320,12 @@ no Visual Studio installation, but there are two quirks:
   scripts cannot tell binary and test targets apart, so binary targets receive the
   archive twice and GNU ld prints `.rsrc merge failure: multiple non-default
   manifests` warnings; the resulting `.exe` still carries the manifest and runs.
+- The GNU target links `WebView2Loader.dll` dynamically, where MSVC links it into
+  the executable, so the installer has to carry the DLL as well. `src-tauri/build.rs`
+  copies the one `webview2-com-sys` built into `src-tauri/resources/`,
+  `bundle.resources` places it next to `glossy.exe` in the installed app, and
+  `scripts/release.ps1` refuses to stage a release without it. The copy `tauri-build`
+  leaves in `target/<profile>/` only covers running from the build directory.
 
 ```powershell
 cd src-tauri
@@ -598,7 +604,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 ### 工具链说明（Windows，GNU 工具链）
 
 本项目使用 GNU Rust 目标（`x86_64-pc-windows-gnu`）构建，它不需要安装
-Visual Studio，但有两个小怪癖：
+Visual Studio，但有三个小怪癖：
 
 - `windows` crate 会让导入表增长到旧版 MinGW binutils 无法接受的程度。
   因此 `src-tauri/Cargo.toml` 声明了 `[lib] crate-type = ["rlib"]`，应用 crate 只作为二进制文件链接。
@@ -607,6 +613,11 @@ Visual Studio，但有两个小怪癖：
   `cargo:rustc-link-arg`，以覆盖每个测试目标。构建脚本无法区分二进制目标和测试目标，
   因此二进制目标会收到两次该归档，GNU ld 会打印 `.rsrc merge failure: multiple non-default
   manifests` 警告；生成的 `.exe` 仍然携带清单并能运行。
+- GNU 目标以动态方式链接 `WebView2Loader.dll`（MSVC 会把它直接链进可执行文件），
+  因此安装包必须一并携带这个 DLL。`src-tauri/build.rs` 会把 `webview2-com-sys`
+  构建出来的那个复制到 `src-tauri/resources/`，`bundle.resources` 让它在安装好的
+  程序目录里落在 `glossy.exe` 旁边，`scripts/release.ps1` 在缺少它时会拒绝发版。
+  `tauri-build` 自己复制到 `target/<profile>/` 的那一份只够从构建目录直接运行。
 
 ```powershell
 cd src-tauri
@@ -1002,7 +1013,7 @@ real en algún momento y ninguno está cubierto por las pruebas automatizadas.
 ### Notas sobre la cadena de herramientas (Windows, cadena GNU)
 
 El proyecto se compila con el destino GNU de Rust (`x86_64-pc-windows-gnu`), que no
-necesita una instalación de Visual Studio, pero hay dos peculiaridades:
+necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 - El crate `windows` hace crecer la tabla de importaciones más allá de lo que
   aceptan los binutils antiguos de MinGW. Por eso `src-tauri/Cargo.toml` declara
@@ -1017,6 +1028,13 @@ necesita una instalación de Visual Studio, pero hay dos peculiaridades:
   archivo dos veces y GNU ld imprime avisos `.rsrc merge failure: multiple
   non-default manifests`; el `.exe` resultante sigue llevando el manifiesto y
   funciona.
+- El destino GNU enlaza `WebView2Loader.dll` de forma dinámica (MSVC lo integra en
+  el ejecutable), así que el instalador también tiene que llevarse el DLL.
+  `src-tauri/build.rs` copia el que compila `webview2-com-sys` en
+  `src-tauri/resources/`, `bundle.resources` lo coloca junto a `glossy.exe` en la
+  aplicación instalada y `scripts/release.ps1` se niega a preparar una versión sin
+  él. La copia que deja `tauri-build` en `target/<profile>/` solo sirve para
+  ejecutar desde el directorio de compilación.
 
 ```powershell
 cd src-tauri

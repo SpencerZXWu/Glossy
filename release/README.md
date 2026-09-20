@@ -92,6 +92,15 @@ without one.
 2. `git tag -a vX.Y.Z -m "Glossy vX.Y.Z"` and `git push origin vX.Y.Z`.
 3. Create the release on GitHub for that tag — paste `RELEASE_NOTES.md` into the
    description, all three languages and the anchor links included.
-4. Attach the installer and `SHA256SUMS.txt`.
+4. Attach the installer and `SHA256SUMS.txt`. The installer has to be the one **this
+   version staged**, whose file name carries the version, and `SHA256SUMS.txt` is
+   generated from that same file — a mismatched pair means the wrong build is going
+   out. v0.3.1 was published with v0.3.0's installer attached, which is how a release
+   shipped without the fixes it described.
+
+The GNU build links `WebView2Loader.dll` dynamically, so an installer that does not
+carry it produces an app that dies on launch with "WebView2Loader.dll was not found".
+`scripts/release.ps1` stops before staging when the DLL is not in `src-tauri/resources/`
+or the generated `installer.nsi` does not install it.
 
 Versions and their acceptance criteria are in [../ROADMAP.md](../ROADMAP.md).

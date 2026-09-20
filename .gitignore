@@ -1,6 +1,9 @@
 node_modules/
 src-tauri/target/
 src-tauri/gen/schemas/
+
+# Staged from webview2-com-sys by src-tauri/build.rs so the installer can ship it; see README
+src-tauri/resources/WebView2Loader.dll
 .tmp/
 .mixmark/
 *.log
