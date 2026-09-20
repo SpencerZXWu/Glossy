@@ -1,3 +1,7 @@
+[English](#en) · [中文](#zh-cn) · [Español](#es)
+
+<a id="en"></a>
+
 # Glossy
 
 [![CI](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml/badge.svg)](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml)
@@ -319,7 +323,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 128 tests; see "Checks" above for lint and format runs
+cargo test   # 132 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -375,5 +379,703 @@ process. Each release maps to a GitHub milestone of the same name.
 [CHANGELOG.md](./CHANGELOG.md) lists what shipped in every released version.
 
 ## License
+
+[MIT](./LICENSE) © 2026 Spencer Wu
+
+<a id="zh-cn"></a>
+
+# Glossy · 中文
+
+[![CI](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml/badge.svg)](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml)
+
+一款轻量的 Windows 桌面翻译弹窗。在任意应用里用鼠标选中文字，Glossy 就会在光标下方显示一张小小的浮动卡片，上面是译文。
+
+- **单词或短语** → 音标、词性、释义和一个例句。
+- **句子或段落** → 顺应目标语言的流畅译文。
+- **译文仍用目标语言不使用的单位书写的计量或金额** → 换算后的数值和换算率，直接显示在卡片里（`12 ft ≈ 3.66 m`）。货币汇率实时查询，其余单位都内置于应用中。可在设置中关闭。
+- 源语言会自动识别。
+- 以句末标点（`.`, `?`, `!`, `。` 等）结尾的选区，无论多短，都按句子翻译。
+
+## 安装
+
+从 [Releases](https://github.com/SpencerZXWu/Glossy/releases/latest) 下载最新安装包（`Glossy_<version>_x64-setup.exe`）并运行。Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。
+
+安装包尚未代码签名，因此 SmartScreen 会警告未知发布者。若想改为从源码构建，请见 [开发](#开发)。
+
+## 使用方法
+
+1. 启动 Glossy。设置窗口只在首次启动时打开——之后的启动都会安静地在通知区域运行，Glossy 从启动那一刻起就开始监听选区。
+2. 关闭该窗口并不会退出 Glossy——它会在后台继续监听选区。点击通知区域中的 Glossy 图标（或在其菜单中选择**打开 Glossy**）可以把窗口重新调出来，用同一个菜单中的**退出**来结束 Glossy。在已经运行时再次启动 Glossy，只会显示一条简短提示。静默启动会由右下角的一张小卡片告知；它几秒后淡出，点击它会打开设置窗口。Windows 11 会把新的通知区域图标收进溢出菜单（时钟旁的 `^`）——把图标拖到任务栏上，或在**设置 → 个性化 → 任务栏 → 其他系统托盘图标**中打开它，即可让它保持可见。
+3. 在任何应用中，**拖动划过文字**（或**双击一个单词**）即可选中它。
+4. 弹窗出现在光标下方。拖动它的标题栏可以移动它，用按钮复制结果或将它关闭，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*。
+5. 短于所设最小长度的选区（默认 2 个字符）会被忽略，起点或终点落在弹窗本身的拖动永远不会触发翻译。
+
+按下全局快捷键（默认 **Ctrl+Alt+C**）可以改为翻译剪贴板内容，而无需选中任何东西。
+
+弹窗是一个不抢焦点、始终置顶的窗口：它绝不会从你正在阅读的应用那里抢走键盘焦点。它始终保持在光标所在显示器的工作区之内，下方没有空间时会翻到光标上方。
+
+### 设置
+
+| 选项 | 含义 |
+| --- | --- |
+| 界面语言 | `跟随系统`、`简体中文` 或 `English`。会立即切换设置窗口和弹窗。 |
+| 开启划词翻译 | 总开关。关闭后立即暂停全局划词捕获。 |
+| 随 Windows 启动 | 在 `HKCU\...\Run` 中写入一条 `--autostart` 项，这样登录后 Glossy 就已经在通知区域待命。这样启动时不会显示"Glossy 已在后台运行"卡片。 |
+| 拖动鼠标划过文字时翻译 | 启用拖动划词手势。 |
+| 双击单词时翻译 | 启用双击手势。 |
+| 读取选区后恢复剪贴板 | 在 Glossy 复制了选区之后，恢复你原先的剪贴板内容。 |
+| 在弹窗中显示原文 | 关闭时隐藏卡片中的原文行。 |
+| 把译文语言不常用的计量与货币换算过来 | 当译文仍用目标语言不使用的单位来计量某样东西时——英尺、磅、°F、外币金额——卡片会在下方补上换算后的数值和换算率（`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`）。数值是从译文中读取的，因为只有翻译服务才能判断一个符号到底是不是单位，而且它总是用单位表所认识的语言书写；如果译文里没有，就改为读取原文。长度、质量、体积、速度、面积和温度都在各自类别内换算，目标单位取人们实际会写的那个；目标货币跟随目标语言（`zh-CN` → CNY，`en` → USD）。货币汇率来自 `open.er-api.com`（备用 ECB），缓存六小时；其余一切都内置于应用中。关闭表示不换算，也不请求汇率。 |
+| 触发翻译的最短长度 | 低于该字符数的选区会被忽略（`1`–`40`，默认 `2`）。 |
+| 全局快捷键 | 用于翻译剪贴板内容的快捷键，例如 `Ctrl+Alt+C`。清空该字段即可关闭它。字段下方的一行显示已注册的组合，或 Windows 拒绝它的原因。 |
+| 以下程序中不翻译 | 一份进程名列表（`idea64.exe`、`mstsc`），其中的程序会跳过划词捕获。输入名字即可添加（`.exe` 后缀可选——`添加` 按钮会把它规范化），也可以从当前运行程序的下拉框中选择，或按下 `用鼠标拾取` 后点选要忽略的窗口。每个条目都有一个 `×` 可以删除；重复项按大小写不敏感处理并被丢弃。 |
+| 配色 | `跟随系统` 跟随 Windows 的浅色/深色偏好；`始终浅色` 和 `始终深色` 会在两个窗口中强制使用一种方案。 |
+| 文字大小 | 弹窗中所有文字大小的倍数（`90 %`–`150 %`）。 |
+| 宽度 | 弹窗卡片宽度（`300`–`520` CSS 像素）。 |
+| 不透明度 | 弹窗卡片的透明程度（从 `100 %` 不透明一直到 `50 %`）。卡片会变淡，而文字在它背后的任何内容之上都保持可读。 |
+| 自动关闭 | 弹窗自行隐藏前的秒数；`不自动关闭` 会让它一直开着直到被关闭。 |
+| 复制译文后立即关闭弹窗 | 使用过复制按钮后隐藏卡片。 |
+| 翻译为 | 译文要翻译成的语言。 |
+| 历史记录 | 记住多少条已完成的翻译（`关闭` 到 `最近 500 条`，默认 50）。选择器下方的列表保留原文、译文、翻译渠道和时间；`搜索` 会同时过滤两段文本，点击一条记录会在浮动卡片中再次显示它（不会再次请求翻译渠道），每条记录都有复制和删除按钮。`清空历史记录` 会清空列表。该文件位于 `%APPDATA%\com.glossy.translator\history.json`。 |
+| 设置文件 | `导出…` 会写入 `Documents\glossy-settings.json`；`导入…` 会把你选择的文件读回应用中。勾选 `导出文件中包含我的 API 密钥` 可以连同密钥一起带走——Glossy 在以明文写入之前会再确认一次。导入会通过 `sanitized()` 校验，并在写入磁盘的过程中用 DPAPI 保护它带来的密钥。 |
+| 更新 | `启动 Glossy 时检查新版本` 会在每次启动时询问 GitHub Releases（默认关闭）。`立即检查` 会立刻查看并说明是哪个版本在等待，`下载并重启` 则会安装它。没有更新签名密钥的构建——在发布密钥对存在之前的所有构建都是如此——会隐藏这些按钮并说明原因。 |
+| 翻译渠道 | `google`（免费，无需密钥）、`baidu`（每月免费额度，APP ID + 密钥）、`zhipu`（免费额度，API Key）、`deepl` 或 `openai`（API Key）。 |
+| APP ID / API Key | 只在需要它们的渠道中显示：`baidu` 需要两个字段，`zhipu`、`deepl` 和 `openai` 只需要密钥，免费的 `google` 渠道则两个都不显示。这些值按渠道分别记住，因此切换到之前配置过的渠道时会把它自己的字段重新填好。 |
+
+快捷键接受 `Ctrl`/`Control`、`Alt`、`Shift`、`Win`/`Meta` 外加一个按键：
+字母、数字、`F1`–`F24`、`Space`、`Enter`、`Tab`、`Esc`、`Backspace`、
+`Delete`、`Insert`、`Home`、`End`、`PageUp`、`PageDown` 或方向键。至少
+需要一个修饰键。当 Windows 拒绝该组合时——通常是因为别的程序已经占用了它——
+原因会显示在字段下方，并且在该设置被改正之前快捷键一直不会生效。
+
+如果剪贴板里完全没有文本，快捷键会退回到复制当前选区，所以"选中文字，按下快捷键"也一样管用。
+
+### 翻译渠道
+
+| 翻译渠道 | 费用 | 说明 |
+| --- | --- | --- |
+| `google` | 免费，无需密钥 | 公开的 `translate.googleapis.com` 接口。在部分网络中被屏蔽，包括中国大陆的大部分地区。始终以 `dict-chrome-ex` 客户端 id 查询；被限流的 `gtx` id 只作为后备。 |
+| `baidu` | 每月免费额度，APP ID + 密钥 | 百度翻译开放平台（`fanyi-api.baidu.com/api/trans/vip/translate`）。中国大陆可直接访问，每月免费额度 50,000 字符，完成免费的个人认证后提升到 1,000,000。需要 <https://fanyi-api.baidu.com> 上的 **APP ID** 和**密钥**。会传递 `from=auto`，因此源语言会被识别。 |
+| `zhipu` | 免费额度，API Key | 智谱 `glm-4.7-flash` 对话模型。中国大陆可直接访问，一次调用即可返回译文、音标、释义和一个例句。密钥来自 <https://open.bigmodel.cn>。⚠️ 智谱的用户协议把非付费模型授权为**仅限非商业的个人研究学习**——在发布 Glossy 之前请先看下文。 |
+| `deepl` | API Key | 以 `:fx` 结尾的密钥使用免费接口。 |
+| `openai` | API Key | `gpt-4o-mini`。 |
+
+单个单词的音标和释义来自 `api.dictionaryapi.dev`，它免费、无需密钥，且中国大陆可直接访问。只有在所选渠道没有返回某些细节时，才会去请求 Google 接口。
+
+### 免费额度与商业使用
+
+各免费额度在许可范围上并不相同：
+
+- **智谱** —— 用户协议 §非付费功能 只把免费模型授权给*非商业的、个人研究学习*用途。个人使用没问题；用于已发布或收费的产品则不行。
+- **ModelScope API-Inference** —— 明确为非商业化、非盈利。
+- **阿里云机器翻译** —— 每月免费额度明确仅适用客户试用场景。
+- **腾讯云 TMT** —— 每月 5M 字符的免费额度仍在宣传，但该服务已不再提供文本翻译：自 2026-03 和 2026-07 的版本起，`TextTranslate`、`TextTranslateBatch`、`ImageTranslate`、`LanguageDetect` 和 `SpeechTranslate` 动作已被移除，API 概览中只列出 `ImageTranslateLLM`。计费概述页面已经过时，所以不要指望它。
+- **百度翻译开放平台** —— 未认证 50k 字符/月，个人认证 1M，企业认证 2M。其条款对商业使用只字未提，但服务协议禁止*客户端程序*缓存百度翻译数据，也禁止转售。Glossy 不缓存任何内容，所以这不会造成影响；某个加了缓存的分支则需要重新审视这一点。额度受 QPS 限制为 1 / 10 / 100。
+- **火山引擎** —— 每月 2M 字符，但开通需要签订销售合同。
+- **小牛翻译** —— 注册后每天 200k 字符；商业条款未公开。
+- **SiliconFlow** —— `tencent/Hunyuan-MT-7B` 免费，但平台条款对免费模型只字未提，且只限于企业内部业务用途。
+- **完全离线** —— `Opus-MT` / `Argos Translate` 权重是 CC-BY-4.0/Apache-2.0（可商用，int8 约 83 MB，内存约 300 MB）。`NLLB-200` 是 CC-BY-NC-4.0，**不能**发布。
+
+设置以 JSON 形式保存在 `%APPDATA%\com.glossy.translator\settings.json`。
+该文件中的 `firstRun` 标记记录着欢迎窗口已经显示过；删除它（或整个文件）会在下次启动时把该窗口带回来。
+翻译凭证存放在一个以渠道为键的 `credentials` 映射中，已有的单渠道 `apiKey`/`appId` 值会在首次启动时迁移进该映射。
+该映射中的每个值在写入文件之前都会用 Windows DPAPI（`CryptProtectData`，当前用户范围）加密，因此文件里保存的是
+`"apiKey": "dpapi:AQAAANCM…"` 而不是密钥本身，只有录入它的那个 Windows 登录账户才能读回它。由较早版本写出的文件会在该构建首次启动时得到保护；属于其他登录账户或计算机的值无法解锁，会被丢弃，因此必须重新输入密钥。
+被忽略的程序列表以 `ignoredApps` 数组保存；旧版用逗号分隔的字符串也能接受，并在加载时拆分。
+
+### 在应用内翻译
+
+设置窗口包含与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（这些临时覆盖永远不会被保存）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
+
+### 常见问题
+
+- **"Google Translate is rate limiting requests right now"**（Google 正在限流）—— Google 返回了 `429`，公开接口对桌面 HTTP 客户端常常如此，即便浏览器或 `curl` 仍然能正常工作。Glossy 会先用第二个客户端 id 重试；如果提示还在，等一分钟，或把渠道切换到 `baidu`、`zhipu`、`deepl` 或 `openai`。
+- **"Could not reach Google Translate"**（无法连接 Google Translate）—— 免费的 `google` 渠道会访问 `translate.googleapis.com`，它在部分网络中被屏蔽（包括中国大陆的大部分地区）。卡片会提供重试按钮；如果一直失败，请把渠道切换到 `baidu`（每月免费额度，APP ID 和密钥来自 fanyi-api.baidu.com）、`zhipu`（免费额度，密钥来自 open.bigmodel.cn）、`deepl` 或 `openai`。
+- **"Baidu rejected the APP ID" / "Baidu rejected the signature"**（百度拒绝了 APP ID / 百度拒绝了签名）—— 凭证对的两半被对调或输错了。`baidu` 需要在第一个框中填 APP ID，第二个框填密钥；密钥从不会被发送给百度，它只用来给请求签名。
+- **"Baidu rejected this computer's IP address"**（百度拒绝了本机的 IP 地址）—— 百度控制台中该应用的 IP 白名单被填上了内容。要么清空它，要么把 Glossy 拨号所用的地址加进去。
+- **弹窗显示"已暂停"**，尽管翻译是开启的 —— 设置窗口中的总开关被关掉了，或者启动时设置文件无法读取。
+
+## 划词是如何捕获的
+
+Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道。
+
+## 开发
+
+### 环境要求
+
+| 工具 | 版本 | 说明 |
+| --- | --- | --- |
+| Node.js | 18 或更新 | 仅用于 Tauri CLI；前端没有打包器 |
+| Rust | stable，`1.77` 或更新 | GNU 目标 `x86_64-pc-windows-gnu` —— 见下文 |
+| `rustfmt` + `clippy` | 同一工具链 | `rustup component add rustfmt clippy` |
+| MinGW-w64 | 8.1 或更新 | GNU 目标的链接器；需在 `PATH` 中作为 `gcc.exe` |
+
+```powershell
+rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --component clippy
+rustup default stable-x86_64-pc-windows-gnu
+npm.cmd install          # npm.ps1 is blocked by the default execution policy
+npm.cmd run tauri dev    # dev build with hot reload of src/
+npm.cmd run tauri build  # release build (installer + .exe)
+```
+
+`npm.cmd run icon` 会从 `assets/` 重新生成 `src-tauri/icons`。
+
+`npm.cmd run tauri build` 会把安装包写到
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe`，把独立可执行文件写到
+`src-tauri\target\release\Glossy.exe`。NSIS 打包器首次运行需要网络连接，以下载它的插件。
+
+`scripts\release.ps1` 封装了发布构建：它会把安装包暂存到
+`release\v<version>\`，连同校验和与发布说明的文本。用
+`powershell -ExecutionPolicy Bypass -File
+scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这也是上面使用 `npm.cmd` 的同一个原因。参见 [release/README.md](./release/README.md)。
+
+### 检查
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
+node --test                                                          # 81 frontend tests
+cd src-tauri
+cargo fmt --all --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+```
+
+`npm test` 运行的是同一条 `node --test` 命令。前端测试把
+`src/js/i18n.js` 和 `src/js/render.js` 加载进一个最小 DOM（见 `tests/helpers/`），
+覆盖词典、占位符替换和卡片渲染器。在 Node 24/Windows 上请使用纯目录形式运行——`node --test tests` 和
+`node --test .` 在那里无法解析测试文件。
+
+版本号存在于六个地方（见 `scripts\version.ps1`），所以绝不要手动修改它们：
+`tauri.conf.json` 是权威来源，`scripts\version.ps1 -Set 0.1.2` 会把它写到其他所有地方，
+`scripts\version.ps1 -Get` 会为 `release.ps1` 之类的脚本打印它，后者在版本号不一致时拒绝构建。同一个检查也在 CI 中运行，所以忘记升版本会让构建失败。
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) 会在每次推送和拉取请求时，于 `windows-latest` 上运行全部四项检查以及前端测试套件。
+
+### 更新
+
+Glossy 会向
+`https://github.com/SpencerZXWu/Glossy/releases/latest/download/latest.json` 查询是否有更新的版本。只有携带用发布密钥生成的签名时，更新才会被接受：
+
+```powershell
+cargo tauri signer generate -w $env:USERPROFILE\.tauri\glossy.key   # once
+```
+
+把打印出来的公钥填入
+`src-tauri\tauri.conf.json` 中的 `plugins.updater.pubkey`（里面的占位符正是设置窗口声称该构建无法自我更新的原因），并在构建发布版之前导出私钥：
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $env:USERPROFILE\.tauri\glossy.key -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
+```
+
+`tauri.conf.json` 中的 `bundle.createUpdaterArtifacts` 在该私钥存在之前保持关闭：
+没有它打包器会失败，有它构建还会写出已签名的安装包和读取更新所用的 `latest.json`。请把私钥留在仓库之外——它是唯一能让发布版被替换的东西。
+
+### 手动回归检查清单
+
+在给发布版打标签之前运行这一清单。其中每一项都曾在某个时刻是真实的 bug，而且没有任何一项被自动化测试覆盖。
+
+| # | 要做的事 | 应有的结果 |
+| --- | --- | --- |
+| 1 | 在干净的配置下启动 Glossy | 设置窗口打开，没有任何东西被意外预选，状态行显示捕获正在运行 |
+| 2 | 关闭设置窗口，然后再次启动 Glossy | 没有第二个窗口，也没有第二个鼠标钩子：通知显示 Glossy 已在运行，托盘图标可以再次打开窗口 |
+| 3 | 勾选"随 Windows 启动"，重启，然后登录 | 没有控制台窗口闪现，没有"运行中"卡片出现，托盘图标就在那里 |
+| 4 | 取消勾选，重启 | Glossy 没有启动（`reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v Glossy` 查不到任何内容） |
+| 5 | 在记事本、浏览器、Word 和终端中选中一个单词 | 每次弹窗都出现在光标下方，并带有该单词的音标和释义 |
+| 6 | 在同样的每个程序中选中一个句子 | 弹窗只显示译文，没有音标或释义 |
+| 7 | 把弹窗拖到每台显示器和每个屏幕边缘 | 卡片在每台显示器上、在 100 %、125 % 和 150 % 缩放下都保持在工作区内 |
+| 8 | 固定弹窗，点击桌面别处，等待超过自动关闭超时 | 卡片保持打开，直到取消固定或使用 × |
+| 9 | 点击未固定卡片的外部 | 点击一落到外面，它就关闭 |
+| 10 | 在 Windows 中切换浅色/深色，然后在设置中强制使用每种方案 | 两个窗口都跟随该选择，两者的文字和边框都清晰可读 |
+| 11 | 用五个渠道各翻译一次，其中一个使用错误的密钥 | 正常的那些能出结果；填错的那个显示可读的错误和重试按钮 |
+| 12 | 把正在运行的程序加入忽略列表，在其中翻译，然后移除它 | 它在列表中时不会弹出任何东西，移除后弹窗恢复 |
+| 13 | 剪贴板中有文本时按全局快捷键，然后在剪贴板为空且有选区时再按一次 | 第一种情况下译文在光标旁打开，第二种情况下使用当前选区 |
+| 14 | 不带密钥导出、带密钥导出，然后分别导入这两个文件 | 普通导出没有 `credentials` 块；带密钥的导出会先请求确认；导入会恢复每一项设置，且密钥可用 |
+| 15 | 把历史记录设为 `最近 50 条`，翻译 60 段文本，然后把它设为 `关闭` | 列表保留 50 条，搜索能过滤它们，点击一条会在卡片中重新打开它，`关闭` 会清空文件 |
+| 16 | 修改不透明度、字号和宽度，然后重启 | 弹窗保持所选择的值 |
+| 17 | 打开更新部分 | 没有签名密钥的这个构建会隐藏检查按钮并说明该构建无法自我更新；密钥对存在之后，`立即检查` 要么报告当前运行的版本，要么报告正在等待的那个版本 |
+
+### 工具链说明（Windows，GNU 工具链）
+
+本项目使用 GNU Rust 目标（`x86_64-pc-windows-gnu`）构建，它不需要安装
+Visual Studio，但有两个小怪癖：
+
+- `windows` crate 会让导入表增长到旧版 MinGW binutils 无法接受的程度。
+  因此 `src-tauri/Cargo.toml` 声明了 `[lib] crate-type = ["rlib"]`，应用 crate 只作为二进制文件链接。
+- `cargo test` 在测试执行器中也同样需要生成的资源归档（图标、版本信息和
+  common-controls v6 清单），否则执行器会在 `main` 之前以 `0xC0000139` 启动失败。`src-tauri/build.rs` 为 `libresource.a` 添加了一条普通的
+  `cargo:rustc-link-arg`，以覆盖每个测试目标。构建脚本无法区分二进制目标和测试目标，
+  因此二进制目标会收到两次该归档，GNU ld 会打印 `.rsrc merge failure: multiple non-default
+  manifests` 警告；生成的 `.exe` 仍然携带清单并能运行。
+
+```powershell
+cd src-tauri
+cargo test   # 132 tests; see "Checks" above for lint and format runs
+```
+
+## 目录结构
+
+```
+src/                     frontend (plain HTML/CSS/JS, no bundler)
+  index.html             settings window + in-app translate card
+  popup.html             floating card
+  notice.html            "already running in the background" card
+  js/bridge.js           Tauri IPC helpers used by both windows
+  js/i18n.js             English/Chinese dictionaries and DOM translation
+  js/render.js           shared card renderer (word, sentence, loading, error)
+  js/theme.js            resolves system/light/dark for every window
+  js/app.js              settings window logic
+  js/popup.js            popup window logic
+  js/notice.js           start card logic
+  styles/tokens.css      the only place a colour, radius, shadow or duration is written
+tests/                   node --test suite for i18n.js and render.js
+src-tauri/src/
+  main.rs  lib.rs        window setup, Tauri commands
+  selection.rs           global mouse hook, gesture tracking, capture
+  hotkey.rs              global hotkey registration and parsing
+  classify.rs            word/phrase vs. sentence detection
+  units/                 unit and currency conversion for the card
+  translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
+  popup.rs               placement/clamping geometry
+  surface.rs             Mica backdrop and title bar colour
+  history.rs             the translation store behind the History panel
+  autostart.rs           the login item and the --autostart marker
+  updater.rs             the release feed behind the Updates section
+  secrets.rs             DPAPI protection for the stored API keys
+  notice.rs              start card placement and lifetime
+  tray.rs                notification area icon: open the window, quit
+  instance.rs            named-mutex guard against a second Glossy
+  console.rs             borrows the console of the terminal that started Glossy
+  platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
+  clipboard.rs  settings.rs  state.rs  input.rs
+scripts/
+  version.ps1            the version number, in one place
+  release.ps1            release build + staging for a GitHub release
+.github/workflows/
+  ci.yml                 format, lint, test and version check on every push
+release/
+  v<version>/            installer, RELEASE_NOTES.md and checksum of a release
+```
+
+## 路线图
+
+[ROADMAP.md](./ROADMAP.md) 记录了计划发布的版本（`v0.1.1` 到 `v1.0.0`）及其验收标准、版本号策略、已知风险和发布流程。每个版本都对应一个同名的 GitHub 里程碑。
+
+[CHANGELOG.md](./CHANGELOG.md) 列出了每个已发布版本中交付的内容。
+
+## 许可证
+
+[MIT](./LICENSE) © 2026 Spencer Wu
+
+<a id="es"></a>
+
+# Glossy · Español
+
+[![CI](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml/badge.svg)](https://github.com/SpencerZXWu/Glossy/actions/workflows/ci.yml)
+
+Un traductor emergente de escritorio y ligero para Windows. Selecciona texto con
+el ratón en cualquier aplicación y Glossy muestra una pequeña tarjeta flotante
+con la traducción bajo el cursor.
+
+- **Palabra o frase corta** → símbolos fonéticos, categoría gramatical, definiciones y un ejemplo.
+- **Oración o párrafo** → una traducción fluida a tu idioma de destino.
+- **Una medida o una cantidad** que la traducción sigue expresando en una unidad
+  que tu idioma de destino no utiliza → el valor convertido y el factor de
+  conversión, directamente en la tarjeta (`12 ft ≈ 3.66 m`). Los tipos de cambio
+  de las divisas se consultan en vivo; todas las demás unidades están integradas
+  en la aplicación. Se puede desactivar en los ajustes.
+- El idioma de origen se detecta automáticamente.
+- Una selección que termina con puntuación de oración (`.`, `?`, `!`, `。` …) se
+  traduce siempre como oración, por corta que sea.
+
+## Instalación
+
+Descarga el instalador más reciente desde
+[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest)
+(`Glossy_<version>_x64-setup.exe`) y ejecútalo. Windows 11 x64; se necesita
+WebView2, que viene incluido en las versiones actuales de Windows.
+
+El instalador todavía no está firmado con un certificado de código, así que
+SmartScreen advierte de un editor desconocido. Para compilarlo desde el código
+fuente, consulta [Desarrollo](#desarrollo).
+
+## Uso
+
+1. Inicia Glossy. La ventana de ajustes se abre solo en el primer arranque; los
+   arranques posteriores se inician en silencio en el área de notificación, y
+   Glossy escucha las selecciones desde el momento en que arranca.
+2. Cerrar esa ventana no cierra Glossy: sigue vigilando las selecciones en
+   segundo plano. Haz clic en el icono de Glossy del área de notificación (o
+   elige **Open Glossy** en su menú) para volver a mostrar la ventana, y usa
+   **Quit** en ese mismo menú para detener Glossy. Iniciar Glossy cuando ya se
+   está ejecutando solo muestra un breve aviso. Un arranque silencioso se anuncia
+   con una pequeña tarjeta en la esquina inferior derecha; se desvanece a los
+   pocos segundos y, al hacer clic en ella, se abre la ventana de ajustes. Windows
+   11 mantiene los iconos nuevos del área de notificación en el menú de
+   desbordamiento (el `^` que hay junto al reloj): arrastra el icono a la barra de
+   tareas, o actívalo en **Settings → Personalization → Taskbar → Other system
+   tray icons**, para que siga visible.
+3. En cualquier aplicación, **arrastra el ratón sobre el texto** (o **haz doble
+   clic en una palabra**) para seleccionarlo.
+4. El emergente aparece debajo del cursor. Arrastra su encabezado para moverlo,
+   usa los botones para copiar el resultado o cerrarlo, o haz clic en cualquier
+   otro sitio para descartarlo. La fila que hay bajo el encabezado muestra el par
+   de idiomas: pasa el cursor por encima y elige cualquiera de los dos lados en
+   los desplegables para volver a traducir con ese idioma, o pulsa el botón `⇄`
+   para traducir el resultado de vuelta al idioma del que procede. El par se
+   restablece a *detectar el idioma de origen y usar el destino configurado* en
+   cada nueva selección.
+5. Las selecciones más cortas que el mínimo configurado (2 caracteres por
+   defecto) se ignoran, y un arrastre que empieza o termina sobre el propio
+   emergente nunca activa una traducción.
+
+Pulsa el atajo de teclado global (**Ctrl+Alt+C** de forma predeterminada) para
+traducir el contenido del portapapeles en lugar de seleccionar algo.
+
+El emergente es una ventana que no se activa y que está siempre encima: nunca
+roba el foco del teclado a la aplicación en la que estás leyendo. Se mantiene
+dentro del área de trabajo del monitor en el que está el cursor y salta por
+encima de él cuando no hay espacio debajo.
+
+### Ajustes
+
+| Opción | Significado |
+| --- | --- |
+| Interface language | `Follow Windows`, `简体中文` o `English`. Cambia al instante la ventana de ajustes y el emergente. |
+| Enable selection translation | Interruptor principal. Al desactivarlo se pausa de inmediato la captura global de selecciones. |
+| Start Glossy with Windows | Añade una entrada `--autostart` a `HKCU\...\Run`, de modo que Glossy ya está esperando en el área de notificación tras iniciar sesión. Iniciado así, no muestra la tarjeta "Glossy is running". |
+| Translate when the mouse drags across text | Activa el gesto de arrastre. |
+| Translate a word on double click | Activa el gesto de doble clic. |
+| Put the clipboard back after reading a selection | Restaura el contenido anterior del portapapeles después de que Glossy haya copiado la selección. |
+| Show the original text in the popup | Oculta la línea de origen de la tarjeta cuando está desactivado. |
+| Convert units and currency | Cuando la traducción sigue midiendo algo en una unidad que tu idioma de destino no usa —pies, libras, °F, una cantidad extranjera—, la tarjeta añade debajo el valor convertido y el factor de conversión (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). Los números se leen de la traducción, porque es el traductor quien decide si un símbolo es una unidad y siempre la escribe en un idioma que las tablas conocen; si la traducción no contiene ninguna, se lee el original. Longitud, masa, volumen, velocidad, superficie y temperatura se convierten dentro de su categoría, y la unidad de destino es la que escribiría una persona; la moneda de destino sigue al idioma de destino (`zh-CN` → CNY, `en` → USD). Los tipos de cambio provienen de `open.er-api.com` (con el BCE como alternativa) y se guardan en caché durante seis horas; todo lo demás está integrado en la aplicación. Desactivado significa que no hay conversión ni petición de tipos de cambio. |
+| Shortest selection to translate | Número de caracteres por debajo del cual se ignora una selección (`1`–`40`, por defecto `2`). |
+| Global hotkey | Combinación que traduce el contenido del portapapeles, p. ej. `Ctrl+Alt+C`. Vacía el campo para desactivarla. La línea que hay bajo el campo muestra la combinación registrada o por qué Windows la rechazó. |
+| Never translate in these programs | Una lista de nombres de proceso (`idea64.exe`, `mstsc`) en los que se omite la captura de selecciones. Añade uno escribiéndolo (el sufijo `.exe` es opcional: el botón `Add` lo normaliza), eligiéndolo en el desplegable de programas en ejecución o pulsando `Pick with the mouse` y haciendo clic en la ventana que quieras ignorar. Cada entrada tiene una `×` para eliminarla; los duplicados se descartan sin distinguir mayúsculas y minúsculas. |
+| Colours | `system` sigue la preferencia de Windows para modo claro u oscuro; `light` y `dark` fuerzan un esquema en ambas ventanas. |
+| Text size | Multiplicador de todos los tamaños de texto del emergente (`90 %`–`150 %`). |
+| Width | Ancho de la tarjeta emergente (`300`–`520` px CSS). |
+| Opacity | Cuán transparente es la tarjeta emergente (de `100 %` opaca hasta `50 %`). La tarjeta se atenúa mientras el texto sigue siendo legible sobre lo que haya detrás. |
+| Close by itself | Segundos antes de que el emergente se oculte por sí solo; `Never` lo mantiene abierto hasta que lo descartes. |
+| Close the popup right after the translation is copied | Oculta la tarjeta en cuanto se ha usado el botón de copiar. |
+| Target language | Idioma al que se traduce el resultado. |
+| History | Cuántas traducciones terminadas recordar (`Off` hasta `The last 500`, por defecto 50). La lista que hay bajo el selector conserva el original, la traducción, el proveedor y la hora; `Search` filtra ambos textos, al hacer clic en una entrada se muestra de nuevo en la tarjeta flotante (sin una segunda llamada al proveedor), y cada entrada tiene un botón de copiar y otro de eliminar. `Forget everything` vacía la lista. El archivo está en `%APPDATA%\com.glossy.translator\history.json`. |
+| Settings file | `Export…` escribe `Documents\glossy-settings.json`; `Import…` vuelve a leer en la aplicación un archivo que elijas. Marca `Include my API keys in the exported file` para incluir también las claves: Glossy vuelve a preguntar antes de escribirlas en texto sin formato. Una importación se valida mediante `sanitized()` y protege las claves que trae con DPAPI de camino al disco. |
+| Updates | `Check for a new version when Glossy starts` consulta GitHub Releases en cada arranque (desactivado por defecto). `Check now` busca de inmediato y dice qué versión está esperando, y `Download and restart` la instala. Una compilación sin clave de firma de actualizaciones —que es toda compilación hasta que exista el par de claves de publicación— oculta los botones y lo indica. |
+| Translation provider | `google` (gratis, sin clave), `baidu` (cuota mensual gratuita, APP ID + clave), `zhipu` (nivel gratuito, clave de API), `deepl` u `openai` (clave de API). |
+| APP ID / API key | Se muestra solo para los proveedores que las necesitan: `baidu` pide los dos campos, `zhipu`, `deepl` y `openai` solo la clave, y el proveedor gratuito `google` oculta ambos. Los valores se recuerdan por proveedor, así que al cambiar a un proveedor que configuraste antes sus campos se rellenan de nuevo. |
+
+El atajo de teclado acepta `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` más una
+tecla: una letra, un dígito, `F1`–`F24`, `Space`, `Enter`, `Tab`, `Esc`,
+`Backspace`, `Delete`, `Insert`, `Home`, `End`, `PageUp`, `PageDown` o una tecla
+de flecha. Se necesita al menos un modificador. Cuando Windows rechaza la
+combinación —normalmente porque otro programa ya la tiene—, el motivo se muestra
+bajo el campo y el atajo permanece inactivo hasta que se corrija el ajuste.
+
+Si el portapapeles no contiene ningún texto, el atajo recurre a copiar la
+selección actual, de modo que "seleccionar el texto y pulsar el atajo" también
+funciona.
+
+### Proveedores
+
+| Proveedor | Coste | Notas |
+| --- | --- | --- |
+| `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
+| `baidu` | cuota mensual gratuita, APP ID + clave | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Accesible desde China continental con una cuota mensual gratuita de 50 000 caracteres, que sube a 1 000 000 tras la 个人认证 (la verificación personal gratuita). Necesita tanto el **APP ID** como la **密钥** de <https://fanyi-api.baidu.com>. Envía `from=auto`, de modo que se detecta el idioma de origen. |
+| `zhipu` | nivel gratuito, clave de API | Modelo de chat `glm-4.7-flash` de Zhipu. Accesible desde China continental y devuelve la traducción, los símbolos fonéticos, las definiciones y un ejemplo en una sola llamada. Clave en <https://open.bigmodel.cn>. ⚠️ El acuerdo de usuario de Zhipu licencia los modelos no de pago **solo para estudio personal no comercial**; consulta más abajo antes de publicar Glossy. |
+| `deepl` | clave de API | Las claves que terminan en `:fx` usan el punto de conexión gratuito. |
+| `openai` | clave de API | `gpt-4o-mini`. |
+
+Los símbolos fonéticos y las definiciones de palabras sueltas provienen de
+`api.dictionaryapi.dev`, que es gratuito, no necesita clave y es accesible desde
+China continental. Solo se pregunta al punto de conexión de Google por los
+detalles que el proveedor seleccionado no haya devuelto.
+
+### Cuotas gratuitas y uso comercial
+
+Los niveles gratuitos se diferencian en lo que permiten:
+
+- **Zhipu** — 用户协议 §非付费功能 licencia los modelos gratuitos solo para uso
+  *非商业的、个人研究学习*. Está bien para uso personal; no lo está para un producto
+  publicado o de pago.
+- **ModelScope API-Inference** — explícitamente 非商业化, 非盈利.
+- **Aliyun 机器翻译** — la cuota mensual gratuita es explícitamente 仅适用客户试用场景.
+- **Tencent 腾讯云 TMT** — la cuota gratuita de 5 M de caracteres al mes todavía se
+  anuncia, pero el servicio ya no ofrece traducción de texto: en las versiones de
+  2026-03 y 2026-07 se eliminaron las acciones `TextTranslate`, `TextTranslateBatch`,
+  `ImageTranslate`, `LanguageDetect` y `SpeechTranslate`, y la 概览 de la API solo
+  incluye `ImageTranslateLLM`. La página 计费概述 está desactualizada, así que no
+  cuentes con ella.
+- **Baidu 翻译开放平台** — 50 000 caracteres al mes sin verificar, 1 M con
+  verificación personal y 2 M con verificación de empresa. Sus condiciones no dicen
+  nada sobre el uso comercial, pero el 服务协议 prohíbe que un *programa cliente*
+  guarde en caché los datos de traducción de Baidu y prohíbe su reventa. Glossy no
+  guarda nada en caché, así que esto no le afecta; un fork que añada una caché
+  tendría que volver a revisarlo. Las cuotas están limitadas por QPS a 1 / 10 / 100.
+- **Volcengine 火山引擎** — 2 M de caracteres al mes, pero la incorporación requiere
+  un contrato de ventas.
+- **NiuTrans 小牛翻译** — 200 000 caracteres al día tras registrarte; las condiciones
+  comerciales no están publicadas.
+- **SiliconFlow** — `tencent/Hunyuan-MT-7B` es gratuito, pero las condiciones de la
+  plataforma no dicen nada sobre los modelos gratuitos y están restringidas a fines
+  comerciales internos.
+- **Totalmente sin conexión** — los pesos de `Opus-MT` / `Argos Translate` son
+  CC-BY-4.0/Apache-2.0 (uso comercial permitido, ~83 MB int8, ~300 MB de RAM).
+  `NLLB-200` es CC-BY-NC-4.0 y **no** debe distribuirse.
+
+Los ajustes se guardan como JSON en `%APPDATA%\com.glossy.translator\settings.json`.
+El indicador `firstRun` de ese archivo registra que la ventana de bienvenida ya se
+mostró; si lo eliminas (o eliminas el archivo entero), la ventana vuelve a aparecer
+en el siguiente arranque.
+Las credenciales de traducción viven en un mapa `credentials` indexado por
+proveedor, y los valores `apiKey`/`appId` de un único proveedor se migran a ese
+mapa en el primer arranque. Todos los valores de ese mapa se cifran con DPAPI de
+Windows (`CryptProtectData`, ámbito del usuario actual) antes de escribir el
+archivo, así que este contiene `"apiKey": "dpapi:AQAAANCM…"` en lugar de la clave
+en sí, y solo el inicio de sesión de Windows que la introdujo puede leerla. Un
+archivo escrito por una versión anterior se protege la primera vez que arranca
+esta compilación; un valor que pertenece a otro inicio de sesión o a otro equipo
+no se puede desbloquear y se descarta, así que hay que volver a introducir la clave.
+La lista de programas ignorados se guarda como un array `ignoredApps`; una cadena
+heredada separada por comas se acepta y se divide al cargar.
+
+### Traducir dentro de la aplicación
+
+La ventana de ajustes contiene la misma función de traducción que el emergente: un
+cuadro de texto para escribir o pegar texto. Selecciona una palabra, una frase o
+una oración en ese cuadro —o pulsa **Translate** para usar todo el texto— y el
+resultado aparece justo debajo, en una tarjeta idéntica a la del emergente: la
+barra de idioma de origen y destino con su botón de intercambio, el botón de copiar
+y la misma representación de palabra u oración. La barra de idioma sigue las reglas
+del emergente, así que el origen empieza en *Detect language*, el destino sigue al
+idioma configurado y una nueva selección restablece el par (las anulaciones nunca
+se guardan). Pulsa **Show in floating popup** para abrir el emergente real con la
+selección actual (o con todo el texto cuando no hay nada seleccionado): así se
+prueba el emergente sin el enganche global.
+
+### Solución de problemas
+
+- **"Google Translate is rate limiting requests right now"** — Google respondió `429`, algo
+  que les ocurre a los clientes HTTP de escritorio en el punto de conexión público aunque un
+  navegador o `curl` sigan funcionando. Glossy reintenta primero con un segundo id de cliente;
+  si el mensaje persiste, espera un minuto o cambia el proveedor a `baidu`, `zhipu`, `deepl`
+  u `openai`.
+- **"Could not reach Google Translate"** — el proveedor gratuito `google` llama a
+  `translate.googleapis.com`, que está bloqueado en algunas redes (incluida buena parte de
+  China continental). La tarjeta ofrece un botón de reintento; si sigue fallando, cambia el
+  proveedor a `baidu` (cuota mensual gratuita, APP ID y 密钥 de fanyi-api.baidu.com), `zhipu`
+  (nivel gratuito, clave de open.bigmodel.cn), `deepl` u `openai`.
+- **"Baidu rejected the APP ID" / "Baidu rejected the signature"** — las dos mitades del par
+  de credenciales se han intercambiado o están mal escritas. `baidu` necesita el APP ID en el
+  primer cuadro y la 密钥 en el segundo; la clave nunca se envía a Baidu, solo firma la petición.
+- **"Baidu rejected this computer's IP address"** — la lista de IP permitidas de la aplicación
+  en la consola de Baidu está rellenada. Bórrala o añade la dirección desde la que se conecta
+  Glossy.
+- **El emergente muestra "Paused"** aunque las traducciones están activadas: el interruptor
+  principal de la ventana de ajustes está desactivado, o no se pudo leer el archivo de ajustes
+  al arrancar.
+
+## Cómo se captura la selección
+
+Glossy instala un enganche `WH_MOUSE_LL` y vigila los pares de pulsación y
+liberación del botón izquierdo. La función de retorno del enganche solo registra
+coordenadas; un hilo de trabajo decide si el gesto fue un arrastre o un doble clic,
+copia la selección con `Ctrl+C` (enviando `Ctrl+Insert` cuando la ventana en primer
+plano se ejecuta con privilegios elevados), restaura el portapapeles si se ha
+pedido y, por último, indica a la ventana emergente qué debe mostrar. El texto
+capturado solo se envía al proveedor de traducción que hayas elegido.
+
+## Desarrollo
+
+### Qué necesitas
+
+| Herramienta | Versión | Notas |
+| --- | --- | --- |
+| Node.js | 18 o posterior | solo para la CLI de Tauri; el frontend no tiene empaquetador |
+| Rust | estable, `1.77` o posterior | el destino GNU `x86_64-pc-windows-gnu`; consulta más abajo |
+| `rustfmt` + `clippy` | la misma cadena de herramientas | `rustup component add rustfmt clippy` |
+| MinGW-w64 | 8.1 o posterior | el enlazador del destino GNU; en el `PATH` como `gcc.exe` |
+
+```powershell
+rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --component clippy
+rustup default stable-x86_64-pc-windows-gnu
+npm.cmd install          # npm.ps1 is blocked by the default execution policy
+npm.cmd run tauri dev    # dev build with hot reload of src/
+npm.cmd run tauri build  # release build (installer + .exe)
+```
+
+`npm.cmd run icon` regenera `src-tauri/icons` a partir de `assets/`.
+
+`npm.cmd run tauri build` escribe el instalador en
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe` y el binario
+independiente en `src-tauri\target\release\Glossy.exe`. El empaquetador NSIS
+necesita conexión de red la primera vez que se ejecuta, para descargar sus
+complementos.
+
+`scripts\release.ps1` envuelve la compilación de publicación: prepara el instalador
+en `release\v<version>\` junto con una suma de comprobación y el texto para la
+descripción de la publicación. Ejecútalo como `powershell -ExecutionPolicy Bypass
+-File scripts\release.ps1` — los scripts están bloqueados por la directiva de
+ejecución predeterminada, la misma razón por la que arriba se usa `npm.cmd`.
+Consulta [release/README.md](./release/README.md).
+
+### Comprobaciones
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
+node --test                                                          # 81 frontend tests
+cd src-tauri
+cargo fmt --all --check
+cargo clippy --all-targets --locked -- -D warnings
+cargo test --locked
+```
+
+`npm test` ejecuta el mismo comando `node --test`. Las pruebas del frontend cargan
+`src/js/i18n.js` y `src/js/render.js` en un DOM mínimo (consulta `tests/helpers/`)
+y cubren los diccionarios, la sustitución de marcadores y el renderizador de
+tarjetas. Ejecuta la forma de directorio simple en Node 24/Windows: `node --test
+tests` y `node --test .` no resuelven allí los archivos de prueba.
+
+La versión vive en seis sitios (consulta `scripts\version.ps1`), así que no los
+edites nunca a mano: `tauri.conf.json` es la fuente autorizada,
+`scripts\version.ps1 -Set 0.1.2` la escribe en todos los demás y
+`scripts\version.ps1 -Get` la imprime para scripts como `release.ps1`, que se niega
+a compilar cuando los números no coinciden. La misma comprobación se ejecuta en CI,
+así que un incremento olvidado hace fallar la compilación.
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) ejecuta las cuatro
+comprobaciones más la suite de pruebas del frontend en `windows-latest` en cada
+push y cada pull request.
+
+### Actualizaciones
+
+Glossy pide a
+`https://github.com/SpencerZXWu/Glossy/releases/latest/download/latest.json` una
+versión más reciente. Una actualización solo se acepta si lleva una firma hecha con
+la clave de publicación:
+
+```powershell
+cargo tauri signer generate -w $env:USERPROFILE\.tauri\glossy.key   # once
+```
+
+Pon la clave pública impresa en `plugins.updater.pubkey` de
+`src-tauri\tauri.conf.json` (el marcador de posición que hay allí es lo que hace
+que la ventana de ajustes diga que la compilación no puede actualizarse) y exporta
+la privada antes de compilar una publicación:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $env:USERPROFILE\.tauri\glossy.key -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
+```
+
+`bundle.createUpdaterArtifacts` en `tauri.conf.json` permanece desactivado hasta que
+exista ese secreto: sin él el empaquetador falla, y con él la compilación también
+escribe el instalador firmado y el `latest.json` del que se lee una actualización.
+Mantén la clave privada fuera del repositorio: es lo único que permite reemplazar
+una publicación.
+
+### Lista de comprobación de regresión manual
+
+Ejecuta esto antes de etiquetar una publicación. Todos los puntos fueron un error
+real en algún momento y ninguno está cubierto por las pruebas automatizadas.
+
+| # | Qué hacer | Qué debe ocurrir |
+| --- | --- | --- |
+| 1 | Iniciar Glossy con un perfil limpio | Se abre la ventana de ajustes, no hay nada preseleccionado por accidente y la línea de estado indica que la captura está en marcha |
+| 2 | Cerrar la ventana de ajustes y volver a iniciar Glossy | No aparece una segunda ventana ni un segundo enganche del ratón: la notificación dice que Glossy ya se está ejecutando y el icono de la bandeja vuelve a abrir la ventana |
+| 3 | Marcar "Start Glossy with Windows", reiniciar e iniciar sesión | No parpadea ninguna ventana de consola, no aparece la tarjeta "running" y el icono de la bandeja está ahí |
+| 4 | Desmarcarlo y reiniciar | Glossy no arranca (`reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v Glossy` no encuentra nada) |
+| 5 | Seleccionar una palabra en Notepad, un navegador, Word y una terminal | El emergente aparece bajo el cursor cada vez, con los símbolos fonéticos y las definiciones de la palabra |
+| 6 | Seleccionar una oración en cada uno de los mismos programas | El emergente muestra solo la traducción, sin símbolos fonéticos ni acepciones |
+| 7 | Arrastrar el emergente a cada monitor y a cada borde de la pantalla | La tarjeta se mantiene dentro del área de trabajo en todos los monitores y con escalas del 100 %, 125 % y 150 % |
+| 8 | Fijar el emergente, hacer clic en otro punto del escritorio y esperar más allá del tiempo de cierre automático | La tarjeta permanece abierta hasta que se suelte la fijación o se use la × |
+| 9 | Hacer clic fuera de una tarjeta sin fijar | Se cierra en cuanto el clic cae fuera |
+| 10 | Cambiar Windows entre modo claro y oscuro y luego forzar cada esquema en los ajustes | Ambas ventanas siguen la elección, con texto y bordes legibles en las dos |
+| 11 | Traducir con cada uno de los cinco proveedores, incluido uno con una clave incorrecta | Un resultado para los correctos; un error legible con un botón de reintento para el incorrecto |
+| 12 | Añadir un programa en ejecución a la lista de ignorados, traducir dentro de él y luego quitarlo | No aparece nada mientras está en la lista, y el emergente vuelve en cuanto se quita |
+| 13 | Pulsar el atajo de teclado global con texto en el portapapeles y luego con el portapapeles vacío y una selección | La traducción se abre junto al cursor en el primer caso y se usa la selección actual en el segundo |
+| 14 | Exportar sin claves, exportar con claves y luego importar cada archivo | La exportación simple no tiene bloque `credentials`; la exportación con claves pide confirmación antes; una importación restaura todos los ajustes y las claves funcionan |
+| 15 | Poner el historial en `The last 50`, traducir 60 textos y luego ponerlo en `Off` | La lista guarda 50, la búsqueda los filtra, al hacer clic en uno se reabre en la tarjeta y `Off` vacía el archivo |
+| 16 | Cambiar las transparencias, el tamaño de fuente y el ancho, y reiniciar | El emergente conserva los valores elegidos |
+| 17 | Abrir la sección de actualizaciones | Esta compilación, sin clave de firma, oculta los botones de comprobación y dice que la compilación no puede actualizarse; una vez que existe un par de claves, `Check now` informa de la versión en ejecución o de la que está esperando |
+
+### Notas sobre la cadena de herramientas (Windows, cadena GNU)
+
+El proyecto se compila con el destino GNU de Rust (`x86_64-pc-windows-gnu`), que no
+necesita una instalación de Visual Studio, pero hay dos peculiaridades:
+
+- El crate `windows` hace crecer la tabla de importaciones más allá de lo que
+  aceptan los binutils antiguos de MinGW. Por eso `src-tauri/Cargo.toml` declara
+  `[lib] crate-type = ["rlib"]` y el crate de la aplicación se enlaza solo como
+  binario.
+- `cargo test` necesita también el archivo de recursos generado (icono, información
+  de versión y el manifiesto de common-controls v6) en el arnés de pruebas; de lo
+  contrario, el arnés no arranca con `0xC0000139` antes de `main`.
+  `src-tauri/build.rs` añade un `cargo:rustc-link-arg` simple para `libresource.a`
+  para llegar a todos los objetivos de prueba. Los scripts de compilación no
+  distinguen entre objetivos binarios y de prueba, así que los binarios reciben el
+  archivo dos veces y GNU ld imprime avisos `.rsrc merge failure: multiple
+  non-default manifests`; el `.exe` resultante sigue llevando el manifiesto y
+  funciona.
+
+```powershell
+cd src-tauri
+cargo test   # 132 tests; see "Checks" above for lint and format runs
+```
+
+## Estructura
+
+```
+src/                     frontend (plain HTML/CSS/JS, no bundler)
+  index.html             settings window + in-app translate card
+  popup.html             floating card
+  notice.html            "already running in the background" card
+  js/bridge.js           Tauri IPC helpers used by both windows
+  js/i18n.js             English/Chinese dictionaries and DOM translation
+  js/render.js           shared card renderer (word, sentence, loading, error)
+  js/theme.js            resolves system/light/dark for every window
+  js/app.js              settings window logic
+  js/popup.js            popup window logic
+  js/notice.js           start card logic
+  styles/tokens.css      the only place a colour, radius, shadow or duration is written
+tests/                   node --test suite for i18n.js and render.js
+src-tauri/src/
+  main.rs  lib.rs        window setup, Tauri commands
+  selection.rs           global mouse hook, gesture tracking, capture
+  hotkey.rs              global hotkey registration and parsing
+  classify.rs            word/phrase vs. sentence detection
+  units/                 unit and currency conversion for the card
+  translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
+  popup.rs               placement/clamping geometry
+  surface.rs             Mica backdrop and title bar colour
+  history.rs             the translation store behind the History panel
+  autostart.rs           the login item and the --autostart marker
+  updater.rs             the release feed behind the Updates section
+  secrets.rs             DPAPI protection for the stored API keys
+  notice.rs              start card placement and lifetime
+  tray.rs                notification area icon: open the window, quit
+  instance.rs            named-mutex guard against a second Glossy
+  console.rs             borrows the console of the terminal that started Glossy
+  platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
+  clipboard.rs  settings.rs  state.rs  input.rs
+scripts/
+  version.ps1            the version number, in one place
+  release.ps1            release build + staging for a GitHub release
+.github/workflows/
+  ci.yml                 format, lint, test and version check on every push
+release/
+  v<version>/            installer, RELEASE_NOTES.md and checksum of a release
+```
+
+## Hoja de ruta
+
+[ROADMAP.md](./ROADMAP.md) contiene las publicaciones previstas (`v0.1.1` a
+`v1.0.0`) con sus criterios de aceptación, la política de versiones, los riesgos
+conocidos y el proceso de publicación. Cada publicación se corresponde con un hito
+de GitHub del mismo nombre.
+
+[CHANGELOG.md](./CHANGELOG.md) enumera lo que se incluyó en cada versión publicada.
+
+## Licencia
 
 [MIT](./LICENSE) © 2026 Spencer Wu

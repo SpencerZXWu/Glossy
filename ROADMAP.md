@@ -135,7 +135,7 @@ Goal: turn a personal tool into something that can be promised.
 | Performance budget | Idle CPU below 0.5%, memory below 80 MB, selection to popup under 150 ms, and no handle or GDI leak over long runs — the hook and the clipboard are the places to watch |
 | Stability | Crash recovery and optional anonymous error reporting, off by default and asked about on first run |
 | Accessibility | Full keyboard operability, a high-contrast theme, correct focus order and aria labels |
-| Documentation | Multi-language README, FAQ, and a note on provider quotas and terms of use |
+| Documentation | The README already carries all three languages; still to write: the FAQ and a note on provider quotas and terms of use |
 
 Estimated effort: 5–10 days.
 

@@ -10,6 +10,10 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ### Changed
 
+- The README is written in the same three languages as the release notes, in the
+  same single-file layout: an English block, then 中文, then Español, each behind
+  an anchor the link line at the top jumps to. The English block stays first, so
+  existing links to `README.md` and its headings keep working.
 - Release notes are written in three languages — English, Chinese and Spanish — in a
   single `RELEASE_NOTES.md`, with a link line at the top that jumps to an anchor placed
   directly above each language's block. `scripts/release.ps1` fills the English block
