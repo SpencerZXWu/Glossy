@@ -18,6 +18,9 @@
 
     An existing RELEASE_NOTES.md is never overwritten without -ForceNotes.
 
+    With -Publish the script also pushes the tag and creates the GitHub release through
+    the GitHub CLI, so a release is one command from a clean tree.
+
 .PARAMETER SkipBuild
     Skip the build and re-stage whatever is already in src-tauri/target/release/bundle.
 
@@ -26,14 +29,21 @@
     translations are reset to their placeholders, so translations already written by
     hand are lost.
 
+.PARAMETER Publish
+    After staging, push the v<version> tag and create the GitHub release with the
+    GitHub CLI instead of printing the manual steps. Refuses to publish while
+    RELEASE_NOTES.md still holds an untranslated section.
+
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild
+    powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild -Publish
 #>
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
-    [switch]$ForceNotes
+    [switch]$ForceNotes,
+    [switch]$Publish
 )
 
 $ErrorActionPreference = 'Stop'
@@ -194,7 +204,92 @@ Get-ChildItem -LiteralPath $stage -File | ForEach-Object {
     '  {0,-34} {1,10:N0} bytes' -f $_.Name, $_.Length
 }
 Write-Host ''
-Write-Host 'Upload: create the tag vX.Y.Z, then the release titled "Glossy X.Y.Z" (the tag'
-Write-Host 'keeps the v, the title does not), paste RELEASE_NOTES.md into the description'
-Write-Host 'and attach the installer together with SHA256SUMS.txt.'
-Write-Host 'The notes switch language through the links at the top; keep all three translated.'
+
+function Publish-Release {
+    param([string]$Version, [string]$Stage)
+
+    $gh = Get-Command gh -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty Source
+    if (-not $gh) {
+        # A fresh install is not on the PATH of the shell that started before it.
+        $fallback = 'C:\Program Files\GitHub CLI\gh.exe'
+        if (Test-Path -LiteralPath $fallback) { $gh = $fallback }
+    }
+    if (-not $gh) {
+        throw 'The GitHub CLI (gh) was not found. Install it with: winget install --id GitHub.cli'
+    }
+
+    $notesPath = Join-Path $Stage 'RELEASE_NOTES.md'
+    if (-not (Test-Path -LiteralPath $notesPath)) {
+        throw "$notesPath is missing; the release description would be empty."
+    }
+    if (Select-String -LiteralPath $notesPath -SimpleMatch 'TODO: translate' -Quiet) {
+        throw 'RELEASE_NOTES.md still has an untranslated section; all three languages have to be filled in before publishing.'
+    }
+
+    # gh and git report progress and failures on stderr, and PowerShell 5.1 turns
+    # redirected native stderr into an error record, which is fatal under the
+    # $ErrorActionPreference at the top of this script. They are therefore run with
+    # Continue and judged by $LASTEXITCODE alone.
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+
+    & $gh auth status --hostname github.com *> $null
+    if ($LASTEXITCODE -ne 0) {
+        $ErrorActionPreference = $saved
+        throw "gh is not signed in. Run: & '$gh' auth login --hostname github.com --git-protocol https --web"
+    }
+
+    $tag = "v$Version"
+    Write-Host "Publishing $tag" -ForegroundColor Cyan
+
+    Push-Location $root
+    try {
+        & git rev-parse -q --verify "refs/tags/$tag" *> $null
+        if ($LASTEXITCODE -ne 0) {
+            & git tag -a $tag -m "Glossy $Version"
+            if ($LASTEXITCODE -ne 0) {
+                $ErrorActionPreference = $saved
+                throw "git tag $tag failed."
+            }
+        }
+
+        & git push origin $tag
+        if ($LASTEXITCODE -ne 0) {
+            $ErrorActionPreference = $saved
+            throw "git push origin $tag failed. Pushing from this machine needs the proxy: `$env:HTTPS_PROXY='http://127.0.0.1:7897'"
+        }
+    } finally {
+        Pop-Location
+    }
+
+    # The notes are the description, never an asset, so every other staged file goes up.
+    $assets = @(Get-ChildItem -LiteralPath $Stage -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne 'RELEASE_NOTES.md' } |
+        ForEach-Object { $_.FullName })
+    if ($assets.Count -eq 0) {
+        $ErrorActionPreference = $saved
+        throw "Nothing to attach in $Stage."
+    }
+
+    $ghArgs = @('release', 'create', $tag,
+        '--title', "Glossy $Version",
+        '--notes-file', $notesPath,
+        '--verify-tag') + $assets
+    & $gh @ghArgs
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $saved
+    if ($code -ne 0) { throw "gh release create $tag failed with exit code $code." }
+
+    Write-Host "Published release $tag with $($assets.Count) asset(s)." -ForegroundColor Green
+}
+
+if ($Publish) {
+    Publish-Release -Version $version -Stage $stage
+} else {
+    Write-Host 'Publish: re-run with -Publish, or do it by hand - create the tag vX.Y.Z,'
+    Write-Host 'then the release titled "Glossy X.Y.Z" (the tag keeps the v, the title does'
+    Write-Host 'not), paste RELEASE_NOTES.md into the description and attach the installer'
+    Write-Host 'together with SHA256SUMS.txt.'
+    Write-Host 'The notes switch language through the links at the top; keep all three translated.'
+}
