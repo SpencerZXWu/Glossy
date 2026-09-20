@@ -122,7 +122,10 @@ curl https://<控制台给的地址>/v1/health
 
 `configured: true` 就说明密钥配好了。
 
-然后把这个地址填进 Glossy 设置里的「服务器地址」，**只填到域名，不要带 `/v1/translate`**。
+然后把这个地址写进客户端源码里的 `DEFAULT_ENDPOINT`（`src-tauri/src/translate/cloud.rs`），重新构建即可，**只填到域名，不要带 `/v1/translate`**。
+
+> [!NOTE]
+> 界面里已经没有「服务器地址」输入框了：地址跟着构建走，别人改不坏唯一一个「无需配置」的服务；旧版设置文件里的地址会被忽略。
 
 > [!NOTE]
 > **关于计数**：SCF 上没有数据库，计数存在 `/tmp` 的文件里，实例被冻结/重启后能恢复，
@@ -178,7 +181,7 @@ https://glossy-cloud.<你的子域>.workers.dev
 >   2. 等 Cloudflare 显示域名已激活，进入 **Workers & Pages → glossy-cloud → Settings →
 >      Domains & Routes → Add → Custom Domain**，填 `api.你的域名.com`。Cloudflare 会自动加
 >      DNS 记录和证书，一两分钟生效。
->   3. 客户端「服务器地址」改成 `https://api.你的域名.com`（**不要带 `/v1/translate`**）。
+>   3. 把客户端源码里的 `DEFAULT_ENDPOINT`（`src-tauri/src/translate/cloud.rs`）改成 `https://api.你的域名.com`，重新构建（**不要带 `/v1/translate`**）。
 >
 > 自定义域名的 SNI 是你自己的域名，不会被阻断；Cloudflare 免费版在国内通常能通，延迟
 > 200~400ms，对翻译来说够用。

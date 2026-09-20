@@ -183,6 +183,8 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
 #[tauri::command]
 async fn cloud_status(
     state: State<'_, Arc<AppState>>,
+    // Accepted for callers that still name a server; the address the build was
+    // made with wins inside the cloud translator, so an empty value is usual.
     endpoint: Option<String>,
 ) -> Result<translate::CloudQuota, String> {
     let settings = state.settings();

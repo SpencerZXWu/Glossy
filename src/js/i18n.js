@@ -118,8 +118,6 @@
     "providerName.openai": "OpenAI",
     "providerName.local": "Local model",
     "field.appId": "APP ID",
-    "field.cloudEndpoint": "Server address",
-    "cloud.endpointPlaceholder": "https://glossy-cloud.example.workers.dev",
     "cloud.quota.checking": "Asking the server how much is left today…",
     "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
     "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
@@ -132,11 +130,11 @@
     "provider.hint.google":
       "The free public Google endpoint. Phonetics, parts of speech, definitions and an example come from the same call. No key needed.",
     "provider.hint.baidu":
-      "Paste the APP ID and the 密钥 from fanyi-api.baidu.com. The free tier gives 50,000 characters per month, or 1,000,000 after the free 个人认证. Reachable from mainland China, but the API returns the translation only: phonetic symbols and parts of speech need Zhipu GLM, which brings them along in the same call.",
+      "Fill the APP ID and the 密钥 from fanyi-api.baidu.com into the extensions at the bottom of this window. The free tier gives 50,000 characters per month, or 1,000,000 after the free 个人认证. Reachable from mainland China, but the API returns the translation only: phonetic symbols and parts of speech need Zhipu GLM, which brings them along in the same call.",
     "provider.hint.zhipu":
       "Paste a Zhipu (open.bigmodel.cn) API key. The free <code>glm-4.7-flash</code> model returns the translation, phonetics, definitions and an example in one call, and it is reachable from mainland China.",
     "cloud.hint.builtin":
-      "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. The address of a server deployed from <code>server/</code> goes above; each device gets a daily character allowance, and the other services stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
+      "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. Each device gets a daily character allowance, and the other services stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
     "cloud.hint.local":
       "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
     "provider.hint.deepl":
@@ -345,8 +343,6 @@
     "providerName.openai": "OpenAI",
     "providerName.local": "本地模型",
     "field.appId": "APP ID",
-    "field.cloudEndpoint": "服务器地址",
-    "cloud.endpointPlaceholder": "https://glossy-cloud.example.workers.dev",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
     "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
     "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
@@ -359,11 +355,11 @@
     "provider.hint.google":
       "免费的 Google 公共接口：音标、词性、释义和例句都在同一次请求里返回，无需密钥。",
     "provider.hint.baidu":
-      "在 fanyi-api.baidu.com 申请后，把 APP ID 和密钥填在这里。免费版每月 5 万字符，完成个人认证后每月 100 万字符，国内可直接访问。不过这个接口只返回译文：音标和词性需要智谱 GLM，它会在同一次请求里一起返回。",
+      "在 fanyi-api.baidu.com 申请后，在窗口最下面的「扩展」里填入 APP ID 和密钥。免费版每月 5 万字符，完成个人认证后每月 100 万字符，国内可直接访问。不过这个接口只返回译文：音标和词性需要智谱 GLM，它会在同一次请求里一起返回。",
     "provider.hint.zhipu":
       "填入智谱（open.bigmodel.cn）的 API Key。免费的 <code>glm-4.7-flash</code> 模型一次返回译文、音标、释义和例句，国内可直接访问。",
     "cloud.hint.builtin":
-      "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。上面填 <code>server/</code> 部署后的地址即可；每台设备每天有字符额度，用完后仍可换用其他服务。音标、词性和例句会另外查询。",
+      "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。每台设备每天有字符额度，用完后仍可换用其他服务。音标、词性和例句会另外查询。",
     "cloud.hint.local":
       "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
     "provider.hint.deepl":

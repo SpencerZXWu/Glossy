@@ -350,8 +350,9 @@ pub struct Settings {
     /// Model the local service is asked for.
     pub local_model: String,
     /// Address of Glossy's own translation proxy (the Worker in `server/`).
-    /// Empty means "use the address this build was made with", and when that is
-    /// empty as well the provider says it has nowhere to send the text.
+    /// Kept for the settings files written before the window stopped showing a
+    /// field for it: the address the build was made with wins, and this is only
+    /// read by a build that has none.
     pub cloud_endpoint: String,
     /// Random identifier of this installation, so the proxy can count the daily
     /// characters of one device. Generated once and kept, because a fresh one

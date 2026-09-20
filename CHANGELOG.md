@@ -29,6 +29,17 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
   an LLM account when one is configured and falls back to the Baidu credentials it
   had before, so a deployment works either way.
 
+- **The translation server's address is no longer a field.** Glossy's own service
+  is the one that needs nothing set up, and a text box for the address only gave
+  people a way to break it — a wrong or stale address left the app unable to reach
+  any server at all, which is what the settings file of an upgraded install could
+  hold. The address is now part of the build: whichever one the app was compiled
+  with wins, a leftover value in an older settings file is ignored, and the window
+  keeps showing what is left of today's allowance with its `Check again` button.
+  Running your own deployment is a one-line change of `DEFAULT_ENDPOINT` in
+  `src-tauri/src/translate/cloud.rs`; a build made without one still honors the
+  setting.
+
 ## [1.0.1] - 2026-09-20
 
 ### Added

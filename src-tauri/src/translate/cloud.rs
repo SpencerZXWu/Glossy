@@ -62,17 +62,23 @@ fn endpoint_of(configured: &str) -> Result<String, String> {
 /// `endpoint_of` with the build default passed in, so the branch that has
 /// nothing to send to stays reachable for a test even though this build ships
 /// with an address.
+///
+/// The address this build was made with wins over the one in the settings file:
+/// the window has no field for it any more, so a value found there is a leftover
+/// from an older version, and a wrong one breaks the only service that needs
+/// nothing set up. A build made without an address still honors the setting.
 fn endpoint_from(configured: &str, build_default: &str) -> Result<String, String> {
+    let build_default = build_default.trim().trim_end_matches('/');
     let configured = configured.trim().trim_end_matches('/');
-    let endpoint = if configured.is_empty() {
-        build_default
-    } else {
+    let endpoint = if build_default.is_empty() {
         configured
+    } else {
+        build_default
     };
     if endpoint.is_empty() {
         return Err(
-            "The cloud translator has no server address yet. Deploy the Worker from `server/` \
-             and paste its address in Settings, or pick another provider."
+            "The cloud translator has no server address yet. Deploy the service from `server/` \
+             and build Glossy with its address, or pick another provider."
                 .to_string(),
         );
     }
@@ -116,8 +122,8 @@ pub async fn translate(
             "The Glossy translation server sent a response the app could not read.".to_string()
         } else {
             format!(
-                "The Glossy translation server answered HTTP {status}. Is the address in \
-                 Settings the one `wrangler deploy` printed?"
+                "The Glossy translation server answered HTTP {status}. Check that the service \
+                 deployed from `server/` is still running."
             )
         }
     })?;
@@ -159,8 +165,8 @@ pub async fn quota(
         .await
         .map_err(|_| {
             format!(
-                "Could not reach the Glossy translation server at {endpoint}. Check that it is \
-                 deployed and that the address above is the one `wrangler deploy` printed."
+                "Could not reach the Glossy translation server at {endpoint}. Check that the \
+                 service deployed from `server/` is still running."
             )
         })?;
 
@@ -266,17 +272,22 @@ mod tests {
         // nowhere to send the text.
         let error = endpoint_from("", "").unwrap_err();
         assert!(error.contains("no server address"));
-        // Otherwise the build's own address is what an empty setting means.
+        // Otherwise the build's own address is what every setting means.
         assert_eq!(endpoint_of("").unwrap(), DEFAULT_ENDPOINT);
         assert!(DEFAULT_ENDPOINT.starts_with("https://"));
-        // And a setting overrides it. The trailing slash and the path a user
-        // copies from the dashboard are not part of the address requests are
-        // built from.
+        // A build made without an address of its own is the one case where the
+        // settings file is still read, because there is nothing else to use.
         assert_eq!(
-            endpoint_of(" https://glossy.example.workers.dev/ ").unwrap(),
+            endpoint_from(" https://glossy.example.workers.dev/ ", "").unwrap(),
             "https://glossy.example.workers.dev"
         );
-        assert!(endpoint_of("glossy.example.workers.dev").is_err());
+        // The address in the settings file is a leftover the window cannot show,
+        // so it never replaces the one the build was made with.
+        assert_eq!(
+            endpoint_of("https://glossy.example.workers.dev").unwrap(),
+            DEFAULT_ENDPOINT
+        );
+        assert!(endpoint_from("glossy.example.workers.dev", "").is_err());
     }
 
     #[test]

@@ -129,6 +129,7 @@ Goal: make the reading use case actually good.
 | --- | --- | --- |
 | Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | planned |
 | Translation service: one list | One dropdown holds every way a selection can be translated — our own server (nothing to fill in), a model running on this machine over any OpenAI-compatible endpoint, the free public Google endpoint, and the vendors that take the user's key. The credentials of the last group live in an **Extensions** panel at the bottom of the settings window, dimmed while a service that needs nothing is selected. Underneath, the stored shape stayed `channel` + `provider`, so a file written earlier keeps working and a new one starts on our server | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
+| Server address is no longer a field | The one service that needs nothing set up should not come with a box that lets people break it, so the address travels with the build: the `DEFAULT_ENDPOINT` the app was compiled with wins, a leftover address in an older settings file is ignored, and the window keeps only the allowance line and its `Check again` button. Pointing the app at your own deployment means editing that one line in `src-tauri/src/translate/cloud.rs`; a build made without an address still reads the setting | done, in `src-tauri/src/translate/cloud.rs` |
 | Popup rebuild | The card rebuilt on the token layer: header actions, original/translation hierarchy, dictionary and conversion blocks, and a compact mode | partly, the conversion block is in the tree |
 | Icons, motion and accessibility | One icon set, transitions on the popup's appearance and dismissal, full keyboard operability, focus rings, high-contrast colours | planned |
 | Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | planned |
@@ -343,6 +344,7 @@ in it early.
 | --- | --- | --- |
 | 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 计划中 |
 | 翻译渠道：一个列表 | 一个下拉框就装下所有翻译方式——我们自己的服务器（无需填写）、通过任意 OpenAI 兼容接口跑在本机上的模型、免费的公开 Google 接口，以及需要用户密钥的服务。最后一类的凭据放在设置窗口最下面的 **扩展** 面板里，当前服务不需要凭据时会变暗。底层保存格式仍然是 `channel` + `provider`，因此旧文件照常可用，新文件默认走我们自己的服务器 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
+| 服务器地址不再是一个输入框 | 唯一一个「无需配置」的服务不该给用户留下把它填坏的机会，所以地址改为跟着构建走：构建时的 `DEFAULT_ENDPOINT` 优先，旧设置文件里残留的地址被忽略，窗口只保留额度提示行与「重新检查」。想用自己的部署就改 `src-tauri/src/translate/cloud.rs` 里的那一行；不带地址的构建仍然读设置文件 | 已完成，见 `src-tauri/src/translate/cloud.rs` |
 | 弹窗重建 | 在变量层上重建卡片：头部操作、原文/译文层级、词典与换算区块，以及一个紧凑模式 | 部分完成，换算区块已在代码库中 |
 | 图标、动效与无障碍 | 统一图标集、弹窗出现与消失的过渡、完整键盘操作、焦点环、高对比配色 | 计划中 |
 | 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 计划中 |

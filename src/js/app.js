@@ -45,7 +45,6 @@
     apiId: $("apiId"),
     apiKeyField: $("apiKeyField"),
     apiKey: $("apiKey"),
-    cloudEndpoint: $("cloudEndpoint"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
     uiLang: $("uiLang"),
@@ -277,15 +276,15 @@
    * Shows what the cloud provider still allows today.
    *
    * The allowance lives on the server, so it is asked for whenever the window
-   * opens or the endpoint changes; a server that cannot be reached says so in
-   * the same line instead of blocking the rest of the window.
+   * opens or another service is chosen; a server that cannot be reached says so
+   * in the same line instead of blocking the rest of the window. Which server is
+   * asked is decided by the backend, which carries the address it was built with.
    */
   async function refreshCloudQuota() {
-    const endpoint = els.cloudEndpoint.value.trim();
     els.cloudQuota.removeAttribute("data-tone");
     els.cloudQuota.textContent = Glossy.i18n.t("cloud.quota.checking");
     try {
-      const quota = await Glossy.invoke("cloud_status", { endpoint });
+      const quota = await Glossy.invoke("cloud_status", {});
       if (!cloudQuotaVisible()) return;
       const used = quota.used || 0;
       const limit = quota.limit || 0;
@@ -737,7 +736,6 @@
     els.popupOpacity.value = String(pick(OPACITIES, next.popupOpacity, 100));
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
-    els.cloudEndpoint.value = next.cloudEndpoint || "";
     els.localEndpoint.value = next.localEndpoint || "";
     els.localModel.value = next.localModel || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
@@ -777,7 +775,6 @@
       popupOpacity: numberOr(els.popupOpacity.value, 100),
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
-      cloudEndpoint: els.cloudEndpoint.value.trim(),
       // The stored shape still separates where the text goes from which vendor
       // translates it: Glossy's own server and the local model both count as the
       // cloud channel, everything else uses the user's account.
@@ -1116,11 +1113,6 @@
     syncChannelQuota();
     scheduleSave();
   });
-  els.cloudEndpoint.addEventListener("change", () => {
-    // The address decides which server is asked, so the allowance shown has to
-    // come from the new one.
-    refreshCloudQuota();
-  });
   els.cloudQuotaRefresh.addEventListener("click", () => refreshCloudQuota());
   els.ignoredRunning.addEventListener("change", () => {
     const picked = els.ignoredRunning.value;
@@ -1194,7 +1186,6 @@
     els.popupOpacity,
     els.autoCloseSecs,
     els.closeAfterCopy,
-    els.cloudEndpoint,
     els.localEndpoint,
     els.localModel,
     els.unitsEnabled,
