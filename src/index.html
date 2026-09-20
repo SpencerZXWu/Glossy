@@ -208,6 +208,7 @@
               <select id="provider">
                 <option value="google" data-i18n="provider.google">Google · free, no key</option>
                 <option value="baidu" data-i18n="provider.baidu">Baidu 翻译 · free monthly quota, APP ID + key</option>
+                <option value="cloud" data-i18n="provider.cloud">Glossy Cloud · nothing to fill in</option>
                 <option value="zhipu" data-i18n="provider.zhipu">Zhipu GLM · free tier, API key</option>
                 <option value="deepl" data-i18n="provider.deepl">DeepL · API key</option>
                 <option value="openai" data-i18n="provider.openai">OpenAI · API key</option>
@@ -221,6 +222,14 @@
           <div class="field" id="apiKeyField" hidden>
             <label for="apiKey" data-i18n="field.apiKey">API key</label>
             <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
+          </div>
+          <div class="field" id="cloudEndpointField" hidden>
+            <label for="cloudEndpoint" data-i18n="field.cloudEndpoint">Server address</label>
+            <input type="text" id="cloudEndpoint" spellcheck="false" autocomplete="off" data-i18n-placeholder="cloud.endpointPlaceholder" placeholder="https://glossy-cloud.example.workers.dev" />
+            <div class="demo-actions">
+              <p class="hint" id="cloudQuota"></p>
+              <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+            </div>
           </div>
           <p class="hint" id="providerHint"></p>
         </section>

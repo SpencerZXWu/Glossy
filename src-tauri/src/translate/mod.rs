@@ -2,6 +2,7 @@
 
 mod baidu;
 mod chat;
+mod cloud;
 mod deepl;
 mod dictionary;
 mod google;
@@ -13,6 +14,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::classify::{self, Kind};
 use crate::settings::{Provider, Settings};
+
+pub use self::cloud::{new_install_id, quota as cloud_quota, Quota as CloudQuota};
 
 /// The free public endpoints reject requests without a browser like agent.
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
@@ -302,6 +305,18 @@ async fn call_provider(
         }
         Provider::DeepL => {
             deepl::translate(client, text, source, target, kind, &credentials.api_key).await
+        }
+        Provider::Cloud => {
+            cloud::translate(
+                client,
+                text,
+                source,
+                target,
+                kind,
+                &settings.cloud_endpoint,
+                &settings.cloud_id,
+            )
+            .await
         }
         Provider::OpenAI => {
             chat::translate(

@@ -1,0 +1,8 @@
+# 本地开发用（`npx wrangler dev`）。复制成 .dev.vars 后填自己的值，
+# 这个文件在 .gitignore 里，不会被提交。线上用 `wrangler secret put`。
+BAIDU_APP_ID = "202xxxxxxxxx"
+BAIDU_KEY = "你在百度翻译开放平台拿到的密钥"
+# 用来给 IP 做哈希，随便一串随机字符即可，避免明文存 IP。
+IP_SALT = "换成一串随机字符"
+# 只在本地调试时用：把百度地址换成自己的假接口。
+# BAIDU_ENDPOINT = "http://127.0.0.1:8791/api/trans/vip/translate"

@@ -8,6 +8,58 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-20
+
+The first stable release: Glossy now ships with a server of its own, so it can be
+installed and used without anyone having to obtain an API key first.
+
+### Added
+
+- A `cloud` translation provider, **Glossy Cloud**. It talks to a server
+  deployed from the new `server/` directory instead of to a vendor, so there is
+  nothing to fill in: the account behind the server pays for the translation and
+  the keys never reach the app. The settings window asks that server how much of
+  today's allowance is left and shows the answer under the provider row, with
+  **Check again** next to it; a server that cannot be reached says so in the same
+  line instead of blocking the rest of the window. The address of the server
+  lives in the new `cloudEndpoint` setting, is validated for an `https://` URL,
+  and is written to the settings file as plain text because it is not a secret; a
+  build made from this source already carries the address of the deployment the
+  author runs, so the provider works as soon as it is selected.
+- `server/`, a translation proxy that keeps the provider credentials on the
+  machine that already holds them and hands each client a daily character
+  allowance instead. It runs unchanged on two hosts — a Cloudflare Worker with a
+  Durable Object for exact counting, and a Node 18 runtime for Tencent Cloud SCF
+  Web 函数 — and carries its own README with the deployment steps for both,
+  `npm test` coverage for the quota rules, the signature the providers expect and
+  the IP parsing, plus a script that builds the SCF zip. The allowance is checked
+  per installation, per caller address and globally, requests are capped per
+  minute and per request, and the caller address is read from the end of
+  `X-Forwarded-For` minus the two hops a function URL gateway appends, so a
+  client cannot spoof its way into a fresh bucket. Baidu answers a burst with its
+  per-second throttling code; that answer, and Baidu's own hiccups, are retried
+  twice before the app is told anything.
+- An install id (`cloudId` in the settings file), generated once so the server
+  counts one device's characters rather than one launch's, and rewritten when a
+  settings file written before the cloud provider existed has none.
+
+### Changed
+
+- A fresh install starts on the `cloud` provider instead of `google`, so the first
+  selection translates without anything being configured or obtained. Existing
+  settings keep the provider they were saved with.
+- The new Glossy mark is the icon of the application, of the installer and of the
+  tray. `assets/icon.png` is the source; `npm.cmd run icon` rebuilds the whole set.
+
+### Fixed
+
+- The language selectors in the popup card are readable in dark mode. Windows
+  paints a `select` **and its native option list** with the background of the
+  control, so the translucent fill the card has used left the language names
+  sitting on the desktop behind the popup; both the popup selectors and the
+  settings window's now use an opaque surface, carry a visible border and grow to
+  a size that reads as a combo box.
+
 ## [0.3.3] - 2026-09-20
 
 ### Added
@@ -289,7 +341,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.3...v1.0.0
 [0.3.3]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.0...v0.3.1

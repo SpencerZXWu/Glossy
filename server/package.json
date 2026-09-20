@@ -1,0 +1,19 @@
+{
+  "name": "glossy-cloud",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Glossy 的翻译代理：百度翻译的密钥留在服务端，App 免密钥直接调用。",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "dev": "wrangler dev",
+    "dev:node": "node src/node.js",
+    "build:scf": "node scripts/build-scf.mjs",
+    "deploy": "wrangler deploy",
+    "logs": "wrangler tail"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.42.0"
+  }
+}

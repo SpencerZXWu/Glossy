@@ -79,6 +79,12 @@ jobs:
       - name: Frontend tests
         run: npm test
 
+      # `server/` is a Node project of its own. Its tests cover pure functions —
+      # the provider calls are injected — so nothing has to be installed first.
+      - name: Server tests
+        working-directory: server
+        run: npm test
+
       - name: Formatting
         working-directory: src-tauri
         run: cargo fmt --all --check

@@ -12,7 +12,6 @@ pub const MIN_SELECTION_LEN: usize = 2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Provider {
     /// Free public Google translate endpoint, no API key required.
-    #[default]
     #[serde(rename = "google")]
     Google,
     /// Zhipu GLM chat completions, free tier, requires an API key.
@@ -21,6 +20,14 @@ pub enum Provider {
     /// Baidu Translate, free monthly quota, requires an APP ID and a key.
     #[serde(rename = "baidu")]
     Baidu,
+    /// Glossy's own proxy (see `server/`), which keeps the provider
+    /// credentials server side so nothing has to be filled in here. The
+    /// default: a fresh install works before anything is configured, which is
+    /// not true of any provider that needs a key, nor of the free Google
+    /// endpoint on a network that blocks it.
+    #[default]
+    #[serde(rename = "cloud")]
+    Cloud,
     /// DeepL, requires an API key.
     #[serde(rename = "deepl")]
     DeepL,
@@ -36,6 +43,7 @@ impl Provider {
             Provider::Google => "google",
             Provider::Zhipu => "zhipu",
             Provider::Baidu => "baidu",
+            Provider::Cloud => "cloud",
             Provider::DeepL => "deepl",
             Provider::OpenAI => "openai",
         }
@@ -239,6 +247,14 @@ pub struct Settings {
     pub target_lang: String,
     /// Translation backend.
     pub provider: Provider,
+    /// Address of Glossy's own translation proxy (the Worker in `server/`).
+    /// Empty means "use the address this build was made with", and when that is
+    /// empty as well the provider says it has nowhere to send the text.
+    pub cloud_endpoint: String,
+    /// Random identifier of this installation, so the proxy can count the daily
+    /// characters of one device. Generated once and kept, because a fresh one
+    /// on every launch would look like a new device to the quota.
+    pub cloud_id: String,
     /// Credentials of every provider that was configured so far.
     pub credentials: BTreeMap<String, Credentials>,
     /// API key written by versions that only kept one credential pair.
@@ -298,6 +314,8 @@ impl Default for Settings {
             trigger_on_double_click: true,
             target_lang: default_target_lang(),
             provider: Provider::default(),
+            cloud_endpoint: String::new(),
+            cloud_id: crate::translate::new_install_id(),
             credentials: BTreeMap::new(),
             legacy_api_key: String::new(),
             legacy_app_id: String::new(),
@@ -337,7 +355,16 @@ impl Settings {
         match std::fs::read_to_string(&path) {
             Ok(raw) => {
                 let mut settings = Self::parse(&raw);
-                if settings.reveal_credentials() {
+                let mut rewrite = settings.reveal_credentials();
+                // A file written before the cloud provider existed carries no
+                // install id, and the generated one has to reach the disk:
+                // otherwise the proxy would see a new device on every launch and
+                // hand out the daily quota again.
+                if !Self::stores(&raw, "cloudId") || settings.cloud_id.trim().is_empty() {
+                    settings.cloud_id = crate::translate::new_install_id();
+                    rewrite = true;
+                }
+                if rewrite {
                     // The file held plain text, or a credential this login
                     // cannot unlock. Both are gone from memory by now, so write
                     // the result back; failing to do so only means the next save
@@ -350,6 +377,17 @@ impl Settings {
             }
             Err(_) => Settings::default(),
         }
+    }
+
+    /// Whether a stored file holds a given key at all, which `parse` cannot
+    /// tell: it merges the file into the defaults, so a key that is missing
+    /// there shows up as the default value.
+    fn stores(raw: &str, key: &str) -> bool {
+        let text = raw.trim_start_matches('\u{feff}');
+        serde_json::from_str::<serde_json::Value>(text)
+            .ok()
+            .and_then(|value| value.as_object().map(|map| map.contains_key(key)))
+            .unwrap_or(false)
     }
 
     /// Reads persisted JSON, falling back to the defaults for anything unusable.
@@ -525,6 +563,12 @@ impl Settings {
         self.auto_close_secs = self.auto_close_secs.min(600);
         self.history_limit = self.history_limit.min(crate::history::MAX_LIMIT);
         self.hotkey = self.hotkey.trim().to_string();
+        // A pasted address easily carries a trailing slash or a path, and the
+        // request URL is built by appending `/v1/...` to it.
+        self.cloud_endpoint = self.cloud_endpoint.trim().trim_end_matches('/').to_string();
+        if self.cloud_id.is_empty() {
+            self.cloud_id = crate::translate::new_install_id();
+        }
         self.credentials = self
             .credentials
             .iter()

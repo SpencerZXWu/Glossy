@@ -89,7 +89,8 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | History | How many finished translations to remember (`Off` to `The last 500`, default 50). The list below the selector keeps the original, the translation, the provider and the time; `Search` filters both texts, clicking an entry shows it in the floating card again (no second provider call), and each entry has a copy and a remove button. `Forget everything` empties the list. The file lives in `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` writes `Documents\glossy-settings.json`; `Import…` reads a file you pick back into the app. Tick `Include my API keys in the exported file` to carry the keys as well — Glossy asks once more before it writes them in plain text. An import validates through `sanitized()` and protects the keys it brings with DPAPI on the way to disk. |
 | Updates | `Check for a new version when Glossy starts` asks GitHub Releases on every start (off by default). `Check now` looks immediately and says which version is waiting, and `Download and restart` installs it. A build without an update signing key — which is every build until the release key pair exists — hides the buttons and says so. |
-| Translation provider | `google` (free, no key), `baidu` (free monthly quota, APP ID + key), `zhipu` (free tier, API key), `deepl` or `openai` (API key). |
+| Translation provider | `google` (free, no key), `baidu` (free monthly quota, APP ID + key), `cloud` (Glossy's own server, nothing to fill in), `zhipu` (free tier, API key), `deepl` or `openai` (API key). |
+| Server address (cloud) | Shown only for `cloud`: the address of the translation server, `https://…`. A build carries the address of the deployment the project runs, so the field can stay empty; fill it in to point the app at a deployment of your own (see [`server/`](./server/README.md)). Under it, the window shows what is left of today's allowance — or the reason the server could not be reached — with a `Check again` button next to it. |
 | APP ID / API key | Shown only for the providers that need them: `baidu` asks for both fields, `zhipu`, `deepl` and `openai` for the key alone, and the free `google` provider hides both. The values are remembered per provider, so switching to a provider you configured earlier fills its fields back in. |
 
 The hotkey accepts `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` plus one key:
@@ -108,6 +109,7 @@ current selection, so "select text, press the hotkey" works as well.
 | --- | --- | --- |
 | `google` | free, no key | Public `translate.googleapis.com` endpoint. Blocked on some networks, including much of mainland China. Always queried with the `dict-chrome-ex` client id; the throttled `gtx` id is only used as a fallback. |
 | `baidu` | free monthly quota, APP ID + key | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Reachable from mainland China with a monthly free quota of 50,000 characters, raising to 1,000,000 after the free personal 个人认证. Needs both the **APP ID** and the **密钥** from <https://fanyi-api.baidu.com>. Passes `from=auto`, so the source language is detected. |
+| `cloud` | nothing to fill in | **Glossy Cloud**: a server deployed from [`server/`](./server/README.md) does the translating with the project's own account, and the app only sends the text plus an install id. Nothing to configure, no key on the machine, and it works from mainland China. The daily allowance is counted per device, per address and in total, and the settings window shows what is left of it; running your own deployment is a one-command change of the server address. |
 | `zhipu` | free tier, API key | Zhipu `glm-4.7-flash` chat model. Reachable from mainland China and returns translation, phonetics, definitions and an example in a single call. Key from <https://open.bigmodel.cn>. ⚠️ Zhipu's user agreement licenses the non-paid models for **non-commercial personal study only** — see below before shipping Glossy. |
 | `deepl` | API key | Keys ending in `:fx` use the free endpoint. |
 | `openai` | API key | `gpt-4o-mini`. |
@@ -178,12 +180,16 @@ selected) — this exercises the popup without the global hook.
 - **"Google Translate is rate limiting requests right now"** — Google answered `429`, which
   happens to desktop HTTP clients on the public endpoint even though a browser or `curl` still
   works. Glossy first retries with a second client id; if the message stays, wait a minute or
-  switch the provider to `baidu`, `zhipu`, `deepl` or `openai`.
+  switch the provider to `cloud`, `baidu`, `zhipu`, `deepl` or `openai`.
 - **"Could not reach Google Translate"** — the free `google` provider calls
   `translate.googleapis.com`, which is blocked on some networks (including much of mainland
-  China). The card offers a retry button; if it keeps failing, switch the provider to `baidu`
-  (free monthly quota, APP ID and 密钥 from fanyi-api.baidu.com), `zhipu` (free tier, key from
-  open.bigmodel.cn), `deepl` or `openai`.
+  China). The card offers a retry button; if it keeps failing, switch the provider to `cloud`
+  (nothing to fill in), `baidu` (free monthly quota, APP ID and 密钥 from fanyi-api.baidu.com),
+  `zhipu` (free tier, key from open.bigmodel.cn), `deepl` or `openai`.
+- **"The free cloud translation quota for today is used up"** — the `cloud` provider counts
+  the characters it translates per device, per address and in total, and one of those counters
+  hit its daily cap. It starts over at 00:00 UTC. Pick another provider, or deploy your own
+  server from [`server/`](./server/README.md) and point the app at it.
 - **"Baidu rejected the APP ID" / "Baidu rejected the signature"** — the two halves of the
   credential pair were swapped or mistyped. `baidu` needs the APP ID in the first box and the
   密钥 in the second; the key is never sent to Baidu, it only signs the request.
@@ -199,7 +205,9 @@ pairs. The hook callback only records coordinates; a worker thread decides wheth
 the gesture was a drag or a double click, copies the selection with `Ctrl+C`
 (sending `Ctrl+Insert` when the foreground window runs elevated), restores the
 clipboard if requested, and finally tells the popup window what to show. The
-captured text only ever goes to the translation provider you selected.
+captured text only ever goes to the translation provider you selected — which is a
+vendor for every provider except `cloud`, where it goes to the server the project
+runs instead ([`server/`](./server/README.md)).
 
 ## Development
 
@@ -237,11 +245,13 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 81 frontend tests
+node --test                                                          # 130 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
+cargo test --locked                                                  # 135 Rust tests
+cd ..\server
+npm test                                                             # 49 server tests
 ```
 
 `npm test` runs the same `node --test` command. The frontend tests load
@@ -249,6 +259,10 @@ cargo test --locked
 and cover the dictionaries, the placeholder substitution and the card renderer.
 Run the plain directory form on Node 24/Windows — `node --test tests` and
 `node --test .` do not resolve the test files there.
+
+The suite in `server/` needs nothing installed: the calls to the translation
+provider are injected, so the quota rules, the request signature and the caller
+address parsing are all covered without a network.
 
 The version lives in six places (see `scripts\version.ps1`), so never edit them by
 hand: `tauri.conf.json` is authoritative, `scripts\version.ps1 -Set 0.1.2` writes it
@@ -302,7 +316,7 @@ none of them is covered by the automated tests.
 | 8 | Pin the popup, click elsewhere on the desktop, wait past the auto-close timeout | The card stays open until the pin is released or the × is used |
 | 9 | Click outside an unpinned card | It closes as soon as the click lands outside |
 | 10 | Switch Windows between light and dark, then force each scheme in the settings | Both windows follow the choice, with readable text and borders in both |
-| 11 | Translate with each of the five providers, including one with a bad key | A result for the good ones; a readable error with a retry button for the bad one |
+| 11 | Translate with each of the six providers, including one with a bad key | A result for the good ones, including `cloud`; a readable error with a retry button for the bad one |
 | 12 | Add a running program to the ignore list, translate inside it, then remove it | Nothing pops up while it is listed, and the popup is back once it is removed |
 | 13 | Press the global hotkey with text on the clipboard, then with an empty clipboard and a selection | The translation opens next to the cursor in the first case, the current selection is used in the second |
 | 14 | Export without keys, export with keys, then import each file | Plain export has no `credentials` block; the keyed export asks for confirmation first; an import restores every setting and the keys work |
@@ -334,7 +348,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 132 tests; see "Checks" above for lint and format runs
+cargo test   # 135 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -359,7 +373,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -372,6 +386,10 @@ src-tauri/src/
   console.rs             borrows the console of the terminal that started Glossy
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
+server/
+  src/                   the proxy: quota rules, the providers, the two hosts
+  test/                  node --test suite for the rules and the signatures
+  README.md              how to deploy it (Cloudflare Worker or Tencent SCF)
 scripts/
   version.ps1            the version number, in one place
   release.ps1            release build + staging for a GitHub release
@@ -383,7 +401,7 @@ release/
 
 ## Roadmap
 
-[ROADMAP.md](./ROADMAP.md) holds the planned releases (`v0.1.1` through `v1.0.0`) with
+[ROADMAP.md](./ROADMAP.md) holds the releases (`v1.0.0` through `v2.0.0`) with
 their acceptance criteria, the versioning policy, the known risks and the release
 process. Each release maps to a GitHub milestone of the same name.
 
@@ -450,7 +468,8 @@ process. Each release maps to a GitHub milestone of the same name.
 | 历史记录 | 记住多少条已完成的翻译（`关闭` 到 `最近 500 条`，默认 50）。选择器下方的列表保留原文、译文、翻译渠道和时间；`搜索` 会同时过滤两段文本，点击一条记录会在浮动卡片中再次显示它（不会再次请求翻译渠道），每条记录都有复制和删除按钮。`清空历史记录` 会清空列表。该文件位于 `%APPDATA%\com.glossy.translator\history.json`。 |
 | 设置文件 | `导出…` 会写入 `Documents\glossy-settings.json`；`导入…` 会把你选择的文件读回应用中。勾选 `导出文件中包含我的 API 密钥` 可以连同密钥一起带走——Glossy 在以明文写入之前会再确认一次。导入会通过 `sanitized()` 校验，并在写入磁盘的过程中用 DPAPI 保护它带来的密钥。 |
 | 更新 | `启动 Glossy 时检查新版本` 会在每次启动时询问 GitHub Releases（默认关闭）。`立即检查` 会立刻查看并说明是哪个版本在等待，`下载并重启` 则会安装它。没有更新签名密钥的构建——在发布密钥对存在之前的所有构建都是如此——会隐藏这些按钮并说明原因。 |
-| 翻译渠道 | `google`（免费，无需密钥）、`baidu`（每月免费额度，APP ID + 密钥）、`zhipu`（免费额度，API Key）、`deepl` 或 `openai`（API Key）。 |
+| 翻译渠道 | `google`（免费，无需密钥）、`baidu`（每月免费额度，APP ID + 密钥）、`cloud`（Glossy 自己的服务器，什么都不用填）、`zhipu`（免费额度，API Key）、`deepl` 或 `openai`（API Key）。 |
+| 服务器地址（cloud） | 只在 `cloud` 渠道中显示：翻译服务器的地址，`https://…`。构建里已经带了本项目正在运行的那个部署的地址，所以这个字段可以留空；填上它就能把应用指向你自己的部署（见 [`server/`](./server/README.md)）。字段下方会显示今天还剩多少额度——或者服务器联系不上的原因——旁边是 `重新检查` 按钮。 |
 | APP ID / API Key | 只在需要它们的渠道中显示：`baidu` 需要两个字段，`zhipu`、`deepl` 和 `openai` 只需要密钥，免费的 `google` 渠道则两个都不显示。这些值按渠道分别记住，因此切换到之前配置过的渠道时会把它自己的字段重新填好。 |
 
 快捷键接受 `Ctrl`/`Control`、`Alt`、`Shift`、`Win`/`Meta` 外加一个按键：
@@ -467,6 +486,7 @@ process. Each release maps to a GitHub milestone of the same name.
 | --- | --- | --- |
 | `google` | 免费，无需密钥 | 公开的 `translate.googleapis.com` 接口。在部分网络中被屏蔽，包括中国大陆的大部分地区。始终以 `dict-chrome-ex` 客户端 id 查询；被限流的 `gtx` id 只作为后备。 |
 | `baidu` | 每月免费额度，APP ID + 密钥 | 百度翻译开放平台（`fanyi-api.baidu.com/api/trans/vip/translate`）。中国大陆可直接访问，每月免费额度 50,000 字符，完成免费的个人认证后提升到 1,000,000。需要 <https://fanyi-api.baidu.com> 上的 **APP ID** 和**密钥**。会传递 `from=auto`，因此源语言会被识别。 |
+| `cloud` | 无需填写 | **Glossy Cloud**：由后端服务器（[`server/`](./server/README.md)）用本项目自己的账号完成翻译，应用只发送文本和一个安装 id。无需任何配置，机器上也不会有密钥，中国大陆可直接访问。每日额度按设备、按地址以及总量分别统计，设置窗口里会显示当天还剩多少；想换成自己的部署，只需要改一下服务器地址。 |
 | `zhipu` | 免费额度，API Key | 智谱 `glm-4.7-flash` 对话模型。中国大陆可直接访问，一次调用即可返回译文、音标、释义和一个例句。密钥来自 <https://open.bigmodel.cn>。⚠️ 智谱的用户协议把非付费模型授权为**仅限非商业的个人研究学习**——在发布 Glossy 之前请先看下文。 |
 | `deepl` | API Key | 以 `:fx` 结尾的密钥使用免费接口。 |
 | `openai` | API Key | `gpt-4o-mini`。 |
@@ -500,15 +520,16 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 常见问题
 
-- **"Google Translate is rate limiting requests right now"**（Google 正在限流）—— Google 返回了 `429`，公开接口对桌面 HTTP 客户端常常如此，即便浏览器或 `curl` 仍然能正常工作。Glossy 会先用第二个客户端 id 重试；如果提示还在，等一分钟，或把渠道切换到 `baidu`、`zhipu`、`deepl` 或 `openai`。
-- **"Could not reach Google Translate"**（无法连接 Google Translate）—— 免费的 `google` 渠道会访问 `translate.googleapis.com`，它在部分网络中被屏蔽（包括中国大陆的大部分地区）。卡片会提供重试按钮；如果一直失败，请把渠道切换到 `baidu`（每月免费额度，APP ID 和密钥来自 fanyi-api.baidu.com）、`zhipu`（免费额度，密钥来自 open.bigmodel.cn）、`deepl` 或 `openai`。
+- **"Google Translate is rate limiting requests right now"**（Google 正在限流）—— Google 返回了 `429`，公开接口对桌面 HTTP 客户端常常如此，即便浏览器或 `curl` 仍然能正常工作。Glossy 会先用第二个客户端 id 重试；如果提示还在，等一分钟，或把渠道切换到 `cloud`、`baidu`、`zhipu`、`deepl` 或 `openai`。
+- **"Could not reach Google Translate"**（无法连接 Google Translate）—— 免费的 `google` 渠道会访问 `translate.googleapis.com`，它在部分网络中被屏蔽（包括中国大陆的大部分地区）。卡片会提供重试按钮；如果一直失败，请把渠道切换到 `cloud`（什么都不用填）、`baidu`（每月免费额度，APP ID 和密钥来自 fanyi-api.baidu.com）、`zhipu`（免费额度，密钥来自 open.bigmodel.cn）、`deepl` 或 `openai`。
+- **"The free cloud translation quota for today is used up."**（今天的免费云端翻译额度已用完）—— `cloud` 渠道会按设备、按地址和总量分别统计它翻译过的字符数，其中某一个计数器碰到了当天的上限，它会在 UTC 00:00 重新开始。可以换用别的渠道，或者从 [`server/`](./server/README.md) 部署一个自己的服务器并把应用指向它。
 - **"Baidu rejected the APP ID" / "Baidu rejected the signature"**（百度拒绝了 APP ID / 百度拒绝了签名）—— 凭证对的两半被对调或输错了。`baidu` 需要在第一个框中填 APP ID，第二个框填密钥；密钥从不会被发送给百度，它只用来给请求签名。
 - **"Baidu rejected this computer's IP address"**（百度拒绝了本机的 IP 地址）—— 百度控制台中该应用的 IP 白名单被填上了内容。要么清空它，要么把 Glossy 拨号所用的地址加进去。
 - **弹窗显示"已暂停"**，尽管翻译是开启的 —— 设置窗口中的总开关被关掉了，或者启动时设置文件无法读取。
 
 ## 划词是如何捕获的
 
-Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道。
+Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道——除 `cloud` 之外都是厂商的接口，而 `cloud` 发往本项目自己运行的服务器（[`server/`](./server/README.md)）。
 
 ## 开发
 
@@ -544,17 +565,22 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 81 frontend tests
+node --test                                                          # 130 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
+cargo test --locked                                                  # 135 Rust tests
+cd ..\server
+npm test                                                             # 49 server tests
 ```
 
 `npm test` 运行的是同一条 `node --test` 命令。前端测试把
 `src/js/i18n.js` 和 `src/js/render.js` 加载进一个最小 DOM（见 `tests/helpers/`），
 覆盖词典、占位符替换和卡片渲染器。在 Node 24/Windows 上请使用纯目录形式运行——`node --test tests` 和
 `node --test .` 在那里无法解析测试文件。
+
+`server/` 里的测试不需要安装任何依赖：对上游的调用是注入进去的，所以
+额度规则、请求签名和调用方地址解析都能在离线环境下被覆盖。
 
 版本号存在于六个地方（见 `scripts\version.ps1`），所以绝不要手动修改它们：
 `tauri.conf.json` 是权威来源，`scripts\version.ps1 -Set 0.1.2` 会把它写到其他所有地方，
@@ -598,7 +624,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 8 | 固定弹窗，点击桌面别处，等待超过自动关闭超时 | 卡片保持打开，直到取消固定或使用 × |
 | 9 | 点击未固定卡片的外部 | 点击一落到外面，它就关闭 |
 | 10 | 在 Windows 中切换浅色/深色，然后在设置中强制使用每种方案 | 两个窗口都跟随该选择，两者的文字和边框都清晰可读 |
-| 11 | 用五个渠道各翻译一次，其中一个使用错误的密钥 | 正常的那些能出结果；填错的那个显示可读的错误和重试按钮 |
+| 11 | 用六个渠道各翻译一次，其中一个使用错误的密钥 | 正常的那些能出结果（包括 `cloud`）；填错的那个显示可读的错误和重试按钮 |
 | 12 | 把正在运行的程序加入忽略列表，在其中翻译，然后移除它 | 它在列表中时不会弹出任何东西，移除后弹窗恢复 |
 | 13 | 剪贴板中有文本时按全局快捷键，然后在剪贴板为空且有选区时再按一次 | 第一种情况下译文在光标旁打开，第二种情况下使用当前选区 |
 | 14 | 不带密钥导出、带密钥导出，然后分别导入这两个文件 | 普通导出没有 `credentials` 块；带密钥的导出会先请求确认；导入会恢复每一项设置，且密钥可用 |
@@ -626,7 +652,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 132 tests; see "Checks" above for lint and format runs
+cargo test   # 135 tests; see "Checks" above for lint and format runs
 ```
 
 ## 目录结构
@@ -651,7 +677,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -664,6 +690,10 @@ src-tauri/src/
   console.rs             borrows the console of the terminal that started Glossy
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
+server/
+  src/                   the proxy: quota rules, the providers, the two hosts
+  test/                  node --test suite for the rules and the signatures
+  README.md              how to deploy it (Cloudflare Worker or Tencent SCF)
 scripts/
   version.ps1            the version number, in one place
   release.ps1            release build + staging for a GitHub release
@@ -675,7 +705,7 @@ release/
 
 ## 路线图
 
-[ROADMAP.md](./ROADMAP.md) 记录了计划发布的版本（`v0.1.1` 到 `v1.0.0`）及其验收标准、版本号策略、已知风险和发布流程。每个版本都对应一个同名的 GitHub 里程碑。
+[ROADMAP.md](./ROADMAP.md) 记录了各版本（`v1.0.0` 到 `v2.0.0`）及其验收标准、版本号策略、已知风险和发布流程。每个版本都对应一个同名的 GitHub 里程碑。
 
 [CHANGELOG.md](./CHANGELOG.md) 列出了每个已发布版本中交付的内容。
 
@@ -778,7 +808,8 @@ encima de él cuando no hay espacio debajo.
 | History | Cuántas traducciones terminadas recordar (`Off` hasta `The last 500`, por defecto 50). La lista que hay bajo el selector conserva el original, la traducción, el proveedor y la hora; `Search` filtra ambos textos, al hacer clic en una entrada se muestra de nuevo en la tarjeta flotante (sin una segunda llamada al proveedor), y cada entrada tiene un botón de copiar y otro de eliminar. `Forget everything` vacía la lista. El archivo está en `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` escribe `Documents\glossy-settings.json`; `Import…` vuelve a leer en la aplicación un archivo que elijas. Marca `Include my API keys in the exported file` para incluir también las claves: Glossy vuelve a preguntar antes de escribirlas en texto sin formato. Una importación se valida mediante `sanitized()` y protege las claves que trae con DPAPI de camino al disco. |
 | Updates | `Check for a new version when Glossy starts` consulta GitHub Releases en cada arranque (desactivado por defecto). `Check now` busca de inmediato y dice qué versión está esperando, y `Download and restart` la instala. Una compilación sin clave de firma de actualizaciones —que es toda compilación hasta que exista el par de claves de publicación— oculta los botones y lo indica. |
-| Translation provider | `google` (gratis, sin clave), `baidu` (cuota mensual gratuita, APP ID + clave), `zhipu` (nivel gratuito, clave de API), `deepl` u `openai` (clave de API). |
+| Translation provider | `google` (gratis, sin clave), `baidu` (cuota mensual gratuita, APP ID + clave), `cloud` (el propio servidor de Glossy, sin nada que rellenar), `zhipu` (nivel gratuito, clave de API), `deepl` u `openai` (clave de API). |
+| Server address (cloud) | Se muestra solo para `cloud`: la dirección del servidor de traducción, `https://…`. La compilación ya incluye la dirección del despliegue que mantiene el proyecto, así que el campo puede quedarse vacío; rellénalo para apuntar la aplicación a un despliegue tuyo (consulta [`server/`](./server/README.md)). Debajo se indica cuánto queda de la cuota de hoy —o el motivo por el que no se pudo contactar con el servidor— junto a un botón `Check again`. |
 | APP ID / API key | Se muestra solo para los proveedores que las necesitan: `baidu` pide los dos campos, `zhipu`, `deepl` y `openai` solo la clave, y el proveedor gratuito `google` oculta ambos. Los valores se recuerdan por proveedor, así que al cambiar a un proveedor que configuraste antes sus campos se rellenan de nuevo. |
 
 El atajo de teclado acepta `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` más una
@@ -798,6 +829,7 @@ funciona.
 | --- | --- | --- |
 | `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
 | `baidu` | cuota mensual gratuita, APP ID + clave | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Accesible desde China continental con una cuota mensual gratuita de 50 000 caracteres, que sube a 1 000 000 tras la 个人认证 (la verificación personal gratuita). Necesita tanto el **APP ID** como la **密钥** de <https://fanyi-api.baidu.com>. Envía `from=auto`, de modo que se detecta el idioma de origen. |
+| `cloud` | nada que rellenar | **Glossy Cloud**: un servidor desplegado desde [`server/`](./server/README.md) traduce con la cuenta del propio proyecto, y la aplicación solo envía el texto más un id de instalación. Nada que configurar, ninguna clave en la máquina y funciona desde China continental. La cuota diaria se cuenta por dispositivo, por dirección y en total, y la ventana de ajustes muestra lo que queda; usar tu propio despliegue es cambiar la dirección del servidor. |
 | `zhipu` | nivel gratuito, clave de API | Modelo de chat `glm-4.7-flash` de Zhipu. Accesible desde China continental y devuelve la traducción, los símbolos fonéticos, las definiciones y un ejemplo en una sola llamada. Clave en <https://open.bigmodel.cn>. ⚠️ El acuerdo de usuario de Zhipu licencia los modelos no de pago **solo para estudio personal no comercial**; consulta más abajo antes de publicar Glossy. |
 | `deepl` | clave de API | Las claves que terminan en `:fx` usan el punto de conexión gratuito. |
 | `openai` | clave de API | `gpt-4o-mini`. |
@@ -879,13 +911,19 @@ seleccionado): así se prueba el emergente sin el enganche global.
 - **"Google Translate is rate limiting requests right now"** — Google respondió `429`, algo
   que les ocurre a los clientes HTTP de escritorio en el punto de conexión público aunque un
   navegador o `curl` sigan funcionando. Glossy reintenta primero con un segundo id de cliente;
-  si el mensaje persiste, espera un minuto o cambia el proveedor a `baidu`, `zhipu`, `deepl`
-  u `openai`.
+  si el mensaje persiste, espera un minuto o cambia el proveedor a `cloud`, `baidu`, `zhipu`,
+  `deepl` u `openai`.
 - **"Could not reach Google Translate"** — el proveedor gratuito `google` llama a
   `translate.googleapis.com`, que está bloqueado en algunas redes (incluida buena parte de
   China continental). La tarjeta ofrece un botón de reintento; si sigue fallando, cambia el
-  proveedor a `baidu` (cuota mensual gratuita, APP ID y 密钥 de fanyi-api.baidu.com), `zhipu`
+  proveedor a `cloud` (nada que rellenar), `baidu` (cuota mensual gratuita, APP ID y 密钥 de
+  fanyi-api.baidu.com), `zhipu`
   (nivel gratuito, clave de open.bigmodel.cn), `deepl` u `openai`.
+- **"The free cloud translation quota for today is used up."** — el proveedor `cloud` cuenta
+  los caracteres que traduce por dispositivo, por dirección y en total, y alguno de esos
+  contadores ha llegado a su tope diario. Vuelve a empezar a las 00:00 UTC. Usa otro proveedor,
+  o despliega tu propio servidor desde [`server/`](./server/README.md) y apunta la aplicación
+  a él.
 - **"Baidu rejected the APP ID" / "Baidu rejected the signature"** — las dos mitades del par
   de credenciales se han intercambiado o están mal escritas. `baidu` necesita el APP ID en el
   primer cuadro y la 密钥 en el segundo; la clave nunca se envía a Baidu, solo firma la petición.
@@ -904,7 +942,9 @@ coordenadas; un hilo de trabajo decide si el gesto fue un arrastre o un doble cl
 copia la selección con `Ctrl+C` (enviando `Ctrl+Insert` cuando la ventana en primer
 plano se ejecuta con privilegios elevados), restaura el portapapeles si se ha
 pedido y, por último, indica a la ventana emergente qué debe mostrar. El texto
-capturado solo se envía al proveedor de traducción que hayas elegido.
+capturado solo se envía al proveedor de traducción que hayas elegido — para todos
+los proveedores es un tercero, salvo `cloud`, que lo envía al servidor que mantiene
+el proyecto ([`server/`](./server/README.md)).
 
 ## Desarrollo
 
@@ -944,11 +984,13 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 81 frontend tests
+node --test                                                          # 130 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked
+cargo test --locked                                                  # 135 Rust tests
+cd ..\server
+npm test                                                             # 49 server tests
 ```
 
 `npm test` ejecuta el mismo comando `node --test`. Las pruebas del frontend cargan
@@ -956,6 +998,10 @@ cargo test --locked
 y cubren los diccionarios, la sustitución de marcadores y el renderizador de
 tarjetas. Ejecuta la forma de directorio simple en Node 24/Windows: `node --test
 tests` y `node --test .` no resuelven allí los archivos de prueba.
+
+La suite de `server/` no necesita nada instalado: las llamadas al proveedor se
+inyectan, así que las reglas de cuota, la firma de la petición y el análisis de la
+dirección del llamante están cubiertos sin red.
 
 La versión vive en seis sitios (consulta `scripts\version.ps1`), así que no los
 edites nunca a mano: `tauri.conf.json` es la fuente autorizada,
@@ -1012,7 +1058,7 @@ real en algún momento y ninguno está cubierto por las pruebas automatizadas.
 | 8 | Fijar el emergente, hacer clic en otro punto del escritorio y esperar más allá del tiempo de cierre automático | La tarjeta permanece abierta hasta que se suelte la fijación o se use la × |
 | 9 | Hacer clic fuera de una tarjeta sin fijar | Se cierra en cuanto el clic cae fuera |
 | 10 | Cambiar Windows entre modo claro y oscuro y luego forzar cada esquema en los ajustes | Ambas ventanas siguen la elección, con texto y bordes legibles en las dos |
-| 11 | Traducir con cada uno de los cinco proveedores, incluido uno con una clave incorrecta | Un resultado para los correctos; un error legible con un botón de reintento para el incorrecto |
+| 11 | Traducir con cada uno de los seis proveedores, incluido uno con una clave incorrecta | Un resultado para los correctos, incluido `cloud`; un error legible con un botón de reintento para el incorrecto |
 | 12 | Añadir un programa en ejecución a la lista de ignorados, traducir dentro de él y luego quitarlo | No aparece nada mientras está en la lista, y el emergente vuelve en cuanto se quita |
 | 13 | Pulsar el atajo de teclado global con texto en el portapapeles y luego con el portapapeles vacío y una selección | La traducción se abre junto al cursor en el primer caso y se usa la selección actual en el segundo |
 | 14 | Exportar sin claves, exportar con claves y luego importar cada archivo | La exportación simple no tiene bloque `credentials`; la exportación con claves pide confirmación antes; una importación restaura todos los ajustes y las claves funcionan |
@@ -1048,7 +1094,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 132 tests; see "Checks" above for lint and format runs
+cargo test   # 135 tests; see "Checks" above for lint and format runs
 ```
 
 ## Estructura
@@ -1073,7 +1119,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -1086,6 +1132,10 @@ src-tauri/src/
   console.rs             borrows the console of the terminal that started Glossy
   platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
   clipboard.rs  settings.rs  state.rs  input.rs
+server/
+  src/                   the proxy: quota rules, the providers, the two hosts
+  test/                  node --test suite for the rules and the signatures
+  README.md              how to deploy it (Cloudflare Worker or Tencent SCF)
 scripts/
   version.ps1            the version number, in one place
   release.ps1            release build + staging for a GitHub release
@@ -1097,10 +1147,10 @@ release/
 
 ## Hoja de ruta
 
-[ROADMAP.md](./ROADMAP.md) contiene las publicaciones previstas (`v0.1.1` a
-`v1.0.0`) con sus criterios de aceptación, la política de versiones, los riesgos
-conocidos y el proceso de publicación. Cada publicación se corresponde con un hito
-de GitHub del mismo nombre.
+[ROADMAP.md](./ROADMAP.md) contiene las publicaciones (`v1.0.0` a `v2.0.0`) con
+sus criterios de aceptación, la política de versiones, los riesgos conocidos y el
+proceso de publicación. Cada publicación se corresponde con un hito de GitHub del
+mismo nombre.
 
 [CHANGELOG.md](./CHANGELOG.md) enumera lo que se incluyó en cada versión publicada.
 

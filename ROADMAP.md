@@ -8,11 +8,12 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `0.3.3`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~12,700 lines: ~7,300 Rust, ~4,400 frontend (plain HTML/CSS/JS) and ~970 frontend test lines, comments included |
-| Tests | 132 Rust tests and 81 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Version | `1.0.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~16,400 lines: ~8,400 Rust, ~5,000 frontend (plain HTML/CSS/JS), ~1,100 frontend test lines and ~1,800 in `server/`, comments included |
+| Tests | 135 Rust tests, 130 frontend tests (`node --test`) and 49 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
+| Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live |
 | Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/`, `v0.3.0` in `release/v0.3.0/`, `v0.3.1` in `release/v0.3.1/`, `v0.3.2` in `release/v0.3.2/`, `v0.3.3` in `release/v0.3.3/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
@@ -21,13 +22,18 @@ first item of v0.2.0, which is already in the tree.
 
 ## Versioning policy
 
-Semantic Versioning, with explicit meaning for the `0.x` range:
+Semantic Versioning. The `0.x` range was used the way it is meant to be used — every
+release could change the settings file format or an IPC command name — and `1.0.0`
+ends that:
 
 - `0.1.x` — patches. Bug fixes only: no new settings, no changes to the settings file format.
 - `0.x.0` (x ≥ 2) — feature releases. May add settings; `Settings` is
   `#[serde(default)]`, so files written by older versions keep loading.
-- `1.0.0` — the freeze. The settings JSON format and the IPC command names stop
-  changing; later additions go through a migration function.
+- `1.x` — feature releases. Settings are only added, never removed or renamed, and IPC
+  command names and their arguments stay as they are; a file written before an addition
+  keeps loading. Anything that does break either of those waits for `2.0.0`.
+- `2.0.0` — the freeze. The settings JSON format and the IPC command names stop
+  changing for the whole `2.x` line; later additions go through a migration function.
 - Every `X.Y.0` gets a GitHub milestone, and every release is a `vX.Y.Z` tag with the
   NSIS installer attached.
 
@@ -87,12 +93,31 @@ the numbers a reader of the target language needs.
 | Word-card placeholder | The card says the dictionary is being looked up instead of changing under the reader, and the lookups share a short budget | done |
 
 Remaining visual work — the navigation and settings-panel rework, the popup card
-rebuild, icon and motion polish, and the accessibility pass — is listed in v0.4.0.
+rebuild, icon and motion polish, and the accessibility pass — is listed in v1.1.0.
 It is behaviour-preserving and ships as its own step.
 
 Estimated effort: 3–4 days.
 
-## v0.4.0 — Translation quality and the rest of the appearance work
+## v1.0.0 — Glossy Cloud, and the Windows line called stable
+
+Goal: install it and use it. Until now the first thing a new user had to do was
+get an API key from a vendor; this release removes that step, and with it the
+reason the version stayed in `0.x`.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Glossy Cloud provider | A sixth provider that talks to a server of our own instead of to a vendor. The app sends the text and an install id; the server holds the provider credentials, so nothing has to be filled in and no key ever reaches a copy of the app. The address is a setting, validated for `https://`, and a build made from this source already carries the address of the live deployment | done, in `src-tauri/src/translate/cloud.rs` |
+| Today's allowance, in the window | The settings window asks the server what is left of today and shows it under the provider row, with a button to ask again; an unreachable server says so in the same line | done, `cloud_status` and `/v1/quota` |
+| Install id | One random `cloudId` per installation, kept on disk and regenerated only when a settings file written before this release has none, so the allowance is counted per device rather than per launch | done, in `settings.rs` |
+| Server-side quota | Per installation, per caller address and global daily character caps, a per-minute request cap and a per-request size cap, all configurable through environment variables; the caller address comes from the end of `X-Forwarded-For` minus the hops the host's gateway appends, so a client cannot claim a fresh bucket | done, in `server/src/handler.js`; limits documented in `server/README.md` |
+| Upstream resilience | The providers are asked again — twice, 600 ms and 1400 ms apart — when they answer with their per-second throttling code or with a temporary failure, because a paid tier with a one-request-per-second limit is the plan the server runs on | done, in `server/src/upstream.js` |
+| Deployable two ways | The same source runs on a Cloudflare Worker (a Durable Object makes the count exact) and on a Tencent Cloud SCF Web 函数 through `node-server.js`, with the deployment steps for both in `server/README.md` | done |
+| Dark-mode selectors | The language selectors in the popup and in the settings window are readable in dark mode: Windows paints a `select` and its option list with the control's own background, so the translucent fill showed the desktop through the names | done |
+| Documentation | The README's provider tables carry the new provider in all three languages, and the server has its own deployment guide | done |
+
+Estimated effort: 4–6 days, spread over several sessions.
+
+## v1.1.0 — Translation quality and the rest of the appearance work
 
 Goal: make the reading use case actually good.
 
@@ -110,7 +135,7 @@ Goal: make the reading use case actually good.
 
 Estimated effort: 6–10 days.
 
-## v0.5.0 — Cross-platform and distribution
+## v1.2.0 — Cross-platform and distribution
 
 Goal: leave Windows behind and stop being flagged by SmartScreen.
 
@@ -125,7 +150,7 @@ Goal: leave Windows behind and stop being flagged by SmartScreen.
 
 Estimated effort: 8–15 days.
 
-## v1.0.0 — Stable release
+## v2.0.0 — Format freeze and the long-run promises
 
 Goal: turn a personal tool into something that can be promised.
 
@@ -141,19 +166,19 @@ Estimated effort: 5–10 days.
 
 ## Priority
 
-When time is short, the order of return on effort is: **v0.1.1 → the remaining
-v0.2.0 work → provider fallback in v0.4.0 → v0.5.0**.
+When time is short, the order of return on effort is: **provider fallback in
+v1.1.0 → the settings window rework → v1.2.0**.
 Cross-platform support is the only item large enough that it may never be finished,
-so it is deliberately scheduled last; decide on it after v0.4.0 rather than investing
+so it is deliberately scheduled last; decide on it after v1.1.0 rather than investing
 in it early.
 
 ## Risks
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| The Google endpoint is unofficial | It can start rate-limiting or change protocol at any time, and its terms of use are unclear | A retry across two clients already lives in `google.rs`; provider fallback in v0.4.0 is the real fix |
+| The Google endpoint is unofficial | It can start rate-limiting or change protocol at any time, and its terms of use are unclear | A retry across two clients already lives in `google.rs`; provider fallback in v1.1.0 is the real fix |
 | A currency rate service changes shape or goes down | An amount in the card loses its conversion | Two independent sources (exchangerate-api.com, and the ECB through `frankfurter.app`), a six-hour memory and disk cache, a stale table that stays usable for seven days and is labelled as such, and a two-minute quiet period after both fail |
-| Antivirus flags the low-level mouse hook | Installs and runs get blocked | Code signing in v0.4.0, plus a README section explaining what the hook does and why |
+| Antivirus flags the low-level mouse hook | Installs and runs get blocked | Code signing in v1.2.0, plus a README section explaining what the hook does and why |
 | macOS and Linux permission models | The port costs more than expected | Kept as its own release, X11 first, Wayland explicitly unsupported |
 | Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
 | Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer itself is still built locally by `scripts/release.ps1`, and a tagged release workflow is the next step |

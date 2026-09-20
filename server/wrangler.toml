@@ -1,0 +1,29 @@
+# Glossy 翻译代理。密钥不放这里，用 `wrangler secret put` 上传（见 README）。
+name = "glossy-cloud"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# 额度与限流，改完 `npx wrangler deploy` 生效。
+[vars]
+# 单个安装 ID（一台设备）每天最多翻译多少字符。
+DAILY_CHARS_PER_CLIENT = "20000"
+# 同一个 IP 每天的上限，挡住「换个安装 ID 继续刷」。
+DAILY_CHARS_PER_IP = "30000"
+# 全局每天的上限，真正的保险丝：别把百度账号的月度额度刷爆。
+DAILY_CHARS_TOTAL = "300000"
+# 单次请求的字符上限（百度接口本身也在这个量级）。
+MAX_CHARS_PER_REQUEST = "2000"
+# 同一个 IP 每分钟的请求数上限，挡住脚本狂刷。
+MAX_REQUESTS_PER_MINUTE = "30"
+
+# 每天的计数放在 Durable Object 里（免费版也能用 SQLite 后端），
+# 而不是 KV：KV 免费额度每天只有 1000 次写入，一翻译就写会很快撞上。
+[durable_objects]
+bindings = [{ name = "QUOTA", class_name = "QuotaCounter" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["QuotaCounter"]
+
+[observability]
+enabled = true

@@ -35,6 +35,10 @@
     apiId: $("apiId"),
     apiKeyField: $("apiKeyField"),
     apiKey: $("apiKey"),
+    cloudEndpointField: $("cloudEndpointField"),
+    cloudEndpoint: $("cloudEndpoint"),
+    cloudQuota: $("cloudQuota"),
+    cloudQuotaRefresh: $("cloudQuotaRefresh"),
     providerHint: $("providerHint"),
     uiLang: $("uiLang"),
     status: $("status"),
@@ -80,10 +84,17 @@
   const PROVIDER_HINTS = {
     google: "provider.hint.google",
     baidu: "provider.hint.baidu",
+    cloud: "provider.hint.cloud",
     zhipu: "provider.hint.zhipu",
     deepl: "provider.hint.deepl",
     openai: "provider.hint.openai",
   };
+
+  /**
+   * Providers that speak to a server of ours instead of the vendor directly,
+   * and therefore need its address rather than a key.
+   */
+  const PROVIDERS_WITH_ENDPOINT = ["cloud"];
 
   /** Providers that need a secret, and the one that also needs an APP ID. */
   const PROVIDERS_WITH_KEY = ["baidu", "zhipu", "deepl", "openai"];
@@ -218,9 +229,48 @@
 
   function syncProvider() {
     const provider = els.provider.value;
+    const needsEndpoint = PROVIDERS_WITH_ENDPOINT.indexOf(provider) !== -1;
     els.apiIdField.hidden = provider !== "baidu";
     els.apiKeyField.hidden = PROVIDERS_WITH_KEY.indexOf(provider) === -1;
+    els.cloudEndpointField.hidden = !needsEndpoint;
     els.providerHint.innerHTML = Glossy.i18n.t(PROVIDER_HINTS[provider] || "");
+    if (needsEndpoint) refreshCloudQuota();
+    else els.cloudQuota.textContent = "";
+  }
+
+  /**
+   * Shows what the cloud provider still allows today.
+   *
+   * The allowance lives on the server, so it is asked for whenever the window
+   * opens or the endpoint changes; a server that cannot be reached says so in
+   * the same line instead of blocking the rest of the window.
+   */
+  async function refreshCloudQuota() {
+    const endpoint = els.cloudEndpoint.value.trim();
+    els.cloudQuota.removeAttribute("data-tone");
+    els.cloudQuota.textContent = Glossy.i18n.t("cloud.quota.checking");
+    try {
+      const quota = await Glossy.invoke("cloud_status", { endpoint });
+      if (els.provider.value !== "cloud") return;
+      const used = quota.used || 0;
+      const limit = quota.limit || 0;
+      const remaining = quota.remaining === undefined ? Math.max(0, limit - used) : quota.remaining;
+      if (remaining > 0) {
+        els.cloudQuota.removeAttribute("data-tone");
+        els.cloudQuota.textContent = Glossy.i18n.t(
+          "cloud.quota.remaining",
+          remaining.toLocaleString(),
+          limit.toLocaleString()
+        );
+      } else {
+        els.cloudQuota.setAttribute("data-tone", "bad");
+        els.cloudQuota.textContent = Glossy.i18n.t("cloud.quota.used", limit.toLocaleString());
+      }
+    } catch (error) {
+      if (els.provider.value !== "cloud") return;
+      els.cloudQuota.setAttribute("data-tone", "bad");
+      els.cloudQuota.textContent = Glossy.errorMessage(error);
+    }
   }
 
   /** Drops blanks and duplicates, ignoring a trailing `.exe`. */
@@ -578,6 +628,7 @@
     els.popupOpacity.value = String(pick(OPACITIES, next.popupOpacity, 100));
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
+    els.cloudEndpoint.value = next.cloudEndpoint || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
     els.demoUnits.checked = els.unitsEnabled.checked;
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
@@ -612,6 +663,7 @@
       popupOpacity: numberOr(els.popupOpacity.value, 100),
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
+      cloudEndpoint: els.cloudEndpoint.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,
       historyLimit: numberOr(els.historyLimit.value, 50),
       checkUpdates: els.checkUpdates.checked,
@@ -719,6 +771,10 @@
       if (mine !== demoTicket) return;
       Glossy.render.error(els.demoResult, Glossy.errorMessage(error), () => runDemo(text));
     }
+    // A translation through the cloud provider eats into the allowance shown
+    // under the dropdown, and a refusal is exactly when it is worth looking at,
+    // so what is left is read again either way.
+    if (els.provider.value === "cloud" && mine === demoTicket) refreshCloudQuota();
   }
 
   /** Grows the demo card into the full word entry once the lookups have
@@ -937,6 +993,12 @@
     syncProvider();
     scheduleSave();
   });
+  els.cloudEndpoint.addEventListener("change", () => {
+    // The address decides which server is asked, so the allowance shown has to
+    // come from the new one.
+    refreshCloudQuota();
+  });
+  els.cloudQuotaRefresh.addEventListener("click", () => refreshCloudQuota());
   els.ignoredRunning.addEventListener("change", () => {
     const picked = els.ignoredRunning.value;
     els.ignoredRunning.value = "";
@@ -996,6 +1058,7 @@
     els.popupOpacity,
     els.autoCloseSecs,
     els.closeAfterCopy,
+    els.cloudEndpoint,
     els.unitsEnabled,
     els.historyLimit,
     els.checkUpdates,

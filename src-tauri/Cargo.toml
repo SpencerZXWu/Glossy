@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "0.3.3"
+version = "1.0.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"

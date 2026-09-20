@@ -117,54 +117,59 @@ body.dragging .card {
   cursor: default;
 }
 
-/* Reads as plain text until the pointer enters the row, when the two selects
-   reveal themselves as the dropdowns they are. */
+/* Reads as a pair of combo boxes. The fill has to be opaque: Windows paints the
+   native list of a select with the background of the select, and a see-through
+   list would put the language names straight onto whatever is behind the popup. */
 .lang-select {
   flex: 1 1 0;
   min-width: 0;
-  padding: 3px 5px;
-  border: 1px solid transparent;
+  padding: calc(3px * var(--popup-font)) calc(7px * var(--popup-font));
+  border: 1px solid var(--g-stroke-default);
   border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
+  background: var(--g-surface-solid);
+  color: var(--fg-soft);
   font: inherit;
   font-size: calc(11.5px * var(--popup-font));
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.lang-select option {
+  background: var(--g-surface-solid);
+  color: var(--fg);
 }
 
 .lang-select:last-child {
   text-align: right;
 }
 
-.langbar:hover .lang-select,
-.lang-select:focus-visible {
-  border-color: var(--line);
-  background: var(--bg-soft);
-  color: var(--fg-soft);
+.lang-select:hover {
+  border-color: var(--accent);
+  color: var(--fg);
 }
 
-.lang-select:hover {
-  color: var(--fg);
+.lang-select:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .lang-swap {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: calc(24px * var(--popup-font));
+  height: calc(24px * var(--popup-font));
   display: grid;
   place-items: center;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--g-stroke-default);
   border-radius: 7px;
-  background: transparent;
-  color: var(--muted);
+  background: var(--g-surface-solid);
+  color: var(--fg-soft);
   cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .lang-swap:hover {
-  background: var(--bg-soft);
+  border-color: var(--accent);
   color: var(--accent);
 }
 

@@ -173,6 +173,25 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
     .await;
 }
 
+/// What the cloud translator still allows today.
+///
+/// The settings window shows this next to the cloud provider, because the
+/// allowance belongs to the server and the app cannot know it otherwise. A
+/// failure is reported as an error string the same way a translation failure
+/// is, and the window shows it in place of the numbers.
+#[tauri::command]
+async fn cloud_status(
+    state: State<'_, Arc<AppState>>,
+    endpoint: Option<String>,
+) -> Result<translate::CloudQuota, String> {
+    let settings = state.settings();
+    let endpoint = endpoint
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| settings.cloud_endpoint.clone());
+    let client = translate::client()?;
+    translate::cloud_quota(client, &endpoint, &settings.cloud_id).await
+}
+
 /// The dictionary style extra of a word: phonetic symbols, meanings and one
 /// example.
 ///
@@ -459,6 +478,7 @@ pub fn run() {
             import_settings,
             translate_text,
             word_details,
+            cloud_status,
             show_popup,
             popup_present,
             popup_resize,
