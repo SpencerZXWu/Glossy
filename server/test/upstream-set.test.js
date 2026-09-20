@@ -17,10 +17,18 @@ function llmReply(translation = "大模型的译文") {
   );
 }
 
+function youdaoReply(translation = "有道的译文") {
+  return new Response(JSON.stringify({ errorCode: "0", translation: [translation], l: "en" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 /** Routes each call to the stub that matches its destination. */
-function routingFetch({ llm, baidu } = {}) {
+function routingFetch({ llm, baidu, youdao } = {}) {
   return async (url) => {
     if (String(url).includes("bigmodel.cn")) return llm();
+    if (String(url).includes("youdao.com")) return youdao();
     return baidu();
   };
 }
@@ -30,6 +38,82 @@ test("knows whether the deployment holds any key", () => {
   assert.equal(upstreamConfigured({ BAIDU_APP_ID: "app" }), false);
   assert.equal(upstreamConfigured({ BAIDU_APP_ID: "app", BAIDU_KEY: "key" }), true);
   assert.equal(upstreamConfigured({ LLM_API_KEY: "sk-secret" }), true);
+  assert.equal(upstreamConfigured({ YOUDAO_APP_KEY: "app" }), false);
+  assert.equal(upstreamConfigured({ YOUDAO_APP_KEY: "app", YOUDAO_APP_SECRET: "secret" }), true);
+});
+
+test("lists the vendors it can actually serve", () => {
+  assert.deepEqual(createUpstream({}).vendors, []);
+  assert.deepEqual(createUpstream({ YOUDAO_APP_KEY: "app", YOUDAO_APP_SECRET: "secret" }).vendors, ["youdao"]);
+  assert.deepEqual(
+    createUpstream({ LLM_API_KEY: "sk-secret", BAIDU_APP_ID: "app", BAIDU_KEY: "key" }).vendors,
+    ["llm", "baidu"],
+  );
+});
+
+test("starts at the requested vendor instead of the top of the list", async () => {
+  const upstream = createUpstream({
+    LLM_API_KEY: "sk-secret",
+    BAIDU_APP_ID: "app",
+    BAIDU_KEY: "key",
+    YOUDAO_APP_KEY: "y-app",
+    YOUDAO_APP_SECRET: "y-secret",
+  });
+
+  const hit = [];
+  const result = await withFetch(
+    async (url) => {
+      if (String(url).includes("bigmodel.cn")) {
+        hit.push("llm");
+        return llmReply();
+      }
+      if (String(url).includes("youdao.com")) {
+        hit.push("youdao");
+        return youdaoReply();
+      }
+      hit.push("baidu");
+      return baiduReply();
+    },
+    () => upstream.translate({ text: "hello", from: "en", to: "zh", vendor: "Youdao" }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.translation, "有道的译文");
+  assert.equal(result.vendor, "youdao");
+  assert.deepEqual(hit, ["youdao"]);
+});
+
+test("falls back to the remaining vendors when the requested one fails", async () => {
+  const upstream = createUpstream({ BAIDU_APP_ID: "app", BAIDU_KEY: "key", YOUDAO_APP_KEY: "y-app", YOUDAO_APP_SECRET: "y-secret" });
+
+  const hit = [];
+  const result = await withFetch(
+    async (url) => {
+      if (String(url).includes("youdao.com")) {
+        hit.push("youdao");
+        return new Response(JSON.stringify({ errorCode: "108" }), { status: 200 });
+      }
+      hit.push("baidu");
+      return baiduReply("百度的兜底译文");
+    },
+    () => upstream.translate({ text: "hello", from: "en", to: "zh", vendor: "youdao" }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.translation, "百度的兜底译文");
+  assert.equal(result.vendor, "baidu");
+  assert.deepEqual(hit, ["youdao", "baidu"]);
+});
+
+test("ignores a vendor it does not know", async () => {
+  const upstream = createUpstream({ BAIDU_APP_ID: "app", BAIDU_KEY: "key" });
+
+  const result = await withFetch(routingFetch({ baidu: () => baiduReply() }), () =>
+    upstream.translate({ text: "hello", from: "en", to: "zh", vendor: "does-not-exist" }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.vendor, "baidu");
 });
 
 test("refuses to translate when nothing is configured", async () => {

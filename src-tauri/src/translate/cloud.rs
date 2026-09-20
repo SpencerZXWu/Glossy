@@ -88,22 +88,38 @@ fn endpoint_from(configured: &str, build_default: &str) -> Result<String, String
     Ok(endpoint.to_string())
 }
 
+/// What one translation asks the server for.
+pub struct Request<'a> {
+    pub text: &'a str,
+    pub source: &'a str,
+    pub target: &'a str,
+    pub kind: Kind,
+    /// Which vendor the server should translate with — `baidu`, `youdao`, or
+    /// empty to let it walk its own list of backends.
+    pub vendor: &'a str,
+}
+
+impl Request<'_> {
+    /// The body a translation is asked with.
+    fn payload(&self, install_id: &str) -> serde_json::Value {
+        serde_json::json!({
+            "clientId": install_id,
+            "text": self.text,
+            "from": self.source,
+            "to": self.target,
+            "vendor": self.vendor,
+        })
+    }
+}
+
 pub async fn translate(
     client: &reqwest::Client,
-    text: &str,
-    source: &str,
-    target: &str,
-    kind: Kind,
+    request: Request<'_>,
     configured_endpoint: &str,
     install_id: &str,
 ) -> Result<TranslationResult, String> {
     let endpoint = endpoint_of(configured_endpoint)?;
-    let payload = serde_json::json!({
-        "clientId": install_id,
-        "text": text,
-        "from": source,
-        "to": target,
-    });
+    let payload = request.payload(install_id);
 
     let response = client
         .post(format!("{endpoint}/v1/translate"))
@@ -141,7 +157,14 @@ pub async fn translate(
         return Err("The Glossy translation server returned an empty translation.".to_string());
     }
 
-    let mut result = TranslationResult::new(kind, "cloud", text, target);
+    // The server names the engine that answered, so the footer can say which
+    // one it was; an older server sends nothing and Glossy's own name stands.
+    let provider = data
+        .get("vendor")
+        .and_then(|value| value.as_str())
+        .filter(|name| matches!(*name, "baidu" | "youdao"))
+        .unwrap_or("cloud");
+    let mut result = TranslationResult::new(request.kind, provider, request.text, request.target);
     result.translation = translation;
     result.source_lang = data
         .get("from")
@@ -288,6 +311,25 @@ mod tests {
             DEFAULT_ENDPOINT
         );
         assert!(endpoint_from("glossy.example.workers.dev", "").is_err());
+    }
+
+    #[test]
+    fn the_request_names_the_vendor_and_keeps_the_rest() {
+        let request = |vendor: &'static str| Request {
+            text: "hello",
+            source: "en",
+            target: "zh",
+            kind: Kind::Sentence,
+            vendor,
+        };
+        let body = request("youdao").payload("abc");
+        assert_eq!(body["clientId"], "abc");
+        assert_eq!(body["text"], "hello");
+        assert_eq!(body["from"], "en");
+        assert_eq!(body["to"], "zh");
+        assert_eq!(body["vendor"], "youdao");
+        // The empty string is how the app asks the server to choose.
+        assert_eq!(request("").payload("abc")["vendor"], "");
     }
 
     #[test]

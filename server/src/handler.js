@@ -78,6 +78,7 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
         service: "glossy-cloud",
         day,
         configured: Boolean(upstream.configured),
+        vendors: upstream.vendors || [],
       });
     }
 
@@ -123,6 +124,9 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
     const clientId = typeof payload.clientId === "string" ? payload.clientId : "";
     const from = typeof payload.from === "string" && payload.from ? payload.from : "auto";
     const to = typeof payload.to === "string" ? payload.to : "";
+    // Which vendor the user picked in the App. An unknown name is not an error:
+    // the upstream falls back to the order the deployment was configured with.
+    const vendor = typeof payload.vendor === "string" ? payload.vendor.trim().toLowerCase() : "";
 
     if (!text.trim()) return fail(400, "invalid_request", "没有要翻译的内容。");
     if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");
@@ -151,7 +155,7 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
 
     let result;
     try {
-      result = await upstream.translate({ text, from, to });
+      result = await upstream.translate({ text, from, to, vendor });
     } catch (error) {
       await store.refund(day, { clientId, ipHash, chars });
       return fail(502, "upstream_error", `翻译服务调用失败：${error}`);
@@ -168,6 +172,7 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
       from: result.from,
       to: result.to,
       translation: result.translation,
+      vendor: result.vendor || null,
       chars,
       usage: { client: reserved.used, remaining: reserved.remaining },
     });

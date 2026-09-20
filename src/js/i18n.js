@@ -104,6 +104,8 @@
     "field.localEndpoint": "Local service address",
     "field.localModel": "Model name",
     "provider.cloud": "Glossy Translate · recommended, nothing to set up",
+    "provider.cloudBaidu": "Baidu Translate · nothing to set up",
+    "provider.cloudYoudao": "Youdao Translate · nothing to set up",
     "provider.local": "Local model · runs on this machine",
     "provider.google": "Google · free, no key",
     "provider.baidu": "Baidu 翻译 · free monthly quota, APP ID + key",
@@ -112,6 +114,7 @@
     "provider.openai": "OpenAI · API key",
     "providerName.google": "Google",
     "providerName.baidu": "Baidu Translate",
+    "providerName.youdao": "Youdao Translate",
     "providerName.cloud": "Glossy Translate",
     "providerName.zhipu": "Zhipu GLM",
     "providerName.deepl": "DeepL",
@@ -135,6 +138,10 @@
       "Paste a Zhipu (open.bigmodel.cn) API key. The free <code>glm-4.7-flash</code> model returns the translation, phonetics, definitions and an example in one call, and it is reachable from mainland China.",
     "cloud.hint.builtin":
       "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. Each device gets a daily character allowance, and the other services stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
+    "provider.hint.cloudBaidu":
+      "The same server as Glossy Translate, only asked to translate with Baidu. Nothing to fill in — the account stays behind the build — and the server falls back to another engine when Baidu cannot answer.",
+    "provider.hint.cloudYoudao":
+      "The same server as Glossy Translate, only asked to translate with Youdao. Nothing to fill in, and the server falls back to another engine when Youdao cannot answer.",
     "cloud.hint.local":
       "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
     "provider.hint.deepl":
@@ -329,6 +336,8 @@
     "field.localEndpoint": "本地服务地址",
     "field.localModel": "模型名称",
     "provider.cloud": "Glossy 翻译 · 推荐，无需配置",
+    "provider.cloudBaidu": "百度翻译 · 无需配置",
+    "provider.cloudYoudao": "有道翻译 · 无需配置",
     "provider.local": "本地模型 · 在这台电脑上运行",
     "provider.google": "Google · 免费，无需密钥",
     "provider.baidu": "百度翻译 · 每月免费额度，APP ID + 密钥",
@@ -337,6 +346,7 @@
     "provider.openai": "OpenAI · API Key",
     "providerName.google": "Google",
     "providerName.baidu": "百度翻译",
+    "providerName.youdao": "有道翻译",
     "providerName.cloud": "Glossy 翻译",
     "providerName.zhipu": "智谱 GLM",
     "providerName.deepl": "DeepL",
@@ -360,6 +370,10 @@
       "填入智谱（open.bigmodel.cn）的 API Key。免费的 <code>glm-4.7-flash</code> 模型一次返回译文、音标、释义和例句，国内可直接访问。",
     "cloud.hint.builtin":
       "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。每台设备每天有字符额度，用完后仍可换用其他服务。音标、词性和例句会另外查询。",
+    "provider.hint.cloudBaidu":
+      "用的还是 Glossy 翻译的服务器，只是指定它用百度翻译来译。无需填写任何密钥，账号留在服务端；百度答不上来时服务器会自动改用别的引擎。",
+    "provider.hint.cloudYoudao":
+      "用的还是 Glossy 翻译的服务器，只是指定它用有道智云来译。无需填写任何密钥，有道答不上来时服务器会自动改用别的引擎。",
     "cloud.hint.local":
       "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
     "provider.hint.deepl":

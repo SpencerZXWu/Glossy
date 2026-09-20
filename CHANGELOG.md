@@ -10,6 +10,19 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ### Added
 
+- **Baidu and Youdao as channels of their own, still with nothing to set up.**
+  The dropdown now lists **Baidu Translate** and **Youdao Translate** next to
+  Glossy's own server. Both are that same server — no key, no field to fill in —
+  and they only say which upstream it should translate with, so the vendor that
+  answers is visible in the list without anyone handling credentials. The server
+  answers with the named upstream first (the request gained a `vendor` field) and
+  still falls back to the others when it cannot, and the result card names whichever
+  one answered. The settings file stores the choice as `cloudVendor` (`baidu`,
+  `youdao`, or empty for "let the server decide"), the server keeps its
+  `/v1/health` list of the upstreams a deployment actually has, and
+  `server/src/youdao.js` implements the Youdao Zhiyun upstream with its v3
+  signature.
+
 - **Translation service, one list.** The settings window no longer asks whether
   results come from a cloud or from your own account; it asks which service
   translates, and the same dropdown holds all of them: Glossy's own server, which

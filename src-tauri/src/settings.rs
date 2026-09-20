@@ -69,15 +69,6 @@ pub enum Channel {
     Api,
 }
 
-impl Channel {
-    pub fn key(self) -> &'static str {
-        match self {
-            Channel::Cloud => "cloud",
-            Channel::Api => "api",
-        }
-    }
-}
-
 /// What the cloud channel translates with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CloudProvider {
@@ -89,15 +80,6 @@ pub enum CloudProvider {
     /// endpoint such as the one Ollama serves.
     #[serde(rename = "local")]
     Local,
-}
-
-impl CloudProvider {
-    pub fn key(self) -> &'static str {
-        match self {
-            CloudProvider::Builtin => "builtin",
-            CloudProvider::Local => "local",
-        }
-    }
 }
 
 /// Address a local service is asked at when the user has not set one.
@@ -340,6 +322,10 @@ pub struct Settings {
     pub channel: Channel,
     /// What the cloud channel translates with.
     pub cloud_provider: CloudProvider,
+    /// Which vendor Glossy's own server should translate with — `baidu`,
+    /// `youdao`, or empty to let the server pick. The server falls back to its
+    /// own order when it cannot serve the one named here.
+    pub cloud_vendor: String,
     /// Backend of the api channel. The cloud channel ignores it, so it is kept
     /// rather than cleared and switching back lands on what was picked before.
     pub provider: Provider,
@@ -423,6 +409,7 @@ impl Default for Settings {
             target_lang: default_target_lang(),
             channel: Channel::default(),
             cloud_provider: CloudProvider::default(),
+            cloud_vendor: String::new(),
             provider: Provider::default(),
             local_endpoint: DEFAULT_LOCAL_ENDPOINT.to_string(),
             local_model: DEFAULT_LOCAL_MODEL.to_string(),
@@ -708,6 +695,13 @@ impl Settings {
         // A pasted address easily carries a trailing slash or a path, and the
         // request URL is built by appending `/v1/...` to it.
         self.cloud_endpoint = self.cloud_endpoint.trim().trim_end_matches('/').to_string();
+        // Anything but a vendor the server knows is the same as letting the
+        // server choose, and that is what the empty string means.
+        self.cloud_vendor = match self.cloud_vendor.trim().to_lowercase().as_str() {
+            "baidu" => "baidu".to_string(),
+            "youdao" => "youdao".to_string(),
+            _ => String::new(),
+        };
         if self.cloud_id.is_empty() {
             self.cloud_id = crate::translate::new_install_id();
         }
@@ -920,6 +914,24 @@ mod tests {
         .sanitized();
 
         assert_eq!(settings.source_langs, vec!["en", "ja", "zh-TW"]);
+    }
+
+    #[test]
+    fn keeps_only_a_vendor_the_server_knows() {
+        let vendor = |value: &str| {
+            Settings {
+                cloud_vendor: value.to_string(),
+                ..Settings::default()
+            }
+            .sanitized()
+            .cloud_vendor
+        };
+
+        assert_eq!(vendor(" Youdao "), "youdao");
+        assert_eq!(vendor("BAIDU"), "baidu");
+        // Anything else means the server chooses, which is the empty string.
+        assert_eq!(vendor(""), "");
+        assert_eq!(vendor("deepl"), "");
     }
 
     #[test]

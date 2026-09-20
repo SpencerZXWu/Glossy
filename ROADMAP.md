@@ -14,10 +14,10 @@ the milestone is closed and the tag is pushed.
 | --- | --- |
 | Version | `1.0.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~15,700 lines: ~8,300 Rust, ~4,600 frontend (plain HTML/CSS/JS), ~1,000 frontend test lines and ~1,900 in `server/`, comments included |
-| Tests | 152 Rust tests, 130 frontend tests (`node --test`) and 49 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Tests | 157 Rust tests, 155 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
-| Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live |
+| Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
 | Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.0.1` tagged and published with its NSIS installer, and the staged installer kept in `release/vX.Y.Z/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
@@ -128,12 +128,13 @@ Goal: make the reading use case actually good.
 | Work item | Details | State |
 | --- | --- | --- |
 | Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | planned |
-| Translation service: one list | One dropdown holds every way a selection can be translated — our own server (nothing to fill in), a model running on this machine over any OpenAI-compatible endpoint, the free public Google endpoint, and the vendors that take the user's key. The credentials of the last group live in an **Extensions** panel at the bottom of the settings window, dimmed while a service that needs nothing is selected. Underneath, the stored shape stayed `channel` + `provider`, so a file written earlier keeps working and a new one starts on our server | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
+| Translation service: one list | One dropdown holds every way a selection can be translated — our own server (nothing to fill in), a model running on this machine over any OpenAI-compatible endpoint, the free public Google endpoint, and the vendors that take the user's key. The credentials of the last group live in an **Extensions** panel at the bottom of the settings window, dimmed while a service that needs nothing is selected. Underneath, the stored shape stayed `channel` + `provider` (plus `cloudVendor` for the server-backed entries), so a file written earlier keeps working and a new one starts on our server | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
+| Named vendor channels | Baidu and Youdao appear in the same dropdown as channels that need nothing set up, because they are our server with a vendor attached: the app sends `cloudVendor`, the server tries that upstream first and falls back to the others, and the card names the one that answered | done, in `server/src/upstream.js`, `server/src/youdao.js` and `src-tauri/src/translate/cloud.rs` |
 | Server address is no longer a field | The one service that needs nothing set up should not come with a box that lets people break it, so the address travels with the build: the `DEFAULT_ENDPOINT` the app was compiled with wins, a leftover address in an older settings file is ignored, and the window keeps only the allowance line and its `Check again` button. Pointing the app at your own deployment means editing that one line in `src-tauri/src/translate/cloud.rs`; a build made without an address still reads the setting | done, in `src-tauri/src/translate/cloud.rs` |
 | Popup rebuild | The card rebuilt on the token layer: header actions, original/translation hierarchy, dictionary and conversion blocks, and a compact mode | partly, the conversion block is in the tree |
 | Icons, motion and accessibility | One icon set, transitions on the popup's appearance and dismissal, full keyboard operability, focus rings, high-contrast colours | planned |
-| Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | planned |
-| More providers | At least two more free tiers (Youdao, Tencent, Volcengine, or a self-hosted LibreTranslate), plus a custom base URL per provider | planned |
+| Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | done server-side, in `server/src/upstream.js`; the app-side order is still planned |
+| More providers | At least two more free tiers (Tencent, Volcengine, or a self-hosted LibreTranslate), plus a custom base URL per provider. Youdao is in: `server/src/youdao.js` serves it, and the app reaches it through the named vendor channels. Tencent was dropped — its machine translation API no longer has a text action, only `ImageTranslateLLM` | partly done |
 | Richer word cards | Inflections, synonyms and merged definitions from several sources; an optional sentence-by-sentence view that pairs the original with the translation | planned |
 | Word to sentence | Optionally translate the sentence the selected word sits in, alongside the word itself | planned |
 | Text to speech | A pronunciation button for the original and the translation, via Windows SAPI or edge-tts | planned |
@@ -236,10 +237,10 @@ in it early.
 | --- | --- |
 | 版本 | `1.0.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
 | 规模 | 约 15,700 行：Rust 约 8,300 行，前端约 4,600 行（纯 HTML/CSS/JS），前端测试约 1,000 行，`server/` 约 1,900 行，含注释 |
-| 测试 | Rust 152 个测试、前端 130 个测试（`node --test`）、`server/` 49 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
+| 测试 | Rust 157 个测试、前端 155 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows —— 没有 `cfg(target_os)` 分支，`windows` crate 无条件使用 |
 | 分发 | 只有 NSIS 安装包；没有代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
-| 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署 |
+| 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
 | 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.0.1` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
 
 下面的计划里没有遗留缺陷。最后一个 —— API 密钥以明文躺在
@@ -343,12 +344,13 @@ in it early.
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
 | 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 计划中 |
-| 翻译渠道：一个列表 | 一个下拉框就装下所有翻译方式——我们自己的服务器（无需填写）、通过任意 OpenAI 兼容接口跑在本机上的模型、免费的公开 Google 接口，以及需要用户密钥的服务。最后一类的凭据放在设置窗口最下面的 **扩展** 面板里，当前服务不需要凭据时会变暗。底层保存格式仍然是 `channel` + `provider`，因此旧文件照常可用，新文件默认走我们自己的服务器 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
+| 翻译渠道：一个列表 | 一个下拉框就装下所有翻译方式——我们自己的服务器（无需填写）、通过任意 OpenAI 兼容接口跑在本机上的模型、免费的公开 Google 接口，以及需要用户密钥的服务。最后一类的凭据放在设置窗口最下面的 **扩展** 面板里，当前服务不需要凭据时会变暗。底层保存格式仍然是 `channel` + `provider`（走服务器的几个渠道另有 `cloudVendor`），因此旧文件照常可用，新文件默认走我们自己的服务器 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
+| 点名上游的渠道 | 「百度翻译」「有道翻译」和「Glossy 翻译」并列在同一个下拉框里，同样是「无需配置」——因为它们就是我们自己的服务器，只是指定了用哪家上游：应用发送 `cloudVendor`，服务器先试点名的那个，答不上来再按顺序兜底，卡片页脚会注明这次是谁译的 | 已完成，见 `server/src/upstream.js`、`server/src/youdao.js` 与 `src-tauri/src/translate/cloud.rs` |
 | 服务器地址不再是一个输入框 | 唯一一个「无需配置」的服务不该给用户留下把它填坏的机会，所以地址改为跟着构建走：构建时的 `DEFAULT_ENDPOINT` 优先，旧设置文件里残留的地址被忽略，窗口只保留额度提示行与「重新检查」。想用自己的部署就改 `src-tauri/src/translate/cloud.rs` 里的那一行；不带地址的构建仍然读设置文件 | 已完成，见 `src-tauri/src/translate/cloud.rs` |
 | 弹窗重建 | 在变量层上重建卡片：头部操作、原文/译文层级、词典与换算区块，以及一个紧凑模式 | 部分完成，换算区块已在代码库中 |
 | 图标、动效与无障碍 | 统一图标集、弹窗出现与消失的过渡、完整键盘操作、焦点环、高对比配色 | 计划中 |
-| 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 计划中 |
-| 更多服务商 | 至少再接入两个免费档（有道、腾讯、火山引擎，或自建 LibreTranslate），并支持为每个服务商自定义 base URL | 计划中 |
+| 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 服务端已完成，见 `server/src/upstream.js`；客户端可配置顺序仍计划中 |
+| 更多服务商 | 至少再接入两个免费档（腾讯、火山引擎，或自建 LibreTranslate），并支持为每个服务商自定义 base URL。有道已接入：`server/src/youdao.js` 提供上游，客户端通过点名上游的渠道使用它。腾讯已放弃——它的机器翻译接口只剩 `ImageTranslateLLM`，没有文本翻译动作了 | 部分完成 |
 | 更丰富的单词卡片 | 词形变化、同义词，以及合并多个来源的释义；可选的逐句对照视图，把原文与译文配对 | 计划中 |
 | 单词所在句 | 可选地，在显示单词本身的同时翻译它所在的句子 | 计划中 |
 | 朗读 | 原文与译文各一个发音按钮，通过 Windows SAPI 或 edge-tts | 计划中 |

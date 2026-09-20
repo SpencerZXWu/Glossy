@@ -20,7 +20,7 @@
     targetLang: "zh-CN",
     channel: "cloud",
     cloudProvider: "builtin",
-    cloudEndpoint: "",
+    cloudVendor: "",
     localEndpoint: "http://127.0.0.1:11434/v1",
     localModel: "qwen2.5:7b",
     provider: "google",

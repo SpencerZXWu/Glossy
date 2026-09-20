@@ -95,6 +95,8 @@
    */
   const SERVICE_HINTS = {
     cloud: "cloud.hint.builtin",
+    "cloud-baidu": "provider.hint.cloudBaidu",
+    "cloud-youdao": "provider.hint.cloudYoudao",
     local: "cloud.hint.local",
     google: "provider.hint.google",
     baidu: "provider.hint.baidu",
@@ -102,6 +104,12 @@
     deepl: "provider.hint.deepl",
     openai: "provider.hint.openai",
   };
+
+  /**
+   * The dropdown entries that are still Glossy's own server, only asking it to
+   * translate with one particular vendor. `""` lets the server choose.
+   */
+  const CLOUD_VENDORS = { cloud: "", "cloud-baidu": "baidu", "cloud-youdao": "youdao" };
 
   /** Services that take the user's own credentials. */
   const OWN_KEY_SERVICES = ["google", "baidu", "zhipu", "deepl", "openai"];
@@ -239,6 +247,11 @@
     });
   }
 
+  /** Whether the dropdown entry is served by Glossy's own server. */
+  function isCloudService(service) {
+    return Object.prototype.hasOwnProperty.call(CLOUD_VENDORS, service);
+  }
+
   /**
    * Shows the fields and the hint that belong to the chosen service.
    *
@@ -249,7 +262,7 @@
   function syncService() {
     const service = els.service.value;
     const keyNeeded = SERVICES_WITH_KEY.indexOf(service) !== -1;
-    els.cloudBlock.hidden = service !== "cloud";
+    els.cloudBlock.hidden = !isCloudService(service);
     els.cloudLocalBlock.hidden = service !== "local";
     els.serviceHint.innerHTML = Glossy.i18n.t(SERVICE_HINTS[service] || "");
     els.apiIdField.hidden = service !== "baidu";
@@ -260,7 +273,12 @@
 
   /** The dropdown value that matches what the settings file holds. */
   function serviceOf(stored) {
-    if (stored.channel === "cloud") return stored.cloudProvider === "local" ? "local" : "cloud";
+    if (stored.channel === "cloud") {
+      if (stored.cloudProvider === "local") return "local";
+      const vendor = String(stored.cloudVendor || "").toLowerCase();
+      // An unknown vendor means the deployment moved on; the plain entry still works.
+      return vendor === "baidu" || vendor === "youdao" ? `cloud-${vendor}` : "cloud";
+    }
     const provider = stored.provider;
     if (!provider || provider === "cloud" || provider === "local") return "cloud";
     return SERVICE_HINTS[provider] ? provider : "google";
@@ -309,7 +327,7 @@
 
   /** Whether the shared server — and therefore its allowance — is on screen. */
   function cloudQuotaVisible() {
-    return els.service.value === "cloud";
+    return isCloudService(els.service.value);
   }
 
   /** Drops blanks and duplicates, ignoring a trailing `.exe`. */
@@ -780,6 +798,7 @@
       // cloud channel, everything else uses the user's account.
       channel: OWN_KEY_SERVICES.indexOf(service) === -1 ? "cloud" : "api",
       cloudProvider: service === "local" ? "local" : "builtin",
+      cloudVendor: CLOUD_VENDORS[service] || "",
       localEndpoint: els.localEndpoint.value.trim(),
       localModel: els.localModel.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,

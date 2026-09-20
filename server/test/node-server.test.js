@@ -61,6 +61,7 @@ test("answers /v1/health over real HTTP", async (t) => {
     service: "glossy-cloud",
     day: "2025-09-01",
     configured: true,
+    vendors: [],
   });
 });
 
@@ -70,7 +71,12 @@ test("translates through the whole stack and reports the usage", async (t) => {
   const response = await fetch(`${base}/v1/translate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: "Good morning.", clientId: "client-0000000000000001", to: "zh" }),
+    body: JSON.stringify({
+      text: "Good morning.",
+      clientId: "client-0000000000000001",
+      to: "zh",
+      vendor: "Youdao",
+    }),
   });
 
   assert.equal(response.status, 200);
@@ -78,7 +84,8 @@ test("translates through the whole stack and reports the usage", async (t) => {
   assert.equal(body.translation, "你好");
   assert.equal(body.chars, 13);
   assert.deepEqual(body.usage, { client: 13, remaining: 87 });
-  assert.deepEqual(calls, [{ text: "Good morning.", from: "auto", to: "zh" }]);
+  // The vendor the App picked travels to the upstream, lower-cased.
+  assert.deepEqual(calls, [{ text: "Good morning.", from: "auto", to: "zh", vendor: "youdao" }]);
 
   const quota = await (await fetch(`${base}/v1/quota?client=client-0000000000000001`)).json();
   assert.equal(quota.usage.client, 13);

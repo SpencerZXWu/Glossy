@@ -94,7 +94,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | History | How many finished translations to remember (`Off` to `The last 500`, default 50). The list below the selector keeps the original, the translation, the provider and the time; `Search` filters both texts, clicking an entry shows it in the floating card again (no second provider call), and each entry has a copy and a remove button. `Forget everything` empties the list. The file lives in `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` writes `Documents\glossy-settings.json`; `Import…` reads a file you pick back into the app. Tick `Include my API keys in the exported file` to carry the keys as well — Glossy asks once more before it writes them in plain text. An import validates through `sanitized()` and protects the keys it brings with DPAPI on the way to disk. |
 | Updates | `Check for a new version when Glossy starts` asks GitHub Releases on every start (off by default). `Check now` looks immediately and says which version is waiting, and `Download and restart` installs it. A build without an update signing key — which is every build until the release key pair exists — hides the buttons and says so. |
-| Translation service | Which service translates: `cloud` (Glossy's own server — recommended, nothing to set up), `local` (a model running on this machine), `google` (the free public endpoint, no key), or one of the vendors that take your own key — `baidu`, `zhipu`, `deepl`, `openai`. A new install starts on `cloud`. Stored as `channel` + `provider`, see below. |
+| Translation service | Which service translates: `cloud` (Glossy's own server — recommended, nothing to set up), `cloud-baidu` / `cloud-youdao` (the same server, told which vendor to use — still nothing to fill in), `local` (a model running on this machine), `google` (the free public endpoint, no key), or one of the vendors that take your own key — `baidu`, `zhipu`, `deepl`, `openai`. A new install starts on `cloud`. Stored as `channel` + `cloudProvider` + `cloudVendor` / `provider`, see below. |
 | Allowance line (`cloud`) | Shown only for Glossy's server: what is left of today's allowance — or the reason the server could not be reached — with a `Check again` button next to it. The address itself is part of the build rather than a field, so nobody can break the one service that needs nothing set up; see [`server/`](./server/README.md) to run a deployment of your own. |
 | Local service address, model name (`local`) | Shown only for the local model: any OpenAI-compatible endpoint (default `http://127.0.0.1:11434/v1`, the address Ollama serves) and the model name it was pulled under (default `qwen2.5:7b`). The text goes no further than this machine, so nothing leaves the computer and nothing is metered. |
 | APP ID / API key | The last panel of the settings window, **Extensions · my own API**, at the bottom: the credentials the services above expect sit here rather than next to the dropdown, and the panel is dimmed (still editable) while a service that needs nothing is selected. `baidu` asks for both fields, `zhipu`, `deepl` and `openai` for the key alone, and the free `google` service hides both. The values are remembered per service, so switching back to one you configured earlier fills its fields in again. |
@@ -115,11 +115,17 @@ current selection, so "select text, press the hotkey" works as well.
 run on an account you own — the last group is the one the **Extensions** panel at
 the bottom of the settings window collects the credentials for.
 
+`cloud-baidu` and `cloud-youdao` are still Glossy's own server, so they need
+nothing filled in either; they only name the upstream the server should translate
+with, and it falls back to another engine when that one cannot answer.
+
 | Provider | Cost | Notes |
 | --- | --- | --- |
 | `google` | free, no key | Public `translate.googleapis.com` endpoint. Blocked on some networks, including much of mainland China. Always queried with the `dict-chrome-ex` client id; the throttled `gtx` id is only used as a fallback. |
 | `baidu` | free monthly quota, APP ID + key | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Reachable from mainland China with a monthly free quota of 50,000 characters, raising to 1,000,000 after the free personal 个人认证. Needs both the **APP ID** and the **密钥** from <https://fanyi-api.baidu.com>. Passes `from=auto`, so the source language is detected. |
 | `cloud` | nothing to fill in | **Glossy Translate**: a server deployed from [`server/`](./server/README.md) does the translating with the project's own account, and the app only sends the text plus an install id. Nothing to configure, no key on the machine, and it works from mainland China. The daily allowance is counted per device, per address and in total, and the settings window shows what is left of it; running your own deployment is a one-line change of the address inside the build. |
+| `cloud-baidu` | nothing to fill in | **Baidu Translate** — the same server as `cloud`, only asked to translate with Baidu. Listing it separately keeps the vendor visible without asking anyone for a key: the credentials stay on the server, and the request falls through to another engine when Baidu cannot answer. Named `vendor: "baidu"` on the wire. |
+| `cloud-youdao` | nothing to fill in | **Youdao Translate** — again Glossy's own server, asked to translate with 有道智云. Same deal: no key, nothing to fill in, and a fallback when Youdao cannot answer. Named `vendor: "youdao"` on the wire. |
 | `local` | nothing to fill in | **Local model**: any service that speaks the OpenAI chat API — Ollama serves one at `http://127.0.0.1:11434/v1` — translates on this machine, so no text and no key ever leaves it, and no allowance is counted. Download a model first (`ollama pull qwen2.5:7b`), then give Glossy the address and the model name. A 7B model is decent for a sentence and weaker than Glossy's server on idioms; a larger one closes most of the gap. |
 | `zhipu` | free tier, API key | Zhipu `glm-4.7-flash` chat model. Reachable from mainland China and returns translation, phonetics, definitions and an example in a single call. Key from <https://open.bigmodel.cn>. ⚠️ Zhipu's user agreement licenses the non-paid models for **non-commercial personal study only** — see below before shipping Glossy. |
 | `deepl` | API key | Keys ending in `:fx` use the free endpoint. |
@@ -182,11 +188,14 @@ Which service translates is stored in the older two-part shape: `channel`
 account of your own, and `provider` names the service inside it — `cloud`,
 `local`, `google`, `baidu`, `zhipu`, `deepl` or `openai`. `cloudProvider`
 (`builtin` or `local`) with `localEndpoint`/`localModel` sits behind the local
-model, and while `channel` is `cloud` the stored `provider` is left as it was, so
-the vendor picked earlier is still there after a detour through Glossy's server.
-The dropdown maps to that shape on the way in and out, so a file written by an
-older build keeps working: one without a `channel` is read as the API channel it
-already was, and a file that has none is written with `cloud`.
+model, and `cloudVendor` (`baidu`, `youdao`, or empty to let the server choose)
+is what the server-backed entries ask it for. While `channel` is `cloud` the
+stored `provider` is left as it was, so the vendor picked earlier is still there
+after a detour through Glossy's server. The dropdown maps to that shape on the
+way in and out, so a file written by an older build keeps working: one without a
+`channel` is read as the API channel it already was, a file that has none is
+written with `cloud`, and a `cloudVendor` nothing recognizes reads as "let the
+server decide".
 
 ### Translate inside the app
 
@@ -513,7 +522,7 @@ process. Each release maps to a GitHub milestone of the same name.
 | 历史记录 | 记住多少条已完成的翻译（`关闭` 到 `最近 500 条`，默认 50）。选择器下方的列表保留原文、译文、翻译渠道和时间；`搜索` 会同时过滤两段文本，点击一条记录会在浮动卡片中再次显示它（不会再次请求翻译渠道），每条记录都有复制和删除按钮。`清空历史记录` 会清空列表。该文件位于 `%APPDATA%\com.glossy.translator\history.json`。 |
 | 设置文件 | `导出…` 会写入 `Documents\glossy-settings.json`；`导入…` 会把你选择的文件读回应用中。勾选 `导出文件中包含我的 API 密钥` 可以连同密钥一起带走——Glossy 在以明文写入之前会再确认一次。导入会通过 `sanitized()` 校验，并在写入磁盘的过程中用 DPAPI 保护它带来的密钥。 |
 | 更新 | `启动 Glossy 时检查新版本` 会在每次启动时询问 GitHub Releases（默认关闭）。`立即检查` 会立刻查看并说明是哪个版本在等待，`下载并重启` 则会安装它。没有更新签名密钥的构建——在发布密钥对存在之前的所有构建都是如此——会隐藏这些按钮并说明原因。 |
-| 翻译渠道 | 由哪个服务来翻译：`cloud`（Glossy 自己的服务器——推荐，无需配置）、`local`（跑在这台电脑上的模型）、`google`（免费公开接口，无需密钥），以及需要你自己密钥的服务——`baidu`、`zhipu`、`deepl`、`openai`。全新安装默认使用 `cloud`。底层仍按 `channel` + `provider` 保存，见下文。 |
+| 翻译渠道 | 由哪个服务来翻译：`cloud`（Glossy 自己的服务器——推荐，无需配置）、`cloud-baidu` / `cloud-youdao`（还是那台服务器，只是指定用哪家上游翻译，同样无需配置）、`local`（跑在这台电脑上的模型）、`google`（免费公开接口，无需密钥），以及需要你自己密钥的服务——`baidu`、`zhipu`、`deepl`、`openai`。全新安装默认使用 `cloud`。底层仍按 `channel` + `cloudProvider` + `cloudVendor` / `provider` 保存，见下文。 |
 | 额度提示行（`cloud`） | 只在 Glossy 自己的服务器下显示：今天还剩多少额度——或者服务器联系不上的原因——旁边是 `重新检查` 按钮。服务器地址写死在构建里而不是做成输入框，免得别人把唯一一个「无需配置」的服务填坏；想用自己的部署见 [`server/`](./server/README.md)。 |
 | 本地服务地址、模型名称（`local`） | 只在本地模型下显示：任何 OpenAI 兼容的接口地址（默认 `http://127.0.0.1:11434/v1`，也就是 Ollama 提供的地址），以及你 pull 下来的模型名（默认 `qwen2.5:7b`）。文本不会离开这台电脑，因此不计费，也不会上传到任何地方。 |
 | APP ID / API Key | 设置窗口最下面的 **扩展 · 使用自己的 API** 面板：上面那些服务需要的凭据放在这里，而不是紧挨着下拉框；当前选中的服务不需要任何凭据时，这个面板会变暗（仍然可以编辑）。`baidu` 需要两个字段，`zhipu`、`deepl` 和 `openai` 只需要密钥，免费的 `google` 两个都不显示。这些值按服务分别记住，因此切换回之前配置过的服务时会把它自己的字段重新填好。 |
@@ -529,6 +538,8 @@ process. Each release maps to a GitHub milestone of the same name.
 ### 翻译渠道
 
 `cloud` 和 `local` 什么都不用填，`google` 也不需要密钥，其余服务走你自己的账号——最后这一类的凭据都集中在设置窗口最下面的 **扩展** 面板里。
+
+`cloud-baidu` 和 `cloud-youdao` 也是 Glossy 自己的服务器（什么都不用填），只是点名让服务器用百度 / 有道智云来翻；百度或有道答不上来时，服务器会自动改用别的上游。
 
 | 翻译渠道 | 费用 | 说明 |
 | --- | --- | --- |
@@ -563,7 +574,7 @@ process. Each release maps to a GitHub milestone of the same name.
 该映射中的每个值在写入文件之前都会用 Windows DPAPI（`CryptProtectData`，当前用户范围）加密，因此文件里保存的是
 `"apiKey": "dpapi:AQAAANCM…"` 而不是密钥本身，只有录入它的那个 Windows 登录账户才能读回它。由较早版本写出的文件会在该构建首次启动时得到保护；属于其他登录账户或计算机的值无法解锁，会被丢弃，因此必须重新输入密钥。
 被忽略的程序列表以 `ignoredApps` 数组保存；旧版用逗号分隔的字符串也能接受，并在加载时拆分。
-由哪个服务翻译仍按旧的两段式保存：`channel`（`cloud` 或 `api`）区分是本项目提供的服务还是你自己的账号，`provider` 指明其中的具体服务——`cloud`、`local`、`google`、`baidu`、`zhipu`、`deepl` 或 `openai`；本地模型的引擎、地址和模型名分别是 `cloudProvider`（`builtin` 或 `local`）、`localEndpoint` 与 `localModel`。`channel` 为 `cloud` 时，已保存的 `provider` 会原样保留，所以绕一圈用 Glossy 自己的服务器之后，之前选的厂商还在。下拉框在读取和写入时都会做这个映射，因此旧版本写下的文件依然可用：没有 `channel` 的文件会被当作它原本就是的 API 渠道读取，而新文件会写成 `cloud`。
+由哪个服务翻译仍按旧的两段式保存：`channel`（`cloud` 或 `api`）区分是本项目提供的服务还是你自己的账号，`provider` 指明其中的具体服务——`cloud`、`local`、`google`、`baidu`、`zhipu`、`deepl` 或 `openai`；本地模型的引擎、地址和模型名分别是 `cloudProvider`（`builtin` 或 `local`）、`localEndpoint` 与 `localModel`；`cloudVendor`（`baidu`、`youdao`，留空表示由服务器自己挑）是那几个走服务器的渠道点名要用的上游。`channel` 为 `cloud` 时，已保存的 `provider` 会原样保留，所以绕一圈用 Glossy 自己的服务器之后，之前选的厂商还在。下拉框在读取和写入时都会做这个映射，因此旧版本写下的文件依然可用：没有 `channel` 的文件会被当作它原本就是的 API 渠道读取，而新文件会写成 `cloud`；认不出来的 `cloudVendor` 等于「让服务器自己挑」。
 
 ### 在应用内翻译
 
@@ -863,7 +874,7 @@ encima de él cuando no hay espacio debajo.
 | History | Cuántas traducciones terminadas recordar (`Off` hasta `The last 500`, por defecto 50). La lista que hay bajo el selector conserva el original, la traducción, el proveedor y la hora; `Search` filtra ambos textos, al hacer clic en una entrada se muestra de nuevo en la tarjeta flotante (sin una segunda llamada al proveedor), y cada entrada tiene un botón de copiar y otro de eliminar. `Forget everything` vacía la lista. El archivo está en `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` escribe `Documents\glossy-settings.json`; `Import…` vuelve a leer en la aplicación un archivo que elijas. Marca `Include my API keys in the exported file` para incluir también las claves: Glossy vuelve a preguntar antes de escribirlas en texto sin formato. Una importación se valida mediante `sanitized()` y protege las claves que trae con DPAPI de camino al disco. |
 | Updates | `Check for a new version when Glossy starts` consulta GitHub Releases en cada arranque (desactivado por defecto). `Check now` busca de inmediato y dice qué versión está esperando, y `Download and restart` la instala. Una compilación sin clave de firma de actualizaciones —que es toda compilación hasta que exista el par de claves de publicación— oculta los botones y lo indica. |
-| Servicio de traducción | Qué servicio traduce: `cloud` (el servidor del propio Glossy —recomendado, sin nada que configurar), `local` (un modelo que se ejecuta en esta máquina), `google` (el punto de conexión público gratuito, sin clave) o uno de los proveedores que usan tu propia clave: `baidu`, `zhipu`, `deepl`, `openai`. Una instalación nueva empieza en `cloud`. Se guarda como `channel` + `provider`, ver más abajo. |
+| Servicio de traducción | Qué servicio traduce: `cloud` (el servidor del propio Glossy —recomendado, sin nada que configurar), `cloud-baidu` / `cloud-youdao` (ese mismo servidor, indicándole qué proveedor usar —tampoco hay nada que rellenar), `local` (un modelo que se ejecuta en esta máquina), `google` (el punto de conexión público gratuito, sin clave) o uno de los proveedores que usan tu propia clave: `baidu`, `zhipu`, `deepl`, `openai`. Una instalación nueva empieza en `cloud`. Se guarda como `channel` + `cloudProvider` + `cloudVendor` / `provider`, ver más abajo. |
 | Línea de cuota (`cloud`) | Se muestra solo para el servidor de Glossy: cuánto queda de la cuota de hoy —o el motivo por el que no se pudo contactar con el servidor— junto a un botón `Check again`. La dirección forma parte de la compilación en lugar de ser un campo, para que nadie pueda romper el único servicio que no necesita configurar nada; consulta [`server/`](./server/README.md) para mantener un despliegue propio. |
 | Dirección del servicio local, nombre del modelo (`local`) | Se muestra solo para el modelo local: cualquier punto de conexión compatible con OpenAI (por defecto `http://127.0.0.1:11434/v1`, la dirección que sirve Ollama) y el nombre del modelo tal como lo descargaste (por defecto `qwen2.5:7b`). El texto no sale de esta máquina, así que no se contabiliza nada ni se envía nada fuera. |
 | APP ID / API key | El último panel de la ventana de ajustes, **Extensions · my own API**, abajo del todo: las credenciales que esperan los servicios de arriba están aquí en lugar de junto al desplegable, y el panel se atenúa (sigue siendo editable) mientras está elegido un servicio que no necesita nada. `baidu` pide los dos campos, `zhipu`, `deepl` y `openai` solo la clave, y el servicio gratuito `google` oculta ambos. Los valores se recuerdan por servicio, así que al volver a uno que configuraste antes sus campos se rellenan de nuevo. |
@@ -885,11 +896,17 @@ funciona.
 resto funciona con una cuenta tuya: ese último grupo es el que recoge sus
 credenciales en el panel **Extensions · my own API** al final de la ventana.
 
+`cloud-baidu` y `cloud-youdao` siguen siendo el servidor de Glossy, así que
+tampoco hay nada que rellenar: solo indican con qué proveedor debe traducir, y si
+ese no responde se usa otro motor.
+
 | Proveedor | Coste | Notas |
 | --- | --- | --- |
 | `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
 | `baidu` | cuota mensual gratuita, APP ID + clave | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Accesible desde China continental con una cuota mensual gratuita de 50 000 caracteres, que sube a 1 000 000 tras la 个人认证 (la verificación personal gratuita). Necesita tanto el **APP ID** como la **密钥** de <https://fanyi-api.baidu.com>. Envía `from=auto`, de modo que se detecta el idioma de origen. |
 | `cloud` | nada que rellenar | **Glossy Translate**: un servidor desplegado desde [`server/`](./server/README.md) traduce con la cuenta del propio proyecto, y la aplicación solo envía el texto más un id de instalación. Nada que configurar, ninguna clave en la máquina y funciona desde China continental. La cuota diaria se cuenta por dispositivo, por dirección y en total, y la ventana de ajustes muestra lo que queda; usar tu propio despliegue es cambiar una línea de la dirección dentro de la compilación. |
+| `cloud-baidu` | nada que rellenar | **Baidu Translate**: el mismo servidor que `cloud`, solo que se le pide que traduzca con Baidu. Aparece como proveedor propio sin pedir ninguna clave —las credenciales se quedan en el servidor— y la petición recurre a otro motor cuando Baidu no responde. En la red se llama `vendor: "baidu"`. |
+| `cloud-youdao` | nada que rellenar | **Youdao Translate**: otra vez el servidor de Glossy, esta vez con 有道智云. Igual: sin clave, nada que rellenar, y con motor de reserva cuando Youdao no responde. En la red se llama `vendor: "youdao"`. |
 | `zhipu` | nivel gratuito, clave de API | Modelo de chat `glm-4.7-flash` de Zhipu. Accesible desde China continental y devuelve la traducción, los símbolos fonéticos, las definiciones y un ejemplo en una sola llamada. Clave en <https://open.bigmodel.cn>. ⚠️ El acuerdo de usuario de Zhipu licencia los modelos no de pago **solo para estudio personal no comercial**; consulta más abajo antes de publicar Glossy. |
 | `local` | sin nada que rellenar | **Modelo local**: cualquier servicio que hable la API de chat de OpenAI —Ollama sirve uno en `http://127.0.0.1:11434/v1`— traduce en esta máquina, así que ni el texto ni la clave salen de ella y no se cuenta ninguna cuota. Descarga antes un modelo (`ollama pull qwen2.5:7b`) y luego dale a Glossy la dirección y el nombre del modelo. Un modelo de 7B se defiende con una frase y es más flojo que el servidor de Glossy con las expresiones idiomáticas; uno mayor cierra casi toda la diferencia. |
 | `deepl` | clave de API | Las claves que terminan en `:fx` usan el punto de conexión gratuito. |
@@ -961,12 +978,15 @@ El servicio que traduce se guarda en la antigua forma de dos partes: `channel`
 (`cloud` o `api`) elige entre los servicios que responde el proyecto y una cuenta
 tuya, y `provider` nombra el servicio dentro de ella — `cloud`, `local`, `google`,
 `baidu`, `zhipu`, `deepl` u `openai`. `cloudProvider` (`builtin` o `local`) con
-`localEndpoint`/`localModel` están detrás del modelo local, y mientras `channel`
-sea `cloud` el `provider` guardado se deja como estaba, así que el proveedor
-elegido antes sigue ahí después de pasar por el servidor de Glossy. El desplegable
-hace ese mapeo al leer y al escribir, así que un archivo escrito por una versión
-anterior sigue funcionando: uno sin `channel` se lee como el canal API que ya era,
-y un archivo que no lo tenga se escribe con `cloud`.
+`localEndpoint`/`localModel` están detrás del modelo local, y `cloudVendor`
+(`baidu`, `youdao`, o vacío para que elija el servidor) es el proveedor que piden
+las entradas servidas por el servidor. Mientras `channel` sea `cloud` el `provider`
+guardado se deja como estaba, así que el proveedor elegido antes sigue ahí después
+de pasar por el servidor de Glossy. El desplegable hace ese mapeo al leer y al
+escribir, así que un archivo escrito por una versión anterior sigue funcionando:
+uno sin `channel` se lee como el canal API que ya era, uno que no lo tenga se
+escribe con `cloud`, y un `cloudVendor` que no se reconoce significa «que decida
+el servidor».
 
 ### Traducir dentro de la aplicación
 

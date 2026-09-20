@@ -3,14 +3,22 @@
  *
  * Baidu spells most languages with three letters and a few with codes of its
  * own, so the codes the App sends (BCP 47 or plain two letter tags) are mapped
- * here instead of in every client. The LLM upstream in `llm.js` needs no such
- * mapping; it is given a name instead, which it reads better than a tag.
+ * here instead of in every client. Youdao has its own mapping in `youdao.js`;
+ * the LLM upstream in `llm.js` needs no mapping at all, it is given a name
+ * instead, which it reads better than a tag.
  */
 
 import { translateWithLlm } from "./llm.js";
 import { md5 } from "./md5.js";
+import { translateWithYoudao } from "./youdao.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
+
+/**
+ * Vendors the App can name in a request. Anything else — an empty string, an
+ * older build, a hand written call — starts at the top of the list.
+ */
+export const VENDORS = ["baidu", "youdao"];
 
 const BAIDU_CODES = {
   zh: "zh",
@@ -160,59 +168,95 @@ async function callBaidu({ fetchImpl, appId, key, text, from, to, endpoint }) {
  * Whether this deployment has anything it can translate with.
  *
  * One place, so the health endpoint and the factory cannot disagree: a
- * deployment is ready as soon as it holds either an LLM key or the Baidu pair.
+ * deployment is ready as soon as it holds either an LLM key or one of the two
+ * machine translation pairs.
  */
 export function upstreamConfigured(config) {
-  return Boolean(config.LLM_API_KEY || (config.BAIDU_APP_ID && config.BAIDU_KEY));
+  return Boolean(
+    config.LLM_API_KEY ||
+      (config.BAIDU_APP_ID && config.BAIDU_KEY) ||
+      (config.YOUDAO_APP_KEY && config.YOUDAO_APP_SECRET),
+  );
 }
 
 /**
  * Builds the upstream the handler talks to.
  *
- * Both configured backends are kept and tried in order, LLM first because it
+ * Every configured backend is kept and tried in order, LLM first because it
  * translates better and the operator opted into it by setting a key. A backend
  * that is down, throttled or out of quota therefore hands the request to the
  * next one instead of failing the user.
+ *
+ * A request may name the vendor the user picked in the App (`vendor`), which
+ * moves that backend to the front; the others stay behind it as a fallback, so
+ * a broken vendor still answers with a translation.
  */
 export function createUpstream(config) {
   const fetchImpl = (...args) => fetch(...args);
   const backends = [];
 
   if (config.LLM_API_KEY) {
-    backends.push((input) =>
-      translateWithLlm({
-        fetchImpl,
-        key: config.LLM_API_KEY,
-        endpoint: config.LLM_ENDPOINT,
-        model: config.LLM_MODEL,
-        ...input,
-      }),
-    );
+    backends.push({
+      name: "llm",
+      call: (input) =>
+        translateWithLlm({
+          fetchImpl,
+          key: config.LLM_API_KEY,
+          endpoint: config.LLM_ENDPOINT,
+          model: config.LLM_MODEL,
+          ...input,
+        }),
+    });
   }
 
   if (config.BAIDU_APP_ID && config.BAIDU_KEY) {
-    backends.push((input) =>
-      translateUpstream({
-        fetchImpl,
-        appId: config.BAIDU_APP_ID,
-        key: config.BAIDU_KEY,
-        endpoint: config.BAIDU_ENDPOINT,
-        ...input,
-      }),
-    );
+    backends.push({
+      name: "baidu",
+      call: (input) =>
+        translateUpstream({
+          fetchImpl,
+          appId: config.BAIDU_APP_ID,
+          key: config.BAIDU_KEY,
+          endpoint: config.BAIDU_ENDPOINT,
+          ...input,
+        }),
+    });
+  }
+
+  if (config.YOUDAO_APP_KEY && config.YOUDAO_APP_SECRET) {
+    backends.push({
+      name: "youdao",
+      call: (input) =>
+        translateWithYoudao({
+          fetchImpl,
+          appKey: config.YOUDAO_APP_KEY,
+          secret: config.YOUDAO_APP_SECRET,
+          endpoint: config.YOUDAO_ENDPOINT,
+          ...input,
+        }),
+    });
   }
 
   return {
     isLanguageTag,
     configured: upstreamConfigured(config),
-    async translate(input) {
+    /** Names of the vendors this deployment can serve, in the order it tries them. */
+    vendors: backends.map((backend) => backend.name),
+    async translate(input = {}) {
       if (!backends.length) {
         return { ok: false, code: "not_configured", message: "服务端还没有配置翻译密钥。" };
       }
 
+      const wanted = VENDORS.indexOf(String(input.vendor || "").trim().toLowerCase()) !== -1
+        ? String(input.vendor).trim().toLowerCase()
+        : "";
+      const order = wanted
+        ? [...backends.filter((backend) => backend.name === wanted), ...backends.filter((backend) => backend.name !== wanted)]
+        : backends;
+
       let last;
-      for (const backend of backends) {
-        last = await backend(input);
+      for (const backend of order) {
+        last = { ...(await backend.call(input)), vendor: backend.name };
         if (last.ok) return last;
       }
       return last;

@@ -115,7 +115,7 @@ test("translates and reports usage", async () => {
   assert.equal(body.chars, 11);
   assert.equal(body.usage.client, 11);
   assert.equal(body.usage.remaining, 89);
-  assert.deepEqual(calls, [{ text: "hello world", from: "en", to: "zh-CN" }]);
+  assert.deepEqual(calls, [{ text: "hello world", from: "en", to: "zh-CN", vendor: "" }]);
 });
 
 test("counts characters, not bytes", async () => {

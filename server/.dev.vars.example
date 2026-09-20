@@ -1,7 +1,8 @@
 # 本地开发用（`npx wrangler dev`）。复制成 .dev.vars 后填自己的值，
 # 这个文件在 .gitignore 里，不会被提交。线上用 `wrangler secret put`。
 #
-# 两个上游都配了就都留着：大模型先试，失败了自动交回百度。
+# 三个上游都配了就都留着：大模型先试，失败了自动交回机器翻译；
+# 客户端可以点名要用哪一个（`vendor`），点名的排到最前面，仍然带兜底。
 # 至少配一个，否则 /v1/translate 会返回 not_configured。
 
 # 大模型上游（OpenAI 兼容接口），翻译质量比机器翻译好，按量计费。
@@ -9,6 +10,12 @@
 # 默认智谱；换 DeepSeek、Moonshot、通义、OpenAI 只要改地址和模型名。
 # LLM_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 # LLM_MODEL = "glm-4-flash"
+
+# 有道智云上游，签名简单、按量计费（翻译渠道里的「有道翻译」走的也是它）。
+# YOUDAO_APP_KEY = "你的应用 ID"
+# YOUDAO_APP_SECRET = "你的应用密钥"
+# 只在本地调试时用：把有道地址换成自己的假接口。
+# YOUDAO_ENDPOINT = "http://127.0.0.1:8791/api"
 
 # 百度翻译上游，认证版每月 100 万字符，够一个自用部署。
 BAIDU_APP_ID = "202xxxxxxxxx"

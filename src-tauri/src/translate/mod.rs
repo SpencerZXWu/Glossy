@@ -287,10 +287,13 @@ async fn call_provider(
             CloudProvider::Builtin => {
                 cloud::translate(
                     client,
-                    text,
-                    source,
-                    target,
-                    kind,
+                    cloud::Request {
+                        text,
+                        source,
+                        target,
+                        kind,
+                        vendor: &settings.cloud_vendor,
+                    },
                     &settings.cloud_endpoint,
                     &settings.cloud_id,
                 )
@@ -358,10 +361,13 @@ async fn call_api_provider(
         Provider::Cloud => {
             cloud::translate(
                 client,
-                text,
-                source,
-                target,
-                kind,
+                cloud::Request {
+                    text,
+                    source,
+                    target,
+                    kind,
+                    vendor: &settings.cloud_vendor,
+                },
                 &settings.cloud_endpoint,
                 &settings.cloud_id,
             )

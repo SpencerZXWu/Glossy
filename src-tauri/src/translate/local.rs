@@ -19,7 +19,9 @@ fn endpoint_of(configured: &str) -> Result<String, String> {
         return Err("The local model has no address yet. Fill one in under Settings.".to_string());
     }
     if !base.starts_with("http://") && !base.starts_with("https://") {
-        return Err("The local model address has to start with `http://` or `https://`.".to_string());
+        return Err(
+            "The local model address has to start with `http://` or `https://`.".to_string(),
+        );
     }
     if base.ends_with("/chat/completions") {
         return Ok(base.to_string());

@@ -1,15 +1,21 @@
 # Glossy 云端翻译服务
 
-给你自己用的翻译代理：上游的密钥（大模型或百度）**只放在服务端**，Glossy 客户端不再需要让用户填密钥，直接调这个服务就能翻译。这就是客户端「翻译渠道」里的 **Glossy 翻译**。
+给你自己用的翻译代理：上游的密钥（大模型、百度或有道）**只放在服务端**，Glossy 客户端不再需要让用户填密钥，直接调这个服务就能翻译。这就是客户端「翻译渠道」里的 **Glossy 翻译**（里面的「百度翻译」「有道翻译」也走这台服务器，只是点名要用哪个上游）。
 
-上游可以配两个，配了就都留着：
+上游可以配三个，配了就都留着：
 
 | 上游 | 需要什么 | 说明 |
 | --- | --- | --- |
 | 大模型（OpenAI 兼容接口） | `LLM_API_KEY` | 翻译质量好，按量计费；先试它 |
 | 百度翻译 | `BAIDU_APP_ID` + `BAIDU_KEY` | 认证版每月 100 万字符免费额度 |
+| 有道智云 | `YOUDAO_APP_KEY` + `YOUDAO_APP_SECRET` | 客户端「有道翻译」就是点名用它 |
 
-大模型失败了（连不上、限流、额度用尽）会自动交回百度，用户那边不会看到报错。只配一个也能跑，一个都不配时 `/v1/translate` 返回 `not_configured`。
+大模型失败了（连不上、限流、额度用尽）会自动交回机器翻译，用户那边不会看到报错。只配一个也能跑，一个都不配时 `/v1/translate` 返回 `not_configured`。
+
+客户端可以在请求里带 `"vendor": "baidu"` 或 `"youdao"` 点名要用哪个上游（就是渠道列表里的
+「百度翻译」「有道翻译」）：点名的那个排到最前面先试，失败仍会按顺序兜底，全都不行才报错。
+不带 `vendor`（或写了不认识的名字）就从默认顺序开始。`GET /v1/health` 里的 `vendors`
+会列出这套部署实际能用的上游。
 
 一套代码（`src/`）可以部署到两个地方：
 
@@ -28,7 +34,7 @@
 需要：
 
 - **腾讯云账号并完成实名认证**（部署 SCF 用；个人认证即可，不花钱）
-- 至少一个上游的密钥：大模型的 API Key，或百度翻译开放平台的 APP ID 和密钥
+- 至少一个上游的密钥：大模型的 API Key、百度翻译开放平台的 APP ID 和密钥，或有道智云的应用 ID 和应用密钥
 - Node.js 18 以上（本机已有）
 
 ## 二、部署到腾讯云 SCF（推荐，国内直连）
@@ -100,6 +106,8 @@ exec /var/lang/node18/bin/node index.mjs
 | --- | --- |
 | `BAIDU_APP_ID` | 你的百度 APP ID |
 | `BAIDU_KEY` | 你的百度密钥 |
+| `YOUDAO_APP_KEY` | 你的有道应用 ID（可选，客户端点名「有道翻译」时需要） |
+| `YOUDAO_APP_SECRET` | 你的有道应用密钥（同上） |
 | `LLM_API_KEY` | 大模型的 API Key（可选，配了就优先用它） |
 | `LLM_ENDPOINT` | 大模型接口地址（可选，默认智谱 `https://open.bigmodel.cn/api/paas/v4/chat/completions`） |
 | `LLM_MODEL` | 模型名（可选，默认 `glm-4-flash`） |
@@ -151,6 +159,8 @@ npx wrangler login          # 浏览器里点一下授权
 # 密钥：依次执行，粘贴后回车即可（输入的内容不会显示）
 npx wrangler secret put BAIDU_APP_ID     # 百度 APP ID
 npx wrangler secret put BAIDU_KEY        # 百度密钥
+# npx wrangler secret put YOUDAO_APP_KEY     # 可选：有道应用 ID
+# npx wrangler secret put YOUDAO_APP_SECRET  # 可选：有道应用密钥
 # npx wrangler secret put LLM_API_KEY    # 可选：大模型的 Key，配了会优先用它
 npx wrangler secret put IP_SALT          # 随便一串随机字符，用来给 IP 做哈希
 
@@ -216,10 +226,11 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 ### `GET /v1/health`
 
 ```json
-{ "ok": true, "service": "glossy-cloud", "day": "2025-09-01", "configured": true }
+{ "ok": true, "service": "glossy-cloud", "day": "2025-09-01", "configured": true, "vendors": ["llm", "baidu", "youdao"] }
 ```
 
-`configured: false` 说明一个上游密钥都没配好。
+`configured: false` 说明一个上游密钥都没配好。`vendors` 是这套部署实际能用的上游，按默认尝试顺序排列
+（`llm` / `baidu` / `youdao`）。
 
 ### `GET /v1/quota?client=<安装ID>`
 
@@ -228,8 +239,11 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 ### `POST /v1/translate`
 
 ```json
-{ "clientId": "8-64位字母数字_-", "text": "被翻译的原文", "from": "auto", "to": "zh" }
+{ "clientId": "8-64位字母数字_-", "text": "被翻译的原文", "from": "auto", "to": "zh", "vendor": "youdao" }
 ```
+
+`vendor` 可以省略（空串也一样）：不填就按服务端的默认顺序；填 `baidu` 或 `youdao` 就把那一个排到最前面，
+它答不上来仍然会兜底到别的上游。
 
 成功：
 
@@ -239,10 +253,13 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
   "from": "en",
   "to": "zh",
   "translation": "你好",
+  "vendor": "youdao",
   "chars": 5,
   "usage": { "client": 5, "remaining": 19995 }
 }
 ```
+
+`vendor` 是这次实际回答的上游，客户端用它标注结果来自哪家。
 
 失败统一是 `{ "ok": false, "code": "...", "message": "..." }`，HTTP 状态码配合：
 
@@ -295,11 +312,11 @@ npm run build:scf       # 输出到 dist/scf/
 
 ```bash
 cp .dev.vars.example .dev.vars   # Windows: Copy-Item .dev.vars.example .dev.vars
-# 填好上游密钥（百度必填一组，或填 LLM_API_KEY）
+# 填好上游密钥（百度/有道至少一组，或填 LLM_API_KEY）
 npx wrangler dev                 # 默认 http://127.0.0.1:8787
 ```
 
-`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`LLM_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
+`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`YOUDAO_ENDPOINT`、`LLM_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
 
 ```bash
 curl http://127.0.0.1:9000/v1/health
@@ -314,8 +331,8 @@ Cloudflare：`npx wrangler tail`；腾讯云 SCF：控制台「日志查询」�
 
 常见情况：
 
-- `upstream_credentials`：上游认证失败。百度是 APP ID 或密钥错了，或百度的「个人认证」没通过（个人认证才有免费额度）；大模型是 Key 失效或没权限。
-- `upstream_limit`：上游额度用尽或被限流。两个上游都配了的话，出现这个说明两家都用尽了。
+- `upstream_credentials`：上游认证失败。百度是 APP ID 或密钥错了，或百度的「个人认证」没通过（个人认证才有免费额度）；有道是应用 ID/密钥错了或没开通文本翻译；大模型是 Key 失效或没权限。
+- `upstream_limit`：上游额度用尽或被限流。所有配好的上游都用尽了才会出现这个。
 - SCF 上报 `PortBindingFailed` / 函数启动失败：启动命令没填对。检查是不是监听 `0.0.0.0:9000`、
   `scf_bootstrap` 内容是否 LF 换行、`index.mjs` 与启动命令是否在同一个目录。
 - SCF 上调用超时：把函数**超时时间调到 10 秒**。
@@ -341,7 +358,8 @@ server/
 │   ├── store-file.js     Node 侧的计数存储（JSON 文件）
 │   ├── index.js          Cloudflare Worker 入口
 │   ├── quota-object.js   按天计数的 Durable Object（SQLite）
-│   ├── upstream.js       上游组装（大模型优先、百度兜底）、百度签名、语言代码映射
+│   ├── upstream.js       上游组装（按顺序尝试、客户端可点名）、百度签名、语言代码映射
+│   ├── youdao.js         有道智云上游（v3 签名、错误码映射）
 │   ├── llm.js            OpenAI 兼容的大模型调用与 JSON 解析
 │   └── md5.js            Workers 里没有 MD5，自己带一个
 └── test/                 node --test 单测
