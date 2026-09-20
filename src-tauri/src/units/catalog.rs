@@ -69,7 +69,9 @@ const FAHRENHEIT_SCALE: f64 = 5.0 / 9.0;
 
 /// Every measurement unit Glossy converts. Multiples of the same physical unit
 /// are separate rows on purpose: what matters is the unit the text used and the
-/// unit the reader wants.
+/// unit the reader wants. One row per unit, one line per row: the table is read
+/// as a table, so rustfmt is told to leave it alone.
+#[rustfmt::skip]
 pub const UNITS: &[Unit] = &[
     // Length, base metre.
     Unit { display: "mm", category: Category::Length, system: System::Metric, scale: 0.001, offset: 0.0,
@@ -168,6 +170,7 @@ pub const UNITS: &[Unit] = &[
 ];
 
 /// The currencies a rate can be asked for.
+#[rustfmt::skip]
 pub const CURRENCIES: &[Currency] = &[
     Currency { code: "USD", symbol: "$", decimals: 2, aliases: &["$", "us$", "usd", "dollar", "dollars", "us dollar", "美元", "美金"] },
     Currency { code: "EUR", symbol: "€", decimals: 2, aliases: &["€", "eur", "euro", "euros", "欧元"] },
@@ -209,6 +212,7 @@ pub const CURRENCIES: &[Currency] = &[
 
 /// The units a target language reads in, smallest first. The card picks the
 /// largest one that still reads as a number a person would say out loud.
+#[rustfmt::skip]
 const PREFERRED: &[(Category, System, &[&str])] = &[
     (Category::Length, System::Metric, &["mm", "cm", "m", "km"]),
     // Yards and short tons are real imperial units, but nobody reaches for them
@@ -262,7 +266,12 @@ pub fn target_system(language: &str) -> System {
 
 /// The currency a reader of this language expects to see a foreign amount in.
 pub fn target_currency(language: &str) -> Option<&'static str> {
-    let code = match language.trim().to_ascii_lowercase().replace('_', "-").as_str() {
+    let code = match language
+        .trim()
+        .to_ascii_lowercase()
+        .replace('_', "-")
+        .as_str()
+    {
         "zh" | "zh-cn" | "zh-hans" => "CNY",
         "zh-tw" | "zh-hk" | "zh-hant" => "TWD",
         "en" => "USD",
@@ -313,7 +322,10 @@ mod tests {
             assert!(!displays.is_empty());
             for display in *displays {
                 let unit = unit(display).unwrap_or_else(|| panic!("{display} is not a known unit"));
-                assert_eq!(unit.category, *category, "{display} measures the wrong thing");
+                assert_eq!(
+                    unit.category, *category,
+                    "{display} measures the wrong thing"
+                );
                 assert_eq!(unit.system, *system, "{display} is in the wrong system");
             }
         }
@@ -327,7 +339,10 @@ mod tests {
                 .map(|display| unit(display).expect("known unit").scale)
                 .collect();
             for pair in scales.windows(2) {
-                assert!(pair[0] < pair[1], "{category:?}/{system:?} is out of order: {scales:?}");
+                assert!(
+                    pair[0] < pair[1],
+                    "{category:?}/{system:?} is out of order: {scales:?}"
+                );
             }
         }
     }
@@ -338,7 +353,12 @@ mod tests {
         for unit in UNITS {
             assert!(!unit.aliases.is_empty(), "{} has no alias", unit.display);
             for alias in unit.aliases {
-                assert_eq!(*alias, alias.to_lowercase(), "`{alias}` of {} is not lower case", unit.display);
+                assert_eq!(
+                    *alias,
+                    alias.to_lowercase(),
+                    "`{alias}` of {} is not lower case",
+                    unit.display
+                );
                 assert!(!seen.contains(alias), "`{alias}` is claimed twice");
                 seen.push(alias);
             }
@@ -346,7 +366,10 @@ mod tests {
         for currency in CURRENCIES {
             for alias in currency.aliases {
                 assert_eq!(*alias, alias.to_lowercase(), "`{alias}` is not lower case");
-                assert!(!seen.contains(alias), "`{alias}` is both a unit and a currency");
+                assert!(
+                    !seen.contains(alias),
+                    "`{alias}` is both a unit and a currency"
+                );
                 seen.push(alias);
             }
         }

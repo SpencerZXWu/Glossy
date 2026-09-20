@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [0.3.1] - 2026-09-20
+
+### Changed
+
+- Unit and currency conversion reads the numbers and units out of the
+  **translation** instead of the selection. The translator is what decides
+  whether a symbol is a unit at all — it settles `5 in the morning` against
+  `5 in`, and it writes `12 ft` as `12英尺` for a Chinese reader — so the card
+  converts what the reader is actually being shown. A source language whose unit
+  words the tables never knew now works as soon as the translation writes the
+  measurement in one they do, for example Spanish `mide 12 pies de ancho` →
+  `房间宽12英尺。` → `12英尺 ≈ 3.66 m`. When the translation holds nothing
+  convertible — the translator dropped the measurement, or spelled the number
+  out in words — the original is read instead, so nothing that used to be
+  annotated lost its annotation. Where both have something, the translation is
+  the one that is shown.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added
@@ -228,6 +245,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SpencerZXWu/Glossy/releases/tag/v0.1.0

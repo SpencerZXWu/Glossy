@@ -43,8 +43,8 @@ pub struct TranslationResult {
     pub meanings: Vec<Meaning>,
     pub example: Option<String>,
     pub provider: String,
-    /// Units in the source text that a reader of the target language would not
-    /// expect, annotated with the switch to the units they do.
+    /// Measurements in the translation that a reader of the target language
+    /// would not expect, annotated with the switch to the units they do.
     #[serde(default)]
     pub conversions: Vec<crate::units::Conversion>,
 }

@@ -163,9 +163,10 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
         return;
     };
     let cache = app.path().app_config_dir().ok();
-    result.conversions = units::conversions(
+    result.conversions = units::conversions_for(
         client,
         &result.source_text,
+        &result.translation,
         &result.target_lang,
         cache.as_deref(),
     )
@@ -363,7 +364,6 @@ pub fn run() {
             // Only the settings window has a frame and a desktop behind it. Both
             // calls are best effort: they change how it looks, nothing else.
             surface::prepare(&handle, MAIN_LABEL, state.settings().theme);
-
 
             history::load(&handle, state.settings().history_limit);
 

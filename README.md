@@ -8,10 +8,10 @@ translation under the cursor.
 
 - **Word or short phrase** → phonetic symbols, part of speech, definitions and one example.
 - **Sentence or paragraph** → a smooth translation into your target language.
-- **A measurement or an amount** written in a unit your target language does not
-  use → the converted value and the conversion rate, right in the card
-  (`12 ft ≈ 3.66 m`). Currency rates are looked up live; every other unit is
-  built into the app. Can be switched off in the settings.
+- **A measurement or an amount** that the translation still writes in a unit
+  your target language does not use → the converted value and the conversion
+  rate, right in the card (`12 ft ≈ 3.66 m`). Currency rates are looked up live;
+  every other unit is built into the app. Can be switched off in the settings.
 - The source language is detected automatically.
 - A selection that ends with sentence punctuation (`.`, `?`, `!`, `。` …) is
   always translated as a sentence, however short it is.
@@ -71,7 +71,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | Translate a word on double click | Enables the double-click gesture. |
 | Put the clipboard back after reading a selection | Restores your previous clipboard content after Glossy copied the selection. |
 | Show the original text in the popup | Hides the source line in the card when off. |
-| Convert units and currency | When the original measures something in a unit your target language does not use — feet, pounds, °F, a foreign amount — the card adds the converted value and the rate underneath (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). Length, mass, volume, speed, area and temperature convert inside their category, and the target unit is the one a person would write; the target currency follows the target language (`zh-CN` → CNY, `en` → USD). Currency rates come from `open.er-api.com` (ECB as a fallback) and are cached for six hours; everything else is built into the app. Off means no conversion and no rate request. |
+| Convert units and currency | When the translation still measures something in a unit your target language does not use — feet, pounds, °F, a foreign amount — the card adds the converted value and the rate underneath (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). The numbers are read from the translation, because the translator is what decides whether a symbol is a unit at all and always writes it in a language the tables know; if the translation holds none, the original is read instead. Length, mass, volume, speed, area and temperature convert inside their category, and the target unit is the one a person would write; the target currency follows the target language (`zh-CN` → CNY, `en` → USD). Currency rates come from `open.er-api.com` (ECB as a fallback) and are cached for six hours; everything else is built into the app. Off means no conversion and no rate request. |
 | Shortest selection to translate | Character count below which a selection is ignored (`1`–`40`, default `2`). |
 | Global hotkey | Accelerator that translates the clipboard content, e.g. `Ctrl+Alt+C`. Clear the field to switch it off. The line under the field shows the registered combination or why Windows refused it. |
 | Never translate in these programs | A list of process names (`idea64.exe`, `mstsc`) in which selection capture is skipped. Add one by typing it (the `.exe` suffix is optional — the `Add` button normalises it), by choosing it from the dropdown of currently running programs, or by pressing `Pick with the mouse` and clicking the window to ignore. Each entry has an `×` to remove it; duplicates are dropped case-insensitively. |

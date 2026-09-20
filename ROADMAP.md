@@ -8,12 +8,12 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `0.3.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~12,400 lines: ~7,100 Rust, ~4,300 frontend (plain HTML/CSS/JS) and ~970 frontend test lines, comments included |
-| Tests | 128 Rust tests and 81 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Version | `0.3.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~12,400 lines: ~7,200 Rust, ~4,300 frontend (plain HTML/CSS/JS) and ~970 frontend test lines, comments included |
+| Tests | 132 Rust tests and 81 frontend tests (`node --test`); `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
-| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/`, `v0.3.0` in `release/v0.3.0/` |
+| Repository | MIT licensed, changelog and roadmap in place, `v0.1.0` tagged and released with an installer served from GitHub Releases; `v0.2.1` staged in `release/v0.2.1/`, `v0.3.0` in `release/v0.3.0/`, `v0.3.1` in `release/v0.3.1/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
@@ -82,7 +82,7 @@ the numbers a reader of the target language needs.
 | Design tokens | `src/styles/tokens.css` holds every colour, radius, shadow, font size and duration; the WinUI palette; `app.css`, `popup.css` and `notice.css` alias the tokens instead of repeating literals | done |
 | Theme resolution | `js/theme.js` resolves `system`/`light`/`dark` in one place for all three windows | done |
 | Window material | Mica behind the settings window (`window-vibrancy`), a theme-matched title bar colour, and a `SurfaceInfo.ready` handshake so the stylesheet only turns transparent once the backdrop is confirmed | done, in `src-tauri/src/surface.rs` |
-| Unit and currency conversion | A measurement or amount that the target language does not use is shown converted, with its rate, under the card: length, mass, volume, speed, area, temperature, and money through a live rate table | done, in `src-tauri/src/units/` |
+| Unit and currency conversion | A measurement or amount the target language does not use is shown converted, with its rate, under the card: length, mass, volume, speed, area, temperature, and money through a live rate table. The numbers are read from the translation rather than the selection — the translator is what decides whether a symbol is a unit, and it writes the measurement in a language the tables know — with the original as the fallback when the translation holds none | done, in `src-tauri/src/units/`; reading the translation from 0.3.1 |
 | Conversion switch | `Convert units and currency`, on by default; off means no conversion and no rate request | done |
 | Word-card placeholder | The card says the dictionary is being looked up instead of changing under the reader, and the lookups share a short budget | done |
 

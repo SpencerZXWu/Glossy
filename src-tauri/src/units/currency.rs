@@ -106,7 +106,10 @@ pub async fn rate(
 
     // Nothing fresh: an old table is better than an empty annotation.
     remembered(&from, cache).and_then(|table| {
-        lookup(&table, &to).map(|rate| Rate { stale: true, ..rate })
+        lookup(&table, &to).map(|rate| Rate {
+            stale: true,
+            ..rate
+        })
     })
 }
 
@@ -191,7 +194,9 @@ fn read_cache(cache: Option<&Path>) -> Option<HashMap<String, Table>> {
 }
 
 fn write_cache(cache: Option<&Path>, tables: &HashMap<String, Table>) {
-    let Some(path) = cache_path(cache) else { return };
+    let Some(path) = cache_path(cache) else {
+        return;
+    };
     let data: serde_json::Map<String, Value> = tables
         .iter()
         .map(|(base, table)| {
@@ -294,12 +299,7 @@ fn rates_of(data: &Value) -> Option<HashMap<String, f64>> {
 /// `Thu, 05 Feb 2026 00:02:31 +0000` -> `2026-02-05`.
 fn iso_date(text: &str) -> Option<String> {
     let mut parts = text.split_whitespace();
-    let (_, day, month, year) = (
-        parts.next()?,
-        parts.next()?,
-        parts.next()?,
-        parts.next()?,
-    );
+    let (_, day, month, year) = (parts.next()?, parts.next()?, parts.next()?, parts.next()?);
     let month = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     ]
@@ -343,7 +343,9 @@ mod tests {
             "base_code":"USD","rates":{"USD":1,"CNY":7.1234,"JPY":150.2}}"#;
         let data: Value = serde_json::from_str(body).expect("json");
         assert_eq!(
-            data.get("time_last_update_utc").and_then(Value::as_str).and_then(iso_date),
+            data.get("time_last_update_utc")
+                .and_then(Value::as_str)
+                .and_then(iso_date),
             Some("2026-02-05".to_string())
         );
         let rates = rates_of(&data).expect("rates");
@@ -354,7 +356,8 @@ mod tests {
 
     #[test]
     fn the_fallback_answers_are_read_too() {
-        let body = r#"{"amount":1.0,"base":"USD","date":"2026-02-05","rates":{"CNY":7.11,"JPY":149.5}}"#;
+        let body =
+            r#"{"amount":1.0,"base":"USD","date":"2026-02-05","rates":{"CNY":7.11,"JPY":149.5}}"#;
         let data: Value = serde_json::from_str(body).expect("json");
         let rates = rates_of(&data).expect("rates");
         assert_eq!(rates.get("CNY"), Some(&7.11));
@@ -371,7 +374,10 @@ mod tests {
 
     #[test]
     fn a_date_is_formatted_the_way_a_card_shows_it() {
-        assert_eq!(iso_date("Thu, 05 Feb 2026 00:02:31 +0000").as_deref(), Some("2026-02-05"));
+        assert_eq!(
+            iso_date("Thu, 05 Feb 2026 00:02:31 +0000").as_deref(),
+            Some("2026-02-05")
+        );
         assert_eq!(iso_date("2026-02-05"), None);
         assert_eq!(iso_date(""), None);
     }
@@ -381,8 +387,14 @@ mod tests {
         let directory = std::env::temp_dir().join(format!("glossy-rates-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         let tables = HashMap::from([
-            ("USD".to_string(), table(SOURCE_PRIMARY, now(), &[("CNY", 7.12)])),
-            ("EUR".to_string(), table(SOURCE_FALLBACK, now(), &[("CNY", 7.8)])),
+            (
+                "USD".to_string(),
+                table(SOURCE_PRIMARY, now(), &[("CNY", 7.12)]),
+            ),
+            (
+                "EUR".to_string(),
+                table(SOURCE_FALLBACK, now(), &[("CNY", 7.8)]),
+            ),
         ]);
         write_cache(Some(&directory), &tables);
 
@@ -395,10 +407,17 @@ mod tests {
 
         // A table that was fetched too long ago is not read again.
         let old = directory.join("old");
-        write_cache(Some(&old), &HashMap::from([(
-            "USD".to_string(),
-            table(SOURCE_PRIMARY, now() - USABLE.as_secs() - 1, &[("CNY", 7.12)]),
-        )]));
+        write_cache(
+            Some(&old),
+            &HashMap::from([(
+                "USD".to_string(),
+                table(
+                    SOURCE_PRIMARY,
+                    now() - USABLE.as_secs() - 1,
+                    &[("CNY", 7.12)],
+                ),
+            )]),
+        );
         memory().lock().expect("poisoned").remove("USD");
         assert!(remembered("USD", Some(&old)).is_none());
 
@@ -408,10 +427,10 @@ mod tests {
     #[test]
     fn a_fresh_table_in_memory_is_used_without_a_source() {
         let fetched = now();
-        memory()
-            .lock()
-            .expect("poisoned")
-            .insert("GBP".to_string(), table(SOURCE_PRIMARY, fetched, &[("CNY", 8.9)]));
+        memory().lock().expect("poisoned").insert(
+            "GBP".to_string(),
+            table(SOURCE_PRIMARY, fetched, &[("CNY", 8.9)]),
+        );
         let remembered = remembered("GBP", None).expect("a table");
         assert!(remembered.age() < FRESH);
         assert_eq!(remembered.rates.get("CNY"), Some(&8.9));

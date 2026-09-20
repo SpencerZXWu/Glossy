@@ -117,8 +117,10 @@ pub async fn translate_quickly(
     kind: Kind,
 ) -> Result<TranslationResult, String> {
     if cooling_down(now_millis(), QUICK_DOWN_UNTIL.load(Ordering::Relaxed)) {
-        return Err("Google Translate is unavailable right now; skipping the dictionary lookup."
-            .to_string());
+        return Err(
+            "Google Translate is unavailable right now; skipping the dictionary lookup."
+                .to_string(),
+        );
     }
 
     let result = run(client, text, source, target, kind, Some(QUICK_BUDGET)).await;

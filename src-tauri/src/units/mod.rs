@@ -1,4 +1,5 @@
-//! Unit and currency conversion for the text the user selected.
+//! Unit and currency conversion for what the user selected and what the
+//! translator made of it.
 //!
 //! Everything here is best effort: the popup shows the translation first and the
 //! conversions are annotations next to it, so a slow or missing exchange rate
@@ -71,17 +72,17 @@ pub async fn conversions(
                 if remaining.is_zero() {
                     continue;
                 }
-                let rate = tokio::time::timeout(
-                    remaining,
-                    currency::rate(client, code, target, cache),
-                )
-                .await
-                .ok()
-                .flatten();
+                let rate =
+                    tokio::time::timeout(remaining, currency::rate(client, code, target, cache))
+                        .await
+                        .ok()
+                        .flatten();
                 rate.and_then(|rate| money(&hit, code, value, target, &rate))
             }
         };
-        let Some(conversion) = conversion else { continue };
+        let Some(conversion) = conversion else {
+            continue;
+        };
         if out.iter().any(|seen| seen.original == conversion.original) {
             continue;
         }
@@ -91,6 +92,32 @@ pub async fn conversions(
         }
     }
     out
+}
+
+/// The conversions to annotate a card with.
+///
+/// The numbers and units are read out of the translation rather than the
+/// original, because the translator is the one that knows whether a symbol is a
+/// unit at all: it settles `5 in the morning` against `5 in`, and it writes
+/// `12 ft` as `12英尺` for a Chinese reader. That also means a source language
+/// the tables have never heard of works, as long as the translator wrote the
+/// measurement down in one it has.
+///
+/// The original is still consulted when the translation holds nothing
+/// convertible — a translator that dropped a measurement, or spelled the number
+/// out in words, would otherwise silently lose the annotation.
+pub async fn conversions_for(
+    client: &reqwest::Client,
+    original: &str,
+    translation: &str,
+    target_language: &str,
+    cache: Option<&Path>,
+) -> Vec<Conversion> {
+    let from_translation = conversions(client, translation, target_language, cache).await;
+    if !from_translation.is_empty() {
+        return from_translation;
+    }
+    conversions(client, original, target_language, cache).await
 }
 
 /// The conversion a measurement needs, or `None` when the reader already reads
@@ -138,7 +165,12 @@ fn money(
         category: "currency".to_string(),
         original: hit.original.clone(),
         converted: format_amount(target, value * rate.value),
-        rate: format!("1 {} = {} {}", code, significant(rate.value, 6), target.code),
+        rate: format!(
+            "1 {} = {} {}",
+            code,
+            significant(rate.value, 6),
+            target.code
+        ),
         rate_source: Some(rate.source.to_string()),
         rate_date: rate.date.clone(),
         stale: rate.stale,
@@ -167,7 +199,12 @@ fn rate_line(from: &Unit, to: &Unit) -> String {
             ("°C", "°F") => "°F = °C × 9/5 + 32".to_string(),
             ("K", "°C") => "°C = K − 273.15".to_string(),
             ("K", "°F") => "°F = K × 9/5 − 459.67".to_string(),
-            _ => format!("1 {} = {} {}", from.display, significant(from.scale, 7), to.display),
+            _ => format!(
+                "1 {} = {} {}",
+                from.display,
+                significant(from.scale, 7),
+                to.display
+            ),
         };
     }
     format!(
@@ -262,7 +299,10 @@ fn scan(text: &str, kana: bool) -> Vec<Hit> {
         if let Some((currency, prefix)) = prefix_money(&text[..start], kana) {
             hits.push(Hit {
                 original: text[start - prefix..end].trim().to_string(),
-                found: Found::Money { code: currency.code, value },
+                found: Found::Money {
+                    code: currency.code,
+                    value,
+                },
             });
             continue;
         }
@@ -271,7 +311,10 @@ fn scan(text: &str, kana: bool) -> Vec<Hit> {
         };
         let found = match found {
             Suffix::Measure(unit) => Found::Measure { unit, value },
-            Suffix::Money(currency) => Found::Money { code: currency.code, value },
+            Suffix::Money(currency) => Found::Money {
+                code: currency.code,
+                value,
+            },
         };
         hits.push(Hit {
             original: text[start..end + consumed].trim().to_string(),
@@ -295,7 +338,11 @@ fn suffix_match(after: &str, kana: bool) -> Option<(usize, Suffix)> {
 
     let mut best: Option<(usize, Suffix)> = None;
     let mut take = |length: usize, found: Suffix| {
-        if best.as_ref().is_none_or(|(current, _)| length > *current) {
+        let better = match best {
+            Some((current, _)) => length > current,
+            None => true,
+        };
+        if better {
             best = Some((length, found));
         }
     };
@@ -365,7 +412,11 @@ fn prefix_money(before: &str, kana: bool) -> Option<(&'static Currency, usize)> 
             if joined {
                 continue;
             }
-            if best.is_none_or(|(_, current)| length > current) {
+            let better = match best {
+                Some((_, current)) => length > current,
+                None => true,
+            };
+            if better {
                 best = Some((resolve_yen(currency, alias, kana), length));
             }
         }
@@ -375,11 +426,7 @@ fn prefix_money(before: &str, kana: bool) -> Option<(&'static Currency, usize)> 
 }
 
 /// `¥` is the symbol of two currencies: a text written with kana means the yen.
-fn resolve_yen(
-    currency: &'static Currency,
-    alias: &str,
-    kana: bool,
-) -> &'static Currency {
+fn resolve_yen(currency: &'static Currency, alias: &str, kana: bool) -> &'static Currency {
     if kana && currency.code == "CNY" && (alias == "¥" || alias == "￥") {
         return currency_of("JPY").unwrap_or(currency);
     }
@@ -393,7 +440,8 @@ fn numbers(text: &str) -> Vec<(f64, usize, usize)> {
     let mut index = 0;
     while index < bytes.len() {
         let byte = bytes[index];
-        let attached = index > 0 && (bytes[index - 1].is_ascii_alphanumeric() || bytes[index - 1] == b'.');
+        let attached =
+            index > 0 && (bytes[index - 1].is_ascii_alphanumeric() || bytes[index - 1] == b'.');
         if !byte.is_ascii_digit() || attached {
             index += 1;
             continue;
@@ -402,16 +450,15 @@ fn numbers(text: &str) -> Vec<(f64, usize, usize)> {
         let mut decimal = false;
         while index < bytes.len() {
             let byte = bytes[index];
-            if byte.is_ascii_digit() {
-                index += 1;
-            } else if byte == b',' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit) {
-                index += 1;
-            } else if byte == b'.' && !decimal && bytes.get(index + 1).is_some_and(u8::is_ascii_digit) {
-                decimal = true;
-                index += 1;
-            } else {
+            let digit = byte.is_ascii_digit();
+            let thousands = byte == b',' && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
+            let point =
+                byte == b'.' && !decimal && bytes.get(index + 1).is_some_and(u8::is_ascii_digit);
+            if !(digit || thousands || point) {
                 break;
             }
+            decimal |= point;
+            index += 1;
         }
         let raw: String = text[start..index].chars().filter(|c| *c != ',').collect();
         if let Ok(value) = raw.parse::<f64>() {
@@ -430,16 +477,15 @@ fn starts_with_ci(text: &str, alias: &str) -> bool {
 /// A unit is only read as a unit when no word continues it: `5 minutes` is not
 /// five metres.
 fn boundary_after(text: &str, length: usize) -> bool {
-    text[length..]
-        .chars()
-        .next()
-        .is_none_or(|next| !next.is_ascii_alphanumeric())
+    match text[length..].chars().next() {
+        Some(next) => !next.is_ascii_alphanumeric(),
+        None => true,
+    }
 }
 
 /// Japanese is the one language where `¥` is not the yuan.
 fn has_kana(text: &str) -> bool {
-    text.chars()
-        .any(|c| ('\u{3040}'..='\u{30ff}').contains(&c))
+    text.chars().any(|c| ('\u{3040}'..='\u{30ff}').contains(&c))
 }
 
 #[cfg(test)]
@@ -462,11 +508,15 @@ mod tests {
 
     fn single(text: &str, language: &str) -> Conversion {
         let found = read(text, language);
-        assert_eq!(found.len(), 1, "expected one conversion in `{text}`: {found:?}");
+        assert_eq!(
+            found.len(),
+            1,
+            "expected one conversion in `{text}`: {found:?}"
+        );
         found.into_iter().next().expect("one conversion")
     }
 
-    fn money_of(text: &str, language: &str) -> Vec<(&'static str, f64)> {
+    fn money_of(text: &str, _language: &str) -> Vec<(&'static str, f64)> {
         scan(text, has_kana(text))
             .into_iter()
             .filter_map(|hit| match hit.found {
@@ -478,8 +528,14 @@ mod tests {
 
     #[test]
     fn a_measurement_becomes_the_unit_the_reader_uses() {
-        assert_eq!(single("The walk is 5 mi long.", "zh-CN").converted, "8.05 km");
-        assert_eq!(single("The room is 12 ft wide.", "zh-CN").converted, "3.66 m");
+        assert_eq!(
+            single("The walk is 5 mi long.", "zh-CN").converted,
+            "8.05 km"
+        );
+        assert_eq!(
+            single("The room is 12 ft wide.", "zh-CN").converted,
+            "3.66 m"
+        );
         assert_eq!(single("It weighs 100 lb.", "zh-CN").converted, "45.4 kg");
         assert_eq!(single("A 60 mph wind.", "zh-CN").converted, "96.6 km/h");
         assert_eq!(single("The pool is 25 m.", "en").converted, "82 ft");
@@ -492,8 +548,14 @@ mod tests {
         assert_eq!(hot.converted, "37.8 °C");
         assert_eq!(hot.rate, "°C = (°F − 32) × 5/9");
         assert_eq!(single("Water boils at 100°C.", "en").converted, "212 °F");
-        assert_eq!(single("Water freezes at 273.15 kelvin.", "en").converted, "32 °F");
-        assert_eq!(single("The core reaches 6000 kelvin.", "en").converted, "10,340 °F");
+        assert_eq!(
+            single("Water freezes at 273.15 kelvin.", "en").converted,
+            "32 °F"
+        );
+        assert_eq!(
+            single("The core reaches 6000 kelvin.", "en").converted,
+            "10,340 °F"
+        );
     }
 
     #[test]
@@ -523,12 +585,21 @@ mod tests {
     #[test]
     fn an_amount_of_money_becomes_the_readers_currency() {
         assert_eq!(money_of("It costs $200.", "zh-CN"), vec![("USD", 200.0)]);
-        assert_eq!(money_of("It costs 200 dollars.", "zh-CN"), vec![("USD", 200.0)]);
+        assert_eq!(
+            money_of("It costs 200 dollars.", "zh-CN"),
+            vec![("USD", 200.0)]
+        );
         assert_eq!(money_of("售价 200 元。", "en"), vec![("CNY", 200.0)]);
         assert_eq!(money_of("It costs €50.", "en"), vec![("EUR", 50.0)]);
         assert_eq!(money_of("通常 3 美元。", "ja"), vec![("USD", 3.0)]);
-        assert_eq!(money_of("It costs 200 US dollars.", "zh-CN"), vec![("USD", 200.0)]);
-        assert_eq!(money_of("It costs 15 Swiss francs.", "zh-CN"), vec![("CHF", 15.0)]);
+        assert_eq!(
+            money_of("It costs 200 US dollars.", "zh-CN"),
+            vec![("USD", 200.0)]
+        );
+        assert_eq!(
+            money_of("It costs 15 Swiss francs.", "zh-CN"),
+            vec![("CHF", 15.0)]
+        );
     }
 
     #[test]
@@ -546,9 +617,18 @@ mod tests {
 
     #[test]
     fn a_rate_line_explains_the_switch() {
-        assert_eq!(single("The walk is 5 mi long.", "zh-CN").rate, "1 mi = 1.609344 km");
-        assert_eq!(single("The room is 12 ft wide.", "zh-CN").rate, "1 ft = 0.3048 m");
-        assert_eq!(single("It weighs 100 lb.", "zh-CN").rate, "1 lb = 0.4535924 kg");
+        assert_eq!(
+            single("The walk is 5 mi long.", "zh-CN").rate,
+            "1 mi = 1.609344 km"
+        );
+        assert_eq!(
+            single("The room is 12 ft wide.", "zh-CN").rate,
+            "1 ft = 0.3048 m"
+        );
+        assert_eq!(
+            single("It weighs 100 lb.", "zh-CN").rate,
+            "1 lb = 0.4535924 kg"
+        );
     }
 
     #[test]
@@ -587,7 +667,10 @@ mod tests {
         assert_eq!(conversion.original, "$200");
         assert_eq!(conversion.converted, "¥1,424.68");
         assert_eq!(conversion.rate, "1 USD = 7.1234 CNY");
-        assert_eq!(conversion.rate_source.as_deref(), Some("exchangerate-api.com"));
+        assert_eq!(
+            conversion.rate_source.as_deref(),
+            Some("exchangerate-api.com")
+        );
         assert_eq!(conversion.rate_date.as_deref(), Some("2026-01-31"));
         assert!(!conversion.stale);
     }
@@ -612,5 +695,59 @@ mod tests {
         let found = read("The room is 12 ft by 10 ft and the bed is 5 lb.", "zh-CN");
         let originals: Vec<&str> = found.iter().map(|entry| entry.original.as_str()).collect();
         assert_eq!(originals, vec!["12 ft", "10 ft", "5 lb"]);
+    }
+
+    fn annotate(original: &str, translation: &str, language: &str) -> Vec<Conversion> {
+        tauri::async_runtime::block_on(conversions_for(
+            &reqwest::Client::new(),
+            original,
+            translation,
+            language,
+            None,
+        ))
+    }
+
+    #[test]
+    fn the_translation_is_where_the_numbers_are_read() {
+        // The original is Spanish and the tables do not know `pies`; the
+        // translator wrote the measurement as 英尺, which is what is read.
+        let found = annotate(
+            "La habitación mide 12 pies de ancho.",
+            "房间宽12英尺。",
+            "zh-CN",
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].original, "12英尺");
+        assert_eq!(found[0].converted, "3.66 m");
+    }
+
+    #[test]
+    fn the_translation_wins_over_a_unit_it_decided_to_keep() {
+        // `°F` survives a Chinese translation unchanged, and it is still a unit.
+        let found = annotate("It is 212 °F outside.", "室外温度为212°F。", "zh-CN");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].original, "212°F");
+        assert_eq!(found[0].converted, "100 °C");
+    }
+
+    #[test]
+    fn a_translation_in_the_readers_own_units_needs_no_annotation() {
+        let found = annotate(
+            "房间宽12英尺，桌子长3米。",
+            "The room is 12 feet wide and the table is 3 metres long.",
+            "en",
+        );
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].original, "3 metres");
+        assert_eq!(found[0].converted, "9.84 ft");
+    }
+
+    #[test]
+    fn the_original_is_read_when_the_translation_holds_nothing() {
+        // The translator dropped the measurement, so the original is the only
+        // place left that still has it.
+        let found = annotate("The room is 12 ft wide.", "房间很宽。", "zh-CN");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].original, "12 ft");
     }
 }
