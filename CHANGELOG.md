@@ -8,6 +8,8 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-20
+
 ### Added
 
 - **Only translate these source languages**, a new list in the Trigger panel of
@@ -377,7 +379,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.3...v1.0.0
 [0.3.3]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.1...v0.3.2

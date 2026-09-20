@@ -12,13 +12,13 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.0.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Version | `1.0.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~15,700 lines: ~8,300 Rust, ~4,600 frontend (plain HTML/CSS/JS), ~1,000 frontend test lines and ~1,900 in `server/`, comments included |
 | Tests | 152 Rust tests, 130 frontend tests (`node --test`) and 49 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
 | Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live |
-| Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.0.0` tagged and published with its NSIS installer, and the staged installer kept in `release/vX.Y.Z/` |
+| Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.0.1` tagged and published with its NSIS installer, and the staged installer kept in `release/vX.Y.Z/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
@@ -232,13 +232,13 @@ in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.0.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 版本 | `1.0.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
 | 规模 | 约 15,700 行：Rust 约 8,300 行，前端约 4,600 行（纯 HTML/CSS/JS），前端测试约 1,000 行，`server/` 约 1,900 行，含注释 |
 | 测试 | Rust 152 个测试、前端 130 个测试（`node --test`）、`server/` 49 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows —— 没有 `cfg(target_os)` 分支，`windows` crate 无条件使用 |
 | 分发 | 只有 NSIS 安装包；没有代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署 |
-| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.0.0` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
+| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.0.1` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
 
 下面的计划里没有遗留缺陷。最后一个 —— API 密钥以明文躺在
 `%APPDATA%\com.glossy.translator\settings.json` 里 —— 由 v0.2.0 的第一项修复，

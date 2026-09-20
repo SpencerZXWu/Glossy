@@ -1,6 +1,6 @@
 {
   "name": "glossy-cloud",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Glossy 的翻译代理：百度翻译的密钥留在服务端，App 免密钥直接调用。",
   "type": "module",
