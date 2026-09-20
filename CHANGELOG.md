@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [Unreleased]
+
+### Changed
+
+- Release notes are written in three languages — English, Chinese and Spanish — in a
+  single `RELEASE_NOTES.md`, with a link line at the top that jumps to an anchor placed
+  directly above each language's block. `scripts/release.ps1` fills the English block
+  from this file and leaves the other two as placeholders it warns about until they are
+  translated, so a release cannot go out half-translated by accident. `CHANGELOG.md`
+  itself stays English, as Keep a Changelog expects.
+
 ## [0.3.1] - 2026-09-20
 
 ### Changed

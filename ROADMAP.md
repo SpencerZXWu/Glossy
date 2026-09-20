@@ -166,10 +166,17 @@ in it early.
 2. `cargo test`, the frontend tests and CI all pass.
 3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` builds the installer
    and stages it in `release/vX.Y.Z/` with `SHA256SUMS.txt` and the text for the
-   release description.
+   release description. The notes it writes are trilingual: English from
+   `CHANGELOG.md`, then the same text translated into Chinese and Spanish, each behind
+   an anchor (`<a id="en">`, `<a id="zh-cn">`, `<a id="es">`) that the links at the top
+   jump to, so one file serves all three languages. A freshly generated file still
+   holds the translations as placeholders and the script warns about them; the two
+   translations are written by hand (Google Translate is fine as the starting point)
+   before the release goes out.
 4. Tag `vX.Y.Z` on `main` and push the tag.
 5. Publish a GitHub release at that tag: paste `release/vX.Y.Z/RELEASE_NOTES.md` into
-   the description and attach the installer together with the checksum.
+   the description - all three languages, anchors included - and attach the installer
+   together with the checksum.
 6. From v0.2.0 on, the release also serves as the auto-update feed.
 
 ## What is explicitly out of scope

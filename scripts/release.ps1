@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Builds the Windows installer and stages everything needed for a GitHub release.
 
@@ -10,14 +10,21 @@
     number out of src-tauri/tauri.conf.json and refuses to continue when
     package.json, package-lock.json, Cargo.toml or Cargo.lock disagree.
 
-    RELEASE_NOTES.md is extracted from the matching section of CHANGELOG.md, unless the
-    file already exists - hand-written notes are never overwritten without -ForceNotes.
+    RELEASE_NOTES.md is written in three languages behind anchors - English, Chinese
+    and Spanish - so the release description can be read without leaving the page and
+    switched with the links at the top. The English section comes from the matching
+    section of CHANGELOG.md, which stays English; the other two are filled in by hand
+    and a placeholder left behind is called out before the release is published.
+
+    An existing RELEASE_NOTES.md is never overwritten without -ForceNotes.
 
 .PARAMETER SkipBuild
     Skip the build and re-stage whatever is already in src-tauri/target/release/bundle.
 
 .PARAMETER ForceNotes
-    Regenerate RELEASE_NOTES.md from CHANGELOG.md even if the file already exists.
+    Regenerate RELEASE_NOTES.md from CHANGELOG.md even if the file already exists. The
+    translations are reset to their placeholders, so translations already written by
+    hand are lost.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1
@@ -30,6 +37,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 decodes a BOM-less script as ANSI, which would silently turn
+# the Chinese and Spanish labels in New-NotesScaffold into mojibake inside the notes.
+$self = [IO.File]::ReadAllBytes($MyInvocation.MyCommand.Path)
+if ($self.Length -lt 3 -or $self[0] -ne 0xEF -or $self[1] -ne 0xBB -or $self[2] -ne 0xBF) {
+    throw 'scripts\release.ps1 has to stay saved as UTF-8 with a BOM; re-save it that way.'
+}
 
 $root = Split-Path -Parent $PSScriptRoot
 
@@ -52,6 +66,39 @@ function Get-ChangelogSection {
 
     if ($start -lt 0) { return $null }
     return (($lines[($start + 1)..($end - 1)]) -join [Environment]::NewLine).Trim()
+}
+
+function New-NotesScaffold {
+    <#
+        Builds the trilingual skeleton: a switcher line, then every language behind
+        its own anchor, in reading order. The English body comes from CHANGELOG.md;
+        the translations are left as placeholders that release.ps1 reports.
+    #>
+    param([string]$Section)
+
+    $todo = '<!-- TODO: translate the English section above, then delete this comment. -->'
+    $parts = @(
+        '[English](#en) · [中文](#zh-cn) · [Español](#es)',
+        '',
+        '<a id="en"></a>',
+        '',
+        '## English',
+        '',
+        $Section,
+        '',
+        '<a id="zh-cn"></a>',
+        '',
+        '## 中文',
+        '',
+        $todo,
+        '',
+        '<a id="es"></a>',
+        '',
+        '## Español',
+        '',
+        $todo
+    )
+    return ($parts -join [Environment]::NewLine)
 }
 
 function Stop-RunningApp {
@@ -115,9 +162,16 @@ if ((Test-Path -LiteralPath $notesPath) -and -not $ForceNotes) {
     if (-not $section) {
         Write-Warning "CHANGELOG.md has no '## [$version]' section - write RELEASE_NOTES.md by hand."
     } else {
-        [IO.File]::WriteAllText($notesPath, ($section + $eol), (New-Object Text.UTF8Encoding($false)))
-        Write-Host 'Wrote RELEASE_NOTES.md from CHANGELOG.md' -ForegroundColor Green
+        $notes = (New-NotesScaffold -Section $section) + $eol
+        [IO.File]::WriteAllText($notesPath, $notes, (New-Object Text.UTF8Encoding($false)))
+        Write-Host 'Wrote the trilingual RELEASE_NOTES.md skeleton' -ForegroundColor Green
+        Write-Host '  translate the English section for the other two languages before publishing.' -ForegroundColor Yellow
     }
+}
+
+if ((Test-Path -LiteralPath $notesPath) -and
+    (Select-String -LiteralPath $notesPath -SimpleMatch 'TODO: translate' -Quiet)) {
+    Write-Warning 'RELEASE_NOTES.md still has an untranslated section; fill it in before publishing.'
 }
 
 Write-Host ''
@@ -128,3 +182,4 @@ Get-ChildItem -LiteralPath $stage -File | ForEach-Object {
 Write-Host ''
 Write-Host 'Upload: create the tag, then the release, paste RELEASE_NOTES.md into the'
 Write-Host 'description and attach the installer together with SHA256SUMS.txt.'
+Write-Host 'The notes switch language through the links at the top; keep all three translated.'
