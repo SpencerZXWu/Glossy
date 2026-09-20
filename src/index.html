@@ -214,34 +214,66 @@
               <select id="targetLang"></select>
             </div>
             <div class="field">
+              <label for="channel" data-i18n="field.channel">Where results come from</label>
+              <select id="channel">
+                <option value="cloud" data-i18n="channel.cloud">Glossy Cloud · nothing to fill in</option>
+                <option value="api" data-i18n="channel.api">My own account · API key</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="cloudBlock">
+            <div class="field">
+              <label for="cloudEngine" data-i18n="field.cloudEngine">Cloud engine</label>
+              <select id="cloudEngine">
+                <option value="builtin" data-i18n="engine.builtin">Glossy server · shared, nothing to set up</option>
+                <option value="local" data-i18n="engine.local">Local model · runs on this machine</option>
+              </select>
+            </div>
+            <div id="cloudBuiltinBlock">
+              <div class="field">
+                <label for="cloudEndpoint" data-i18n="field.cloudEndpoint">Server address</label>
+                <input type="text" id="cloudEndpoint" spellcheck="false" autocomplete="off" data-i18n-placeholder="cloud.endpointPlaceholder" placeholder="https://glossy-cloud.example.workers.dev" />
+              </div>
+              <div class="demo-actions">
+                <p class="hint" id="cloudQuota"></p>
+                <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+              </div>
+            </div>
+            <div id="cloudLocalBlock" hidden>
+              <div class="field">
+                <label for="localEndpoint" data-i18n="field.localEndpoint">Local service address</label>
+                <input type="text" id="localEndpoint" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:11434/v1" />
+              </div>
+              <div class="field">
+                <label for="localModel" data-i18n="field.localModel">Model name</label>
+                <input type="text" id="localModel" spellcheck="false" autocomplete="off" placeholder="qwen2.5:7b" />
+              </div>
+            </div>
+            <p class="hint" id="cloudHint"></p>
+          </div>
+
+          <div id="apiBlock" hidden>
+            <div class="field">
               <label for="provider" data-i18n="field.provider">Translation provider</label>
               <select id="provider">
                 <option value="google" data-i18n="provider.google">Google · free, no key</option>
                 <option value="baidu" data-i18n="provider.baidu">Baidu 翻译 · free monthly quota, APP ID + key</option>
-                <option value="cloud" data-i18n="provider.cloud">Glossy Cloud · nothing to fill in</option>
                 <option value="zhipu" data-i18n="provider.zhipu">Zhipu GLM · free tier, API key</option>
                 <option value="deepl" data-i18n="provider.deepl">DeepL · API key</option>
                 <option value="openai" data-i18n="provider.openai">OpenAI · API key</option>
               </select>
             </div>
-          </div>
-          <div class="field" id="apiIdField" hidden>
-            <label for="apiId" data-i18n="field.appId">APP ID</label>
-            <input type="text" id="apiId" spellcheck="false" autocomplete="off" placeholder="Baidu 翻译开放平台 APP ID" />
-          </div>
-          <div class="field" id="apiKeyField" hidden>
-            <label for="apiKey" data-i18n="field.apiKey">API key</label>
-            <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
-          </div>
-          <div class="field" id="cloudEndpointField" hidden>
-            <label for="cloudEndpoint" data-i18n="field.cloudEndpoint">Server address</label>
-            <input type="text" id="cloudEndpoint" spellcheck="false" autocomplete="off" data-i18n-placeholder="cloud.endpointPlaceholder" placeholder="https://glossy-cloud.example.workers.dev" />
-            <div class="demo-actions">
-              <p class="hint" id="cloudQuota"></p>
-              <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+            <div class="field" id="apiIdField" hidden>
+              <label for="apiId" data-i18n="field.appId">APP ID</label>
+              <input type="text" id="apiId" spellcheck="false" autocomplete="off" placeholder="Baidu 翻译开放平台 APP ID" />
             </div>
+            <div class="field" id="apiKeyField" hidden>
+              <label for="apiKey" data-i18n="field.apiKey">API key</label>
+              <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
+            </div>
+            <p class="hint" id="providerHint"></p>
           </div>
-          <p class="hint" id="providerHint"></p>
         </section>
 
         <section class="panel">

@@ -18,6 +18,11 @@
     triggerOnDrag: true,
     triggerOnDoubleClick: true,
     targetLang: "zh-CN",
+    channel: "cloud",
+    cloudProvider: "builtin",
+    cloudEndpoint: "",
+    localEndpoint: "http://127.0.0.1:11434/v1",
+    localModel: "qwen2.5:7b",
     provider: "google",
     credentials: {},
     restoreClipboard: true,
@@ -147,6 +152,9 @@
         };
       case "capture_status":
         return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
+      case "cloud_status":
+        // The preview has no server behind it, so it reports a plausible day.
+        return { used: 1234, limit: 30000, remaining: 28766 };
       case "running_apps":
         return [
           { name: "explorer.exe", title: "File Explorer" },

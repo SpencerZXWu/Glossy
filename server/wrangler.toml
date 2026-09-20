@@ -9,7 +9,7 @@ compatibility_date = "2025-09-01"
 DAILY_CHARS_PER_CLIENT = "20000"
 # 同一个 IP 每天的上限，挡住「换个安装 ID 继续刷」。
 DAILY_CHARS_PER_IP = "30000"
-# 全局每天的上限，真正的保险丝：别把百度账号的月度额度刷爆。
+# 全局每天的上限，真正的保险丝：别把上游的额度（或钱包）刷爆。
 DAILY_CHARS_TOTAL = "300000"
 # 单次请求的字符上限（百度接口本身也在这个量级）。
 MAX_CHARS_PER_REQUEST = "2000"

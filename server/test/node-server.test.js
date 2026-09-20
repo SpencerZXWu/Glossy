@@ -29,6 +29,7 @@ async function startGlossy(t) {
     store: createFileStore({ file: join(dir, "quota.json") }),
     upstream: {
       isLanguageTag,
+      configured: true,
       translate: async (input) => {
         calls.push(input);
         return { ok: true, from: "en", to: "zh", translation: "你好" };

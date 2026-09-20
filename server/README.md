@@ -1,6 +1,15 @@
 # Glossy 云端翻译服务
 
-给你自己用的翻译代理：百度翻译的 **APP ID / 密钥只放在服务端**，Glossy 客户端不再需要让用户填密钥，直接调这个服务就能翻译。
+给你自己用的翻译代理：上游的密钥（大模型或百度）**只放在服务端**，Glossy 客户端不再需要让用户填密钥，直接调这个服务就能翻译。这就是客户端里的「云端渠道」。
+
+上游可以配两个，配了就都留着：
+
+| 上游 | 需要什么 | 说明 |
+| --- | --- | --- |
+| 大模型（OpenAI 兼容接口） | `LLM_API_KEY` | 翻译质量好，按量计费；先试它 |
+| 百度翻译 | `BAIDU_APP_ID` + `BAIDU_KEY` | 认证版每月 100 万字符免费额度 |
+
+大模型失败了（连不上、限流、额度用尽）会自动交回百度，用户那边不会看到报错。只配一个也能跑，一个都不配时 `/v1/translate` 返回 `not_configured`。
 
 一套代码（`src/`）可以部署到两个地方：
 
@@ -19,7 +28,7 @@
 需要：
 
 - **腾讯云账号并完成实名认证**（部署 SCF 用；个人认证即可，不花钱）
-- 百度翻译开放平台的 APP ID 和密钥（你已经有了）
+- 至少一个上游的密钥：大模型的 API Key，或百度翻译开放平台的 APP ID 和密钥
 - Node.js 18 以上（本机已有）
 
 ## 二、部署到腾讯云 SCF（推荐，国内直连）
@@ -56,8 +65,8 @@ dist/scf/package.json     {"type":"module"}
 | 内存 / 超时 | 内存 128MB 即可，**超时时间改成 10 秒** |
 
 > [!IMPORTANT]
-> **超时时间一定要改。** SCF 默认只给 3 秒，而百度翻译一次往返经常要 0.5~2 秒，
-> 慢的时候直接用超时把请求掐掉。改成 10 秒最稳。
+> **超时时间一定要改。** SCF 默认只给 3 秒，而百度翻译一次往返经常要 0.5~2 秒（大模型更慢），
+> 慢的时候直接用超时把请求掐掉。改成 10 秒最稳，用大模型的话建议 20 秒。
 
 > [!TIP]
 > **优先用「在线编辑器」直接粘贴 `index.mjs`**，不用上传 zip。因为在 Windows 上用
@@ -85,12 +94,15 @@ exec /var/lang/node18/bin/node index.mjs
 
 ### 4. 配环境变量
 
-**函数配置 → 环境变量**，加三个（这就是密钥不放进代码里、客户端也不用填的原因）：
+**函数配置 → 环境变量**，至少配一组上游密钥（这就是密钥不放进代码里、客户端也不用填的原因）：
 
 | 变量名 | 值 |
 | --- | --- |
 | `BAIDU_APP_ID` | 你的百度 APP ID |
 | `BAIDU_KEY` | 你的百度密钥 |
+| `LLM_API_KEY` | 大模型的 API Key（可选，配了就优先用它） |
+| `LLM_ENDPOINT` | 大模型接口地址（可选，默认智谱 `https://open.bigmodel.cn/api/paas/v4/chat/completions`） |
+| `LLM_MODEL` | 模型名（可选，默认 `glm-4-flash`） |
 | `IP_SALT` | 随便一串长一点的随机字符，用来给 IP 做哈希 |
 
 额度参数也可以在同一个地方配（不配就是用下面的默认值）：`DAILY_CHARS_PER_CLIENT`、
@@ -133,9 +145,10 @@ npm install
 
 npx wrangler login          # 浏览器里点一下授权
 
-# 三个密钥：依次执行，粘贴后回车即可（输入的内容不会显示）
+# 密钥：依次执行，粘贴后回车即可（输入的内容不会显示）
 npx wrangler secret put BAIDU_APP_ID     # 百度 APP ID
 npx wrangler secret put BAIDU_KEY        # 百度密钥
+# npx wrangler secret put LLM_API_KEY    # 可选：大模型的 Key，配了会优先用它
 npx wrangler secret put IP_SALT          # 随便一串随机字符，用来给 IP 做哈希
 
 npx wrangler deploy
@@ -185,7 +198,7 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 | `MAX_CHARS_PER_REQUEST` | 2000 | 单次请求字符上限 |
 | `MAX_REQUESTS_PER_MINUTE` | 30 | 同一 IP 每分钟请求数上限 |
 
-全局上限怎么定：**百度账号的月度字符额度 ÷ 30**，这样就算每天把额度用满，也刚好撑一个月而不会提前烧完（认证版 100 万字符/月 → `30000`）。额度更小就按比例往下压。
+全局上限怎么定：**上游的月度字符额度 ÷ 30**，这样就算每天把额度用满，也刚好撑一个月而不会提前烧完（百度认证版 100 万字符/月 → `30000`）。额度更小就按比例往下压。换成按量计费的大模型时，这个上限直接等于**每天最多花多少钱**，定之前先算一下单价。
 
 计数按 UTC 零点归零（北京时间早上 8 点）。
 
@@ -203,7 +216,7 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 { "ok": true, "service": "glossy-cloud", "day": "2025-09-01", "configured": true }
 ```
 
-`configured: false` 说明两个百度密钥没配好。
+`configured: false` 说明一个上游密钥都没配好。
 
 ### `GET /v1/quota?client=<安装ID>`
 
@@ -239,10 +252,10 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 | `client_quota_exceeded` | 429 | 这台设备今天用完了 |
 | `ip_quota_exceeded` | 429 | 这个网络今天用完了 |
 | `global_quota_exceeded` | 429 | 全局额度用完了 |
-| `not_configured` | 503 | 服务端没配百度密钥 |
-| `upstream_error` / `upstream_timeout` / `upstream_unreachable` | 502 | 百度那边出问题 |
-| `upstream_limit` | 502 | 百度额度用尽或被限流 |
-| `upstream_credentials` | 502 | 百度认证失败（APP ID / 密钥不对） |
+| `not_configured` | 503 | 服务端一个上游密钥都没配 |
+| `upstream_error` / `upstream_timeout` / `upstream_unreachable` | 502 | 上游那边出问题 |
+| `upstream_limit` | 502 | 上游额度用尽或被限流 |
+| `upstream_credentials` | 502 | 上游认证失败（密钥不对） |
 
 翻译失败时**占用的字符会退还**，不计入额度。
 
@@ -279,11 +292,11 @@ npm run build:scf       # 输出到 dist/scf/
 
 ```bash
 cp .dev.vars.example .dev.vars   # Windows: Copy-Item .dev.vars.example .dev.vars
-# 填好三个值
+# 填好上游密钥（百度必填一组，或填 LLM_API_KEY）
 npx wrangler dev                 # 默认 http://127.0.0.1:8787
 ```
 
-`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就一直用百度官方地址。
+`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`LLM_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
 
 ```bash
 curl http://127.0.0.1:9000/v1/health
@@ -298,8 +311,8 @@ Cloudflare：`npx wrangler tail`；腾讯云 SCF：控制台「日志查询」�
 
 常见情况：
 
-- `upstream_credentials`：百度 APP ID 或密钥错了，或百度的「个人认证」没通过（个人认证才有免费额度）。
-- `upstream_limit`：百度账号额度用尽或被限流。
+- `upstream_credentials`：上游认证失败。百度是 APP ID 或密钥错了，或百度的「个人认证」没通过（个人认证才有免费额度）；大模型是 Key 失效或没权限。
+- `upstream_limit`：上游额度用尽或被限流。两个上游都配了的话，出现这个说明两家都用尽了。
 - SCF 上报 `PortBindingFailed` / 函数启动失败：启动命令没填对。检查是不是监听 `0.0.0.0:9000`、
   `scf_bootstrap` 内容是否 LF 换行、`index.mjs` 与启动命令是否在同一个目录。
 - SCF 上调用超时：把函数**超时时间调到 10 秒**。
@@ -325,7 +338,8 @@ server/
 │   ├── store-file.js     Node 侧的计数存储（JSON 文件）
 │   ├── index.js          Cloudflare Worker 入口
 │   ├── quota-object.js   按天计数的 Durable Object（SQLite）
-│   ├── upstream.js       百度签名与调用、语言代码映射
+│   ├── upstream.js       上游组装（大模型优先、百度兜底）、百度签名、语言代码映射
+│   ├── llm.js            OpenAI 兼容的大模型调用与 JSON 解析
 │   └── md5.js            Workers 里没有 MD5，自己带一个
 └── test/                 node --test 单测
 ```

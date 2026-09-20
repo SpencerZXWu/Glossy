@@ -6,6 +6,7 @@ mod cloud;
 mod deepl;
 mod dictionary;
 mod google;
+mod local;
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -13,7 +14,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::classify::{self, Kind};
-use crate::settings::{Provider, Settings};
+use crate::settings::{Channel, CloudProvider, Provider, Settings};
 
 pub use self::cloud::{new_install_id, quota as cloud_quota, Quota as CloudQuota};
 
@@ -231,7 +232,7 @@ pub async fn word_details(
     // they must not take longer than the slower of the two. The free endpoint
     // gets a short budget because on some networks it is simply unreachable,
     // and whatever has not arrived by then is left out.
-    let lookup = if settings.provider == Provider::Google {
+    let lookup = if settings.uses_google_api() {
         None
     } else {
         let client = client.clone();
@@ -268,7 +269,52 @@ pub async fn word_details(
     })
 }
 
+/// Sends the text to whichever backend the settings name.
+///
+/// The cloud channel is Glossy's own: either the built in service the app
+/// ships with, or a model on this machine - neither asks the user for a key.
+/// The api channel is the user's own account with a provider.
 async fn call_provider(
+    client: &reqwest::Client,
+    settings: &Settings,
+    text: &str,
+    source: &str,
+    target: &str,
+    kind: Kind,
+) -> Result<TranslationResult, String> {
+    if settings.channel == Channel::Cloud {
+        return match settings.cloud_provider {
+            CloudProvider::Builtin => {
+                cloud::translate(
+                    client,
+                    text,
+                    source,
+                    target,
+                    kind,
+                    &settings.cloud_endpoint,
+                    &settings.cloud_id,
+                )
+                .await
+            }
+            CloudProvider::Local => {
+                local::translate(
+                    client,
+                    &settings.local_endpoint,
+                    &settings.local_model,
+                    text,
+                    source,
+                    target,
+                    kind,
+                )
+                .await
+            }
+        };
+    }
+
+    call_api_provider(client, settings, text, source, target, kind).await
+}
+
+async fn call_api_provider(
     client: &reqwest::Client,
     settings: &Settings,
     text: &str,
@@ -282,7 +328,7 @@ async fn call_provider(
         Provider::Zhipu => {
             chat::translate(
                 client,
-                &chat::ZHIPU,
+                &chat::zhipu(),
                 text,
                 source,
                 target,
@@ -306,6 +352,9 @@ async fn call_provider(
         Provider::DeepL => {
             deepl::translate(client, text, source, target, kind, &credentials.api_key).await
         }
+        // Kept so a settings file written before the channels existed, one
+        // naming `cloud` as its provider, still translates. The cloud channel
+        // handles that case long before here.
         Provider::Cloud => {
             cloud::translate(
                 client,
@@ -321,7 +370,7 @@ async fn call_provider(
         Provider::OpenAI => {
             chat::translate(
                 client,
-                &chat::OPENAI,
+                &chat::openai(),
                 text,
                 source,
                 target,

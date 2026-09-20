@@ -16,29 +16,57 @@ pub struct Chat {
     /// Service name used in error messages.
     pub label: &'static str,
     /// Full chat completions URL.
-    pub endpoint: &'static str,
-    pub model: &'static str,
+    pub endpoint: String,
+    pub model: String,
     /// Whether the service accepts `response_format`. Where it does not, the
     /// prompt alone has to keep the answer JSON shaped.
     pub json_mode: bool,
+    /// Whether the service authenticates with a key. A model running on this
+    /// machine usually does not.
+    pub needs_key: bool,
 }
 
-pub const OPENAI: Chat = Chat {
-    id: "openai",
-    label: "OpenAI",
-    endpoint: "https://api.openai.com/v1/chat/completions",
-    model: "gpt-4o-mini",
-    json_mode: true,
-};
+pub fn openai() -> Chat {
+    Chat {
+        id: "openai",
+        label: "OpenAI",
+        endpoint: "https://api.openai.com/v1/chat/completions".to_string(),
+        model: "gpt-4o-mini".to_string(),
+        json_mode: true,
+        needs_key: true,
+    }
+}
 
 /// Zhipu's free text tier, which is reachable from mainland China.
-pub const ZHIPU: Chat = Chat {
-    id: "zhipu",
-    label: "Zhipu",
-    endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-    model: "glm-4.7-flash",
-    json_mode: false,
-};
+pub fn zhipu() -> Chat {
+    Chat {
+        id: "zhipu",
+        label: "Zhipu",
+        endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions".to_string(),
+        model: "glm-4.7-flash".to_string(),
+        json_mode: false,
+        needs_key: true,
+    }
+}
+
+/// A service on this machine, which answers the same shape as the two above.
+///
+/// Ollama, LM Studio, llama.cpp and vLLM all serve `/v1/chat/completions`, so
+/// one implementation covers every local model. It is the only backend that
+/// costs nothing and answers to no terms of service at all, at the price of
+/// running on the user's own hardware.
+pub fn local(endpoint: String, model: String) -> Chat {
+    Chat {
+        id: "local",
+        label: "the local model",
+        endpoint,
+        model,
+        // Small local models follow the JSON shape far less reliably, so the
+        // prompt is left to carry it and a plain answer still parses.
+        json_mode: false,
+        needs_key: false,
+    }
+}
 
 fn prompt(text: &str, source: &str, target: &str, kind: Kind) -> String {
     let known_source = if source == "auto" {
@@ -72,7 +100,7 @@ pub async fn translate(
     api_key: &str,
 ) -> Result<TranslationResult, String> {
     let key = api_key.trim();
-    if key.is_empty() {
+    if chat.needs_key && key.is_empty() {
         return Err(format!(
             "{} needs an API key. Add one in Settings, or switch back to the free Google provider.",
             chat.label
@@ -94,11 +122,15 @@ pub async fn translate(
         payload["response_format"] = serde_json::json!({ "type": "json_object" });
     }
 
-    let response = client
-        .post(chat.endpoint)
+    let mut request = client
+        .post(&chat.endpoint)
         .timeout(REQUEST_TIMEOUT)
-        .bearer_auth(key)
-        .json(&payload)
+        .json(&payload);
+    if !key.is_empty() {
+        request = request.bearer_auth(key);
+    }
+
+    let response = request
         .send()
         .await
         .map_err(|error| format!("Could not reach {}: {error}", chat.label))?;

@@ -34,12 +34,20 @@
     closeAfterCopy: $("closeAfterCopy"),
     unitsEnabled: $("unitsEnabled"),
     targetLang: $("targetLang"),
+    channel: $("channel"),
+    cloudBlock: $("cloudBlock"),
+    cloudEngine: $("cloudEngine"),
+    cloudBuiltinBlock: $("cloudBuiltinBlock"),
+    cloudLocalBlock: $("cloudLocalBlock"),
+    localEndpoint: $("localEndpoint"),
+    localModel: $("localModel"),
+    cloudHint: $("cloudHint"),
     provider: $("provider"),
+    apiBlock: $("apiBlock"),
     apiIdField: $("apiIdField"),
     apiId: $("apiId"),
     apiKeyField: $("apiKeyField"),
     apiKey: $("apiKey"),
-    cloudEndpointField: $("cloudEndpointField"),
     cloudEndpoint: $("cloudEndpoint"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
@@ -88,17 +96,16 @@
   const PROVIDER_HINTS = {
     google: "provider.hint.google",
     baidu: "provider.hint.baidu",
-    cloud: "provider.hint.cloud",
     zhipu: "provider.hint.zhipu",
     deepl: "provider.hint.deepl",
     openai: "provider.hint.openai",
   };
 
-  /**
-   * Providers that speak to a server of ours instead of the vendor directly,
-   * and therefore need its address rather than a key.
-   */
-  const PROVIDERS_WITH_ENDPOINT = ["cloud"];
+  /** Hints for the two cloud engines, shown under the channel block. */
+  const CLOUD_HINTS = {
+    builtin: "cloud.hint.builtin",
+    local: "cloud.hint.local",
+  };
 
   /** Providers that need a secret, and the one that also needs an APP ID. */
   const PROVIDERS_WITH_KEY = ["baidu", "zhipu", "deepl", "openai"];
@@ -233,14 +240,35 @@
     });
   }
 
+  /**
+   * Shows the fields that belong to the chosen channel, and the hint that
+   * explains the chosen engine.
+   *
+   * The cloud channel carries no key of the user's, so it only chooses between
+   * the shared server and a model running on this machine; the API channel is
+   * where the vendor and the user's own credentials live.
+   */
+  function syncChannel() {
+    const cloud = els.channel.value === "cloud";
+    const builtin = els.cloudEngine.value === "builtin";
+    els.cloudBlock.hidden = !cloud;
+    els.apiBlock.hidden = cloud;
+    els.cloudBuiltinBlock.hidden = !builtin;
+    els.cloudLocalBlock.hidden = builtin;
+    els.cloudHint.innerHTML = Glossy.i18n.t(CLOUD_HINTS[els.cloudEngine.value] || "");
+    syncProvider();
+  }
+
   function syncProvider() {
     const provider = els.provider.value;
-    const needsEndpoint = PROVIDERS_WITH_ENDPOINT.indexOf(provider) !== -1;
     els.apiIdField.hidden = provider !== "baidu";
     els.apiKeyField.hidden = PROVIDERS_WITH_KEY.indexOf(provider) === -1;
-    els.cloudEndpointField.hidden = !needsEndpoint;
     els.providerHint.innerHTML = Glossy.i18n.t(PROVIDER_HINTS[provider] || "");
-    if (needsEndpoint) refreshCloudQuota();
+  }
+
+  /** Fetches the allowance again whenever the shared server comes into view. */
+  function syncChannelQuota() {
+    if (cloudQuotaVisible()) refreshCloudQuota();
     else els.cloudQuota.textContent = "";
   }
 
@@ -257,7 +285,7 @@
     els.cloudQuota.textContent = Glossy.i18n.t("cloud.quota.checking");
     try {
       const quota = await Glossy.invoke("cloud_status", { endpoint });
-      if (els.provider.value !== "cloud") return;
+      if (!cloudQuotaVisible()) return;
       const used = quota.used || 0;
       const limit = quota.limit || 0;
       const remaining = quota.remaining === undefined ? Math.max(0, limit - used) : quota.remaining;
@@ -273,10 +301,15 @@
         els.cloudQuota.textContent = Glossy.i18n.t("cloud.quota.used", limit.toLocaleString());
       }
     } catch (error) {
-      if (els.provider.value !== "cloud") return;
+      if (!cloudQuotaVisible()) return;
       els.cloudQuota.setAttribute("data-tone", "bad");
       els.cloudQuota.textContent = Glossy.errorMessage(error);
     }
+  }
+
+  /** Whether the shared server — and therefore its allowance — is on screen. */
+  function cloudQuotaVisible() {
+    return els.channel.value === "cloud" && els.cloudEngine.value === "builtin";
   }
 
   /** Drops blanks and duplicates, ignoring a trailing `.exe`. */
@@ -665,7 +698,7 @@
     renderIgnored();
     renderSourceLangs();
     relabelRunningApps();
-    syncProvider();
+    syncChannel();
     showHotkey(lastStatus);
     fillSample();
     syncDemoLanguage();
@@ -704,6 +737,10 @@
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
     els.cloudEndpoint.value = next.cloudEndpoint || "";
+    els.channel.value = next.channel === "api" ? "api" : "cloud";
+    els.cloudEngine.value = next.cloudProvider === "local" ? "local" : "builtin";
+    els.localEndpoint.value = next.localEndpoint || "";
+    els.localModel.value = next.localModel || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
     els.demoUnits.checked = els.unitsEnabled.checked;
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
@@ -711,12 +748,13 @@
     applyTheme(els.theme.value);
     fillLanguages(next.targetLang);
     els.targetLang.value = next.targetLang;
-    els.provider.value = next.provider || "google";
+    els.provider.value = PROVIDER_HINTS[next.provider] ? next.provider : "google";
     els.uiLang.value = next.uiLang === "zh" || next.uiLang === "en" ? next.uiLang : "system";
     Glossy.i18n.set(els.uiLang.value);
     showCredentials(els.provider.value);
     els.options.dataset.disabled = String(!next.enabled);
     applyLanguage();
+    syncChannelQuota();
   }
 
   function collect() {
@@ -740,11 +778,17 @@
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
       cloudEndpoint: els.cloudEndpoint.value.trim(),
+      channel: els.channel.value === "api" ? "api" : "cloud",
+      cloudProvider: els.cloudEngine.value === "local" ? "local" : "builtin",
+      localEndpoint: els.localEndpoint.value.trim(),
+      localModel: els.localModel.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,
       historyLimit: numberOr(els.historyLimit.value, 50),
       checkUpdates: els.checkUpdates.checked,
       targetLang: els.targetLang.value,
-      provider: els.provider.value,
+      provider: PROVIDER_HINTS[els.provider.value]
+        ? els.provider.value
+        : settings.provider || "google",
       uiLang: els.uiLang.value,
     };
   }
@@ -847,10 +891,10 @@
       if (mine !== demoTicket) return;
       Glossy.render.error(els.demoResult, Glossy.errorMessage(error), () => runDemo(text));
     }
-    // A translation through the cloud provider eats into the allowance shown
-    // under the dropdown, and a refusal is exactly when it is worth looking at,
+    // A translation through the shared server eats into the allowance shown
+    // under the address, and a refusal is exactly when it is worth looking at,
     // so what is left is read again either way.
-    if (els.provider.value === "cloud" && mine === demoTicket) refreshCloudQuota();
+    if (cloudQuotaVisible() && mine === demoTicket) refreshCloudQuota();
   }
 
   /** Grows the demo card into the full word entry once the lookups have
@@ -1061,6 +1105,19 @@
     applyLanguage();
     scheduleSave();
   });
+  els.channel.addEventListener("change", () => {
+    // Switching channel can change which account is used, so the credentials of
+    // the provider that is about to be hidden are put away first.
+    rememberCredentials();
+    syncChannel();
+    syncChannelQuota();
+    scheduleSave();
+  });
+  els.cloudEngine.addEventListener("change", () => {
+    syncChannel();
+    syncChannelQuota();
+    scheduleSave();
+  });
   els.provider.addEventListener("change", () => {
     // Keep what the previous provider had before showing the credentials of the
     // newly selected one.
@@ -1148,6 +1205,8 @@
     els.autoCloseSecs,
     els.closeAfterCopy,
     els.cloudEndpoint,
+    els.localEndpoint,
+    els.localModel,
     els.unitsEnabled,
     els.historyLimit,
     els.checkUpdates,

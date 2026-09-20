@@ -1,6 +1,9 @@
 /**
  * The HTTP surface. Kept free of Worker globals so `node --test` can drive it
  * with an in-memory store and a stubbed upstream.
+ *
+ * Nothing here knows which services the deployment holds keys for: the upstream
+ * built by `createUpstream` reports that through its `configured` flag.
  */
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -37,6 +40,7 @@ function limitsFrom(env) {
     charsPerClient: number("DAILY_CHARS_PER_CLIENT", 20000),
     charsPerIp: number("DAILY_CHARS_PER_IP", 30000),
     // 百度翻译认证版每月 100 万字符，按天摊约 3.3 万；留些余量，别把月额度提前烧完。
+    // 换成大模型上游时这个上限更要紧，按量计费的额度不像免费额度那样能重来。
     charsTotal: number("DAILY_CHARS_TOTAL", 30000),
     maxCharsPerRequest: number("MAX_CHARS_PER_REQUEST", 2000),
     requestsPerMinute: number("MAX_REQUESTS_PER_MINUTE", 30),
@@ -73,7 +77,7 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
         ok: true,
         service: "glossy-cloud",
         day,
-        configured: Boolean(config.BAIDU_APP_ID && config.BAIDU_KEY),
+        configured: Boolean(upstream.configured),
       });
     }
 

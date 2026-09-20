@@ -94,9 +94,12 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | History | How many finished translations to remember (`Off` to `The last 500`, default 50). The list below the selector keeps the original, the translation, the provider and the time; `Search` filters both texts, clicking an entry shows it in the floating card again (no second provider call), and each entry has a copy and a remove button. `Forget everything` empties the list. The file lives in `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` writes `Documents\glossy-settings.json`; `Import…` reads a file you pick back into the app. Tick `Include my API keys in the exported file` to carry the keys as well — Glossy asks once more before it writes them in plain text. An import validates through `sanitized()` and protects the keys it brings with DPAPI on the way to disk. |
 | Updates | `Check for a new version when Glossy starts` asks GitHub Releases on every start (off by default). `Check now` looks immediately and says which version is waiting, and `Download and restart` installs it. A build without an update signing key — which is every build until the release key pair exists — hides the buttons and says so. |
-| Translation provider | `google` (free, no key), `baidu` (free monthly quota, APP ID + key), `cloud` (Glossy's own server, nothing to fill in), `zhipu` (free tier, API key), `deepl` or `openai` (API key). |
-| Server address (cloud) | Shown only for `cloud`: the address of the translation server, `https://…`. A build carries the address of the deployment the project runs, so the field can stay empty; fill it in to point the app at a deployment of your own (see [`server/`](./server/README.md)). Under it, the window shows what is left of today's allowance — or the reason the server could not be reached — with a `Check again` button next to it. |
-| APP ID / API key | Shown only for the providers that need them: `baidu` asks for both fields, `zhipu`, `deepl` and `openai` for the key alone, and the free `google` provider hides both. The values are remembered per provider, so switching to a provider you configured earlier fills its fields back in. |
+| Where results come from | `cloud` or `api`. The cloud channel fills nothing in and picks an engine; the API channel is where your own account lives. A new install starts on `cloud`. |
+| Cloud engine (cloud) | Shown only for the `cloud` channel: `builtin` — the project's own server — or `local`, a model running on this machine. |
+| Server address (cloud, `builtin`) | Shown only for the built-in engine: the address of the translation server, `https://…`. A build carries the address of the deployment the project runs, so the field can stay empty; fill it in to point the app at a deployment of your own (see [`server/`](./server/README.md)). Under it, the window shows what is left of today's allowance — or the reason the server could not be reached — with a `Check again` button next to it. |
+| Local service address, model name (cloud, `local`) | Shown only for the local engine: any OpenAI-compatible endpoint (default `http://127.0.0.1:11434/v1`, the address Ollama serves) and the model name it was pulled under (default `qwen2.5:7b`). The text goes no further than this machine, so nothing leaves the computer and nothing is metered. |
+| Translation provider (api) | Shown only for the API channel: `google` (free, no key), `baidu` (free monthly quota, APP ID + key), `zhipu` (free tier, API key), `deepl` or `openai` (API key). |
+| APP ID / API key (api) | Shown only for the providers that need them: `baidu` asks for both fields, `zhipu`, `deepl` and `openai` for the key alone, and the free `google` provider hides both. The values are remembered per provider, so switching to a provider you configured earlier fills its fields back in. |
 
 The hotkey accepts `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` plus one key:
 a letter, a digit, `F1`–`F24`, `Space`, `Enter`, `Tab`, `Esc`, `Backspace`,
@@ -110,11 +113,15 @@ current selection, so "select text, press the hotkey" works as well.
 
 ### Providers
 
+`cloud` and `local` are the two engines of the cloud channel and need nothing
+filled in; the rest are the API channel and run on an account you own.
+
 | Provider | Cost | Notes |
 | --- | --- | --- |
 | `google` | free, no key | Public `translate.googleapis.com` endpoint. Blocked on some networks, including much of mainland China. Always queried with the `dict-chrome-ex` client id; the throttled `gtx` id is only used as a fallback. |
 | `baidu` | free monthly quota, APP ID + key | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Reachable from mainland China with a monthly free quota of 50,000 characters, raising to 1,000,000 after the free personal 个人认证. Needs both the **APP ID** and the **密钥** from <https://fanyi-api.baidu.com>. Passes `from=auto`, so the source language is detected. |
 | `cloud` | nothing to fill in | **Glossy Cloud**: a server deployed from [`server/`](./server/README.md) does the translating with the project's own account, and the app only sends the text plus an install id. Nothing to configure, no key on the machine, and it works from mainland China. The daily allowance is counted per device, per address and in total, and the settings window shows what is left of it; running your own deployment is a one-command change of the server address. |
+| `local` | nothing to fill in | **Local model**: any service that speaks the OpenAI chat API — Ollama serves one at `http://127.0.0.1:11434/v1` — translates on this machine, so no text and no key ever leaves it, and no allowance is counted. Download a model first (`ollama pull qwen2.5:7b`), then give Glossy the address and the model name. A 7B model is decent for a sentence and weaker than the cloud channel on idioms; a larger one closes most of the gap. |
 | `zhipu` | free tier, API key | Zhipu `glm-4.7-flash` chat model. Reachable from mainland China and returns translation, phonetics, definitions and an example in a single call. Key from <https://open.bigmodel.cn>. ⚠️ Zhipu's user agreement licenses the non-paid models for **non-commercial personal study only** — see below before shipping Glossy. |
 | `deepl` | API key | Keys ending in `:fx` use the free endpoint. |
 | `openai` | API key | `gpt-4o-mini`. |
@@ -125,8 +132,14 @@ details the selected provider did not return.
 
 ### Free quotas and commercial use
 
-The free tiers differ in what they permit:
+The free tiers differ in what they permit. None of them allows its quota to be
+resold or served to other people, which is why the cloud channel does not proxy
+one:
 
+- **The cloud channel** — it translates through an LLM account the project pays
+  for, and falls back to Baidu credentials when no such account is configured, so
+  what it makes are paid calls and the terms above do not apply to it. The local
+  engine underneath needs no service at all.
 - **Zhipu** — 用户协议 §非付费功能 licenses the free models for *非商业的、个人研究学习* use
   only. Fine for personal use; not fine for a published or paid product.
 - **ModelScope API-Inference** — explicitly 非商业化, 非盈利.
@@ -161,6 +174,10 @@ the first time this build starts; a value that belongs to another login or compu
 cannot be unlocked and is dropped, so the key has to be entered again.
 The ignored-program list is stored as an `ignoredApps` array; a legacy
 comma-separated string is accepted and split on load.
+Which channel to use is stored as `channel` (`cloud` or `api`) with
+`cloudProvider` (`builtin` or `local`), `localEndpoint` and `localModel` behind
+the local engine; a file written before the split has no `channel` and is read as
+the API channel it already was, and a file that has none is written with `cloud`.
 
 ### Translate inside the app
 
@@ -333,7 +350,7 @@ none of them is covered by the automated tests.
 | 8 | Pin the popup, click elsewhere on the desktop, wait past the auto-close timeout | The card stays open until the pin is released or the × is used |
 | 9 | Click outside an unpinned card | It closes as soon as the click lands outside |
 | 10 | Switch Windows between light and dark, then force each scheme in the settings | Both windows follow the choice, with readable text and borders in both |
-| 11 | Translate with each of the six providers, including one with a bad key | A result for the good ones, including `cloud`; a readable error with a retry button for the bad one |
+| 11 | Translate through both cloud engines and through each of the five API providers, one of them behind a bad key | A result for the good ones; a readable error with a retry button for the bad one |
 | 12 | Add a running program to the ignore list, translate inside it, then remove it | Nothing pops up while it is listed, and the popup is back once it is removed |
 | 13 | Press the global hotkey with text on the clipboard, then with an empty clipboard and a selection | The translation opens next to the cursor in the first case, the current selection is used in the second |
 | 14 | Export without keys, export with keys, then import each file | Plain export has no `credentials` block; the keyed export asks for confirmation first; an import restores every setting and the keys work |
@@ -391,7 +408,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, local, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -487,9 +504,12 @@ process. Each release maps to a GitHub milestone of the same name.
 | 历史记录 | 记住多少条已完成的翻译（`关闭` 到 `最近 500 条`，默认 50）。选择器下方的列表保留原文、译文、翻译渠道和时间；`搜索` 会同时过滤两段文本，点击一条记录会在浮动卡片中再次显示它（不会再次请求翻译渠道），每条记录都有复制和删除按钮。`清空历史记录` 会清空列表。该文件位于 `%APPDATA%\com.glossy.translator\history.json`。 |
 | 设置文件 | `导出…` 会写入 `Documents\glossy-settings.json`；`导入…` 会把你选择的文件读回应用中。勾选 `导出文件中包含我的 API 密钥` 可以连同密钥一起带走——Glossy 在以明文写入之前会再确认一次。导入会通过 `sanitized()` 校验，并在写入磁盘的过程中用 DPAPI 保护它带来的密钥。 |
 | 更新 | `启动 Glossy 时检查新版本` 会在每次启动时询问 GitHub Releases（默认关闭）。`立即检查` 会立刻查看并说明是哪个版本在等待，`下载并重启` 则会安装它。没有更新签名密钥的构建——在发布密钥对存在之前的所有构建都是如此——会隐藏这些按钮并说明原因。 |
-| 翻译渠道 | `google`（免费，无需密钥）、`baidu`（每月免费额度，APP ID + 密钥）、`cloud`（Glossy 自己的服务器，什么都不用填）、`zhipu`（免费额度，API Key）、`deepl` 或 `openai`（API Key）。 |
-| 服务器地址（cloud） | 只在 `cloud` 渠道中显示：翻译服务器的地址，`https://…`。构建里已经带了本项目正在运行的那个部署的地址，所以这个字段可以留空；填上它就能把应用指向你自己的部署（见 [`server/`](./server/README.md)）。字段下方会显示今天还剩多少额度——或者服务器联系不上的原因——旁边是 `重新检查` 按钮。 |
-| APP ID / API Key | 只在需要它们的渠道中显示：`baidu` 需要两个字段，`zhipu`、`deepl` 和 `openai` 只需要密钥，免费的 `google` 渠道则两个都不显示。这些值按渠道分别记住，因此切换到之前配置过的渠道时会把它自己的字段重新填好。 |
+| 译文从哪里来 | `cloud` 或 `api`。云端渠道什么都不用填，只需挑一个引擎；API 渠道才是你自己的账号所在的地方。全新安装默认使用 `cloud`。 |
+| 云端引擎（cloud） | 只在 `cloud` 渠道中显示：`builtin`——本项目自己的服务器——或 `local`，一个跑在这台电脑上的模型。 |
+| 服务器地址（cloud、`builtin`） | 只在内置引擎中显示：翻译服务器的地址，`https://…`。构建里已经带了本项目正在运行的那个部署的地址，所以这个字段可以留空；填上它就能把应用指向你自己的部署（见 [`server/`](./server/README.md)）。字段下方会显示今天还剩多少额度——或者服务器联系不上的原因——旁边是 `重新检查` 按钮。 |
+| 本地服务地址、模型名称（cloud、`local`） | 只在本地引擎中显示：任何 OpenAI 兼容的接口地址（默认 `http://127.0.0.1:11434/v1`，也就是 Ollama 提供的地址），以及你 pull 下来的模型名（默认 `qwen2.5:7b`）。文本不会离开这台电脑，因此不计费，也不会上传到任何地方。 |
+| 翻译渠道（api） | 只在 API 渠道中显示：`google`（免费，无需密钥）、`baidu`（每月免费额度，APP ID + 密钥）、`zhipu`（免费额度，API Key）、`deepl` 或 `openai`（API Key）。 |
+| APP ID / API Key（api） | 只在需要它们的渠道中显示：`baidu` 需要两个字段，`zhipu`、`deepl` 和 `openai` 只需要密钥，免费的 `google` 渠道则两个都不显示。这些值按渠道分别记住，因此切换到之前配置过的渠道时会把它自己的字段重新填好。 |
 
 快捷键接受 `Ctrl`/`Control`、`Alt`、`Shift`、`Win`/`Meta` 外加一个按键：
 字母、数字、`F1`–`F24`、`Space`、`Enter`、`Tab`、`Esc`、`Backspace`、
@@ -501,11 +521,14 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 翻译渠道
 
+`cloud` 和 `local` 是云端渠道下的两个引擎，什么都不用填；其余属于 API 渠道，走你自己的账号。
+
 | 翻译渠道 | 费用 | 说明 |
 | --- | --- | --- |
 | `google` | 免费，无需密钥 | 公开的 `translate.googleapis.com` 接口。在部分网络中被屏蔽，包括中国大陆的大部分地区。始终以 `dict-chrome-ex` 客户端 id 查询；被限流的 `gtx` id 只作为后备。 |
 | `baidu` | 每月免费额度，APP ID + 密钥 | 百度翻译开放平台（`fanyi-api.baidu.com/api/trans/vip/translate`）。中国大陆可直接访问，每月免费额度 50,000 字符，完成免费的个人认证后提升到 1,000,000。需要 <https://fanyi-api.baidu.com> 上的 **APP ID** 和**密钥**。会传递 `from=auto`，因此源语言会被识别。 |
 | `cloud` | 无需填写 | **Glossy Cloud**：由后端服务器（[`server/`](./server/README.md)）用本项目自己的账号完成翻译，应用只发送文本和一个安装 id。无需任何配置，机器上也不会有密钥，中国大陆可直接访问。每日额度按设备、按地址以及总量分别统计，设置窗口里会显示当天还剩多少；想换成自己的部署，只需要改一下服务器地址。 |
+| `local` | 无需填写 | **本地模型**：任何一个说 OpenAI 对话接口的服务——Ollama 在 `http://127.0.0.1:11434/v1` 提供一个——都在这台电脑上翻译，因此文本和密钥都不会离开本机，也不计任何额度。先下载一个模型（`ollama pull qwen2.5:7b`），再把地址和模型名填给 Glossy。7B 模型翻译句子尚可，遇到习语比云端渠道弱；更大的模型能补上大部分差距。 |
 | `zhipu` | 免费额度，API Key | 智谱 `glm-4.7-flash` 对话模型。中国大陆可直接访问，一次调用即可返回译文、音标、释义和一个例句。密钥来自 <https://open.bigmodel.cn>。⚠️ 智谱的用户协议把非付费模型授权为**仅限非商业的个人研究学习**——在发布 Glossy 之前请先看下文。 |
 | `deepl` | API Key | 以 `:fx` 结尾的密钥使用免费接口。 |
 | `openai` | API Key | `gpt-4o-mini`。 |
@@ -514,8 +537,9 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 免费额度与商业使用
 
-各免费额度在许可范围上并不相同：
+各免费额度在许可范围上并不相同。它们都不允许把自己的额度转售或提供给他人使用，这也正是云端渠道不去中转它们的原因：
 
+- **云端渠道** —— 它走的是本项目付费的 LLM 账号；没有配置该账号时则退回百度凭据，因此它发出的是付费调用，上面的条款对它不适用。它下面的本地引擎则完全不需要任何服务。
 - **智谱** —— 用户协议 §非付费功能 只把免费模型授权给*非商业的、个人研究学习*用途。个人使用没问题；用于已发布或收费的产品则不行。
 - **ModelScope API-Inference** —— 明确为非商业化、非盈利。
 - **阿里云机器翻译** —— 每月免费额度明确仅适用客户试用场景。
@@ -532,6 +556,7 @@ process. Each release maps to a GitHub milestone of the same name.
 该映射中的每个值在写入文件之前都会用 Windows DPAPI（`CryptProtectData`，当前用户范围）加密，因此文件里保存的是
 `"apiKey": "dpapi:AQAAANCM…"` 而不是密钥本身，只有录入它的那个 Windows 登录账户才能读回它。由较早版本写出的文件会在该构建首次启动时得到保护；属于其他登录账户或计算机的值无法解锁，会被丢弃，因此必须重新输入密钥。
 被忽略的程序列表以 `ignoredApps` 数组保存；旧版用逗号分隔的字符串也能接受，并在加载时拆分。
+使用哪个渠道保存在 `channel`（`cloud` 或 `api`）中，云端渠道的引擎保存在 `cloudProvider`（`builtin` 或 `local`），本地引擎背后的地址和模型名分别是 `localEndpoint` 与 `localModel`；在这个拆分之前写下的文件没有 `channel`，会被当作它原本就是的 API 渠道读取，而新文件会写成 `cloud`。
 
 ### 在应用内翻译
 
@@ -645,7 +670,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 8 | 固定弹窗，点击桌面别处，等待超过自动关闭超时 | 卡片保持打开，直到取消固定或使用 × |
 | 9 | 点击未固定卡片的外部 | 点击一落到外面，它就关闭 |
 | 10 | 在 Windows 中切换浅色/深色，然后在设置中强制使用每种方案 | 两个窗口都跟随该选择，两者的文字和边框都清晰可读 |
-| 11 | 用六个渠道各翻译一次，其中一个使用错误的密钥 | 正常的那些能出结果（包括 `cloud`）；填错的那个显示可读的错误和重试按钮 |
+| 11 | 云端渠道的两个引擎各翻译一次，再对五个 API 渠道各翻译一次，其中一个使用错误的密钥 | 正常的那些能出结果；填错的那个显示可读的错误和重试按钮 |
 | 12 | 把正在运行的程序加入忽略列表，在其中翻译，然后移除它 | 它在列表中时不会弹出任何东西，移除后弹窗恢复 |
 | 13 | 剪贴板中有文本时按全局快捷键，然后在剪贴板为空且有选区时再按一次 | 第一种情况下译文在光标旁打开，第二种情况下使用当前选区 |
 | 14 | 不带密钥导出、带密钥导出，然后分别导入这两个文件 | 普通导出没有 `credentials` 块；带密钥的导出会先请求确认；导入会恢复每一项设置，且密钥可用 |
@@ -699,7 +724,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, local, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -831,9 +856,12 @@ encima de él cuando no hay espacio debajo.
 | History | Cuántas traducciones terminadas recordar (`Off` hasta `The last 500`, por defecto 50). La lista que hay bajo el selector conserva el original, la traducción, el proveedor y la hora; `Search` filtra ambos textos, al hacer clic en una entrada se muestra de nuevo en la tarjeta flotante (sin una segunda llamada al proveedor), y cada entrada tiene un botón de copiar y otro de eliminar. `Forget everything` vacía la lista. El archivo está en `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` escribe `Documents\glossy-settings.json`; `Import…` vuelve a leer en la aplicación un archivo que elijas. Marca `Include my API keys in the exported file` para incluir también las claves: Glossy vuelve a preguntar antes de escribirlas en texto sin formato. Una importación se valida mediante `sanitized()` y protege las claves que trae con DPAPI de camino al disco. |
 | Updates | `Check for a new version when Glossy starts` consulta GitHub Releases en cada arranque (desactivado por defecto). `Check now` busca de inmediato y dice qué versión está esperando, y `Download and restart` la instala. Una compilación sin clave de firma de actualizaciones —que es toda compilación hasta que exista el par de claves de publicación— oculta los botones y lo indica. |
-| Translation provider | `google` (gratis, sin clave), `baidu` (cuota mensual gratuita, APP ID + clave), `cloud` (el propio servidor de Glossy, sin nada que rellenar), `zhipu` (nivel gratuito, clave de API), `deepl` u `openai` (clave de API). |
-| Server address (cloud) | Se muestra solo para `cloud`: la dirección del servidor de traducción, `https://…`. La compilación ya incluye la dirección del despliegue que mantiene el proyecto, así que el campo puede quedarse vacío; rellénalo para apuntar la aplicación a un despliegue tuyo (consulta [`server/`](./server/README.md)). Debajo se indica cuánto queda de la cuota de hoy —o el motivo por el que no se pudo contactar con el servidor— junto a un botón `Check again`. |
-| APP ID / API key | Se muestra solo para los proveedores que las necesitan: `baidu` pide los dos campos, `zhipu`, `deepl` y `openai` solo la clave, y el proveedor gratuito `google` oculta ambos. Los valores se recuerdan por proveedor, así que al cambiar a un proveedor que configuraste antes sus campos se rellenan de nuevo. |
+| De dónde vienen los resultados | `cloud` o `api`. El canal cloud no rellena nada y elige un motor; el canal API es donde vive tu propia cuenta. Una instalación nueva empieza en `cloud`. |
+| Motor de la nube (cloud) | Se muestra solo para el canal `cloud`: `builtin` —el servidor del propio proyecto— o `local`, un modelo que se ejecuta en esta máquina. |
+| Dirección del servidor (cloud, `builtin`) | Se muestra solo para el motor integrado: la dirección del servidor de traducción, `https://…`. La compilación ya incluye la dirección del despliegue que mantiene el proyecto, así que el campo puede quedarse vacío; rellénalo para apuntar la aplicación a un despliegue tuyo (consulta [`server/`](./server/README.md)). Debajo se indica cuánto queda de la cuota de hoy —o el motivo por el que no se pudo contactar con el servidor— junto a un botón `Check again`. |
+| Dirección del servicio local, nombre del modelo (cloud, `local`) | Se muestra solo para el motor local: cualquier punto de conexión compatible con OpenAI (por defecto `http://127.0.0.1:11434/v1`, la dirección que sirve Ollama) y el nombre del modelo tal como lo descargaste (por defecto `qwen2.5:7b`). El texto no sale de esta máquina, así que no se contabiliza nada ni se envía nada fuera. |
+| Proveedor de traducción (api) | Se muestra solo para el canal API: `google` (gratis, sin clave), `baidu` (cuota mensual gratuita, APP ID + clave), `zhipu` (nivel gratuito, clave de API), `deepl` u `openai` (clave de API). |
+| APP ID / API key (api) | Se muestra solo para los proveedores que las necesitan: `baidu` pide los dos campos, `zhipu`, `deepl` y `openai` solo la clave, y el proveedor gratuito `google` oculta ambos. Los valores se recuerdan por proveedor, así que al cambiar a un proveedor que configuraste antes sus campos se rellenan de nuevo. |
 
 El atajo de teclado acepta `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` más una
 tecla: una letra, un dígito, `F1`–`F24`, `Space`, `Enter`, `Tab`, `Esc`,
@@ -848,12 +876,16 @@ funciona.
 
 ### Proveedores
 
+`cloud` y `local` son los dos motores del canal cloud y no hay nada que rellenar;
+el resto pertenece al canal API y funciona con una cuenta tuya.
+
 | Proveedor | Coste | Notas |
 | --- | --- | --- |
 | `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
 | `baidu` | cuota mensual gratuita, APP ID + clave | Baidu 翻译开放平台 (`fanyi-api.baidu.com/api/trans/vip/translate`). Accesible desde China continental con una cuota mensual gratuita de 50 000 caracteres, que sube a 1 000 000 tras la 个人认证 (la verificación personal gratuita). Necesita tanto el **APP ID** como la **密钥** de <https://fanyi-api.baidu.com>. Envía `from=auto`, de modo que se detecta el idioma de origen. |
 | `cloud` | nada que rellenar | **Glossy Cloud**: un servidor desplegado desde [`server/`](./server/README.md) traduce con la cuenta del propio proyecto, y la aplicación solo envía el texto más un id de instalación. Nada que configurar, ninguna clave en la máquina y funciona desde China continental. La cuota diaria se cuenta por dispositivo, por dirección y en total, y la ventana de ajustes muestra lo que queda; usar tu propio despliegue es cambiar la dirección del servidor. |
 | `zhipu` | nivel gratuito, clave de API | Modelo de chat `glm-4.7-flash` de Zhipu. Accesible desde China continental y devuelve la traducción, los símbolos fonéticos, las definiciones y un ejemplo en una sola llamada. Clave en <https://open.bigmodel.cn>. ⚠️ El acuerdo de usuario de Zhipu licencia los modelos no de pago **solo para estudio personal no comercial**; consulta más abajo antes de publicar Glossy. |
+| `local` | sin nada que rellenar | **Modelo local**: cualquier servicio que hable la API de chat de OpenAI —Ollama sirve uno en `http://127.0.0.1:11434/v1`— traduce en esta máquina, así que ni el texto ni la clave salen de ella y no se cuenta ninguna cuota. Descarga antes un modelo (`ollama pull qwen2.5:7b`) y luego dale a Glossy la dirección y el nombre del modelo. Un modelo de 7B se defiende con una frase y es más flojo que el canal cloud con las expresiones idiomáticas; uno mayor cierra casi toda la diferencia. |
 | `deepl` | clave de API | Las claves que terminan en `:fx` usan el punto de conexión gratuito. |
 | `openai` | clave de API | `gpt-4o-mini`. |
 
@@ -864,8 +896,14 @@ detalles que el proveedor seleccionado no haya devuelto.
 
 ### Cuotas gratuitas y uso comercial
 
-Los niveles gratuitos se diferencian en lo que permiten:
+Los niveles gratuitos se diferencian en lo que permiten. Ninguno autoriza a
+revender su cuota ni a servirla a otras personas, y por eso el canal cloud no
+actúa de intermediario con ninguno:
 
+- **El canal cloud** — traduce con una cuenta de LLM que paga el proyecto y, si no
+  hay tal cuenta configurada, recurre a las credenciales de Baidu, así que sus
+  llamadas son de pago y las condiciones de arriba no le afectan. El motor local
+  que lleva debajo no necesita ningún servicio.
 - **Zhipu** — 用户协议 §非付费功能 licencia los modelos gratuitos solo para uso
   *非商业的、个人研究学习*. Está bien para uso personal; no lo está para un producto
   publicado o de pago.
@@ -909,6 +947,10 @@ esta compilación; un valor que pertenece a otro inicio de sesión o a otro equi
 no se puede desbloquear y se descarta, así que hay que volver a introducir la clave.
 La lista de programas ignorados se guarda como un array `ignoredApps`; una cadena
 heredada separada por comas se acepta y se divide al cargar.
+El canal que se usa se guarda como `channel` (`cloud` o `api`), con `cloudProvider`
+(`builtin` o `local`), `localEndpoint` y `localModel` detrás del motor local; un
+archivo escrito antes de la división no tiene `channel` y se lee como el canal API
+que ya era, y un archivo nuevo se escribe con `cloud`.
 
 ### Traducir dentro de la aplicación
 
@@ -1095,7 +1137,7 @@ real en algún momento y ninguno está cubierto por las pruebas automatizadas.
 | 8 | Fijar el emergente, hacer clic en otro punto del escritorio y esperar más allá del tiempo de cierre automático | La tarjeta permanece abierta hasta que se suelte la fijación o se use la × |
 | 9 | Hacer clic fuera de una tarjeta sin fijar | Se cierra en cuanto el clic cae fuera |
 | 10 | Cambiar Windows entre modo claro y oscuro y luego forzar cada esquema en los ajustes | Ambas ventanas siguen la elección, con texto y bordes legibles en las dos |
-| 11 | Traducir con cada uno de los seis proveedores, incluido uno con una clave incorrecta | Un resultado para los correctos, incluido `cloud`; un error legible con un botón de reintento para el incorrecto |
+| 11 | Traducir con los dos motores del canal cloud y con cada uno de los cinco proveedores del canal API, uno de ellos con una clave incorrecta | Un resultado para los correctos; un error legible con un botón de reintento para el incorrecto |
 | 12 | Añadir un programa en ejecución a la lista de ignorados, traducir dentro de él y luego quitarlo | No aparece nada mientras está en la lista, y el emergente vuelve en cuanto se quita |
 | 13 | Pulsar el atajo de teclado global con texto en el portapapeles y luego con el portapapeles vacío y una selección | La traducción se abre junto al cursor en el primer caso y se usa la selección actual en el segundo |
 | 14 | Exportar sin claves, exportar con claves y luego importar cada archivo | La exportación simple no tiene bloque `credentials`; la exportación con claves pide confirmación antes; una importación restaura todos los ajustes y las claves funcionan |
@@ -1157,7 +1199,7 @@ src-tauri/src/
   hotkey.rs              global hotkey registration and parsing
   classify.rs            word/phrase vs. sentence detection
   units/                 unit and currency conversion for the card
-  translate/             google, baidu, cloud, zhipu, deepl and openai providers, word dictionary
+  translate/             google, baidu, cloud, local, zhipu, deepl and openai providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel

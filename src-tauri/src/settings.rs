@@ -12,6 +12,7 @@ pub const MIN_SELECTION_LEN: usize = 2;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Provider {
     /// Free public Google translate endpoint, no API key required.
+    #[default]
     #[serde(rename = "google")]
     Google,
     /// Zhipu GLM chat completions, free tier, requires an API key.
@@ -21,11 +22,9 @@ pub enum Provider {
     #[serde(rename = "baidu")]
     Baidu,
     /// Glossy's own proxy (see `server/`), which keeps the provider
-    /// credentials server side so nothing has to be filled in here. The
-    /// default: a fresh install works before anything is configured, which is
-    /// not true of any provider that needs a key, nor of the free Google
-    /// endpoint on a network that blocks it.
-    #[default]
+    /// credentials server side so nothing has to be filled in here. Kept so
+    /// that a file written before the channels existed still reads; the cloud
+    /// *channel* replaced it, and the menu no longer offers it.
     #[serde(rename = "cloud")]
     Cloud,
     /// DeepL, requires an API key.
@@ -49,6 +48,63 @@ impl Provider {
         }
     }
 }
+
+/// Where a translation comes from.
+///
+/// The two channels are the two ways a desktop app can offer translation: on
+/// somebody else's account, or on the user's own. Every vendor forbids handing
+/// a free allowance on to third parties, so the cloud channel cannot simply
+/// resell one of their keys; it runs on an account Glossy pays for, or on a
+/// model running on this machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum Channel {
+    /// Through Glossy's own server (`server/`) or a model on this machine, so
+    /// nothing has to be filled in and a fresh install works right away.
+    #[default]
+    #[serde(rename = "cloud")]
+    Cloud,
+    /// Straight to a service the user holds an account with, using the
+    /// credentials saved under `provider`.
+    #[serde(rename = "api")]
+    Api,
+}
+
+impl Channel {
+    pub fn key(self) -> &'static str {
+        match self {
+            Channel::Cloud => "cloud",
+            Channel::Api => "api",
+        }
+    }
+}
+
+/// What the cloud channel translates with.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum CloudProvider {
+    /// The account behind Glossy's own deployment.
+    #[default]
+    #[serde(rename = "builtin")]
+    Builtin,
+    /// A model running on this machine, reached over an OpenAI compatible
+    /// endpoint such as the one Ollama serves.
+    #[serde(rename = "local")]
+    Local,
+}
+
+impl CloudProvider {
+    pub fn key(self) -> &'static str {
+        match self {
+            CloudProvider::Builtin => "builtin",
+            CloudProvider::Local => "local",
+        }
+    }
+}
+
+/// Address a local service is asked at when the user has not set one.
+pub const DEFAULT_LOCAL_ENDPOINT: &str = "http://127.0.0.1:11434/v1";
+
+/// Model a local service is asked for when the user has not set one.
+pub const DEFAULT_LOCAL_MODEL: &str = "qwen2.5:7b";
 
 /// Credentials of one provider, kept so switching back just works.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,8 +335,20 @@ pub struct Settings {
     pub trigger_on_double_click: bool,
     /// Language the selection is translated into.
     pub target_lang: String,
-    /// Translation backend.
+    /// Whether the text goes through Glossy's own server or through an account
+    /// of the user's own.
+    pub channel: Channel,
+    /// What the cloud channel translates with.
+    pub cloud_provider: CloudProvider,
+    /// Backend of the api channel. The cloud channel ignores it, so it is kept
+    /// rather than cleared and switching back lands on what was picked before.
     pub provider: Provider,
+    /// Address of a local translation service, used when the cloud channel is
+    /// set to the local model. An OpenAI compatible base URL, so `/chat/
+    /// completions` is appended to it.
+    pub local_endpoint: String,
+    /// Model the local service is asked for.
+    pub local_model: String,
     /// Address of Glossy's own translation proxy (the Worker in `server/`).
     /// Empty means "use the address this build was made with", and when that is
     /// empty as well the provider says it has nowhere to send the text.
@@ -352,7 +420,11 @@ impl Default for Settings {
             trigger_on_drag: true,
             trigger_on_double_click: true,
             target_lang: default_target_lang(),
+            channel: Channel::default(),
+            cloud_provider: CloudProvider::default(),
             provider: Provider::default(),
+            local_endpoint: DEFAULT_LOCAL_ENDPOINT.to_string(),
+            local_model: DEFAULT_LOCAL_MODEL.to_string(),
             cloud_endpoint: String::new(),
             cloud_id: crate::translate::new_install_id(),
             credentials: BTreeMap::new(),
@@ -449,6 +521,17 @@ impl Settings {
             .and_then(|value| value.as_object().cloned())
             .unwrap_or_default();
 
+        // A file written before the channels existed names a provider and no
+        // channel, and merging it into the defaults would silently move it to
+        // the cloud one. Everything it could have named needs an account of the
+        // user's, except the proxy itself, which is what the cloud channel
+        // replaced.
+        let pre_channel = !stored.contains_key("channel");
+        let stored_provider = stored
+            .get("provider")
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+
         for (key, value) in stored {
             // Keys written by older versions are kept: they are migrated into
             // `credentials` by `sanitized`, so they must survive the merge.
@@ -464,6 +547,17 @@ impl Settings {
                 }
                 Err(error) => eprintln!("glossy: ignoring the stored setting `{key}`: {error}"),
             }
+        }
+
+        if pre_channel {
+            let channel = match stored_provider.as_deref() {
+                Some(name) if name != "cloud" => Channel::Api,
+                _ => Channel::Cloud,
+            };
+            merged.insert(
+                "channel".to_string(),
+                serde_json::to_value(channel).unwrap_or(serde_json::json!("cloud")),
+            );
         }
 
         serde_json::from_value::<Settings>(serde_json::Value::Object(merged))
@@ -563,6 +657,12 @@ impl Settings {
             .unwrap_or_default()
     }
 
+    /// Whether the api channel is on Google, whose free endpoint is the
+    /// provider itself: the word details must not ask it behind its own back.
+    pub fn uses_google_api(&self) -> bool {
+        self.channel == Channel::Api && self.provider == Provider::Google
+    }
+
     /// Moves the single credential pair written by older versions into the
     /// per-provider map, so it stays available after switching away.
     fn migrate_legacy_credentials(&mut self) {
@@ -609,6 +709,16 @@ impl Settings {
         self.cloud_endpoint = self.cloud_endpoint.trim().trim_end_matches('/').to_string();
         if self.cloud_id.is_empty() {
             self.cloud_id = crate::translate::new_install_id();
+        }
+        // A cleared address or model would leave the local backend with nothing
+        // to ask, and both defaults are what the field shows anyway.
+        self.local_endpoint = self.local_endpoint.trim().trim_end_matches('/').to_string();
+        if self.local_endpoint.is_empty() {
+            self.local_endpoint = DEFAULT_LOCAL_ENDPOINT.to_string();
+        }
+        self.local_model = self.local_model.trim().to_string();
+        if self.local_model.is_empty() {
+            self.local_model = DEFAULT_LOCAL_MODEL.to_string();
         }
         self.credentials = self
             .credentials

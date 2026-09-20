@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { createHandler } from "./handler.js";
 import { createRequestListener } from "./node-server.js";
 import { createFileStore } from "./store-file.js";
-import { isLanguageTag, translateUpstream } from "./upstream.js";
+import { createUpstream } from "./upstream.js";
 
 const DEFAULT_IP_HEADERS = ["x-forwarded-for", "x-real-ip", "cf-connecting-ip"];
 
@@ -30,19 +30,11 @@ const clientIpHeaders = (process.env.CLIENT_IP_HEADERS || "")
   .map((name) => name.trim().toLowerCase())
   .filter(Boolean);
 
+const upstream = createUpstream(process.env);
+
 const handler = createHandler({
   store: createFileStore({ file: stateFile }),
-  upstream: {
-    isLanguageTag,
-    translate: (input) =>
-      translateUpstream({
-        fetchImpl: (...args) => fetch(...args),
-        appId: process.env.BAIDU_APP_ID,
-        key: process.env.BAIDU_KEY,
-        endpoint: process.env.BAIDU_ENDPOINT,
-        ...input,
-      }),
-  },
+  upstream,
   config: process.env,
 });
 
@@ -53,12 +45,12 @@ const server = createServer(
   }),
 );
 
-// 百度的往返可能比默认值慢，别让空闲连接把函数实例挂在半途。
+// 大模型和百度的往返都可能比默认值慢，别让空闲连接把函数实例挂在半途。
 server.keepAliveTimeout = 65_000;
 server.headersTimeout = 70_000;
 
 server.listen(port, host, () => {
   console.log(`glossy-cloud listening on http://${host}:${port}`);
   console.log(`glossy-cloud quota state: ${stateFile || "(memory only)"}`);
-  console.log(`glossy-cloud baidu credentials: ${process.env.BAIDU_APP_ID && process.env.BAIDU_KEY ? "configured" : "missing"}`);
+  console.log(`glossy-cloud upstream: ${upstream.configured ? "configured" : "missing"}`);
 });

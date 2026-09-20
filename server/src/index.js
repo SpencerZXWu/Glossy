@@ -5,7 +5,7 @@
 
 import { createHandler } from "./handler.js";
 import { QuotaCounter } from "./quota-object.js";
-import { isLanguageTag, translateUpstream } from "./upstream.js";
+import { createUpstream } from "./upstream.js";
 
 export { QuotaCounter };
 
@@ -19,25 +19,11 @@ function makeStore(env) {
   };
 }
 
-function makeUpstream(env) {
-  return {
-    isLanguageTag,
-    translate: (input) =>
-      translateUpstream({
-        fetchImpl: (...args) => fetch(...args),
-        appId: env.BAIDU_APP_ID,
-        key: env.BAIDU_KEY,
-        endpoint: env.BAIDU_ENDPOINT,
-        ...input,
-      }),
-  };
-}
-
 export default {
   fetch(request, env) {
     return createHandler({
       store: makeStore(env),
-      upstream: makeUpstream(env),
+      upstream: createUpstream(env),
       config: env,
     })(request);
   },

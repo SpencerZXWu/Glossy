@@ -52,11 +52,12 @@ function memoryStore() {
   };
 }
 
-function setup({ translateImpl, env = {} } = {}) {
+function setup({ translateImpl, env = {}, configured = true } = {}) {
   const store = memoryStore();
   const calls = [];
   const upstream = {
     isLanguageTag,
+    configured,
     translate: async (input) => {
       calls.push(input);
       return translateImpl ? translateImpl(input) : { ok: true, from: "en", to: "zh", translation: "你好" };
@@ -90,7 +91,7 @@ function setup({ translateImpl, env = {} } = {}) {
   return { store, calls, call, translate, upstream };
 }
 
-test("health reports whether credentials are in place", async () => {
+test("health reports whether the upstream has credentials", async () => {
   const { call } = setup();
   const response = await call("/v1/health");
   assert.equal(response.status, 200);
@@ -100,7 +101,7 @@ test("health reports whether credentials are in place", async () => {
   assert.equal(body.configured, true);
   assert.equal(body.day, "2025-09-01");
 
-  const bare = setup({ env: { BAIDU_APP_ID: "", BAIDU_KEY: "" } });
+  const bare = setup({ configured: false });
   assert.equal((await (await bare.call("/v1/health")).json()).configured, false);
 });
 

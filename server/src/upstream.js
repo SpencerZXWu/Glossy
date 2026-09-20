@@ -1,11 +1,13 @@
 /**
- * Language codes and the Baidu call itself.
+ * Language codes and the translation calls behind the cloud channel.
  *
  * Baidu spells most languages with three letters and a few with codes of its
  * own, so the codes the App sends (BCP 47 or plain two letter tags) are mapped
- * here instead of in every client.
+ * here instead of in every client. The LLM upstream in `llm.js` needs no such
+ * mapping; it is given a name instead, which it reads better than a tag.
  */
 
+import { translateWithLlm } from "./llm.js";
 import { md5 } from "./md5.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
@@ -151,5 +153,69 @@ async function callBaidu({ fetchImpl, appId, key, text, from, to, endpoint }) {
     from: typeof data.from === "string" ? data.from : baiduCode(from),
     to: typeof data.to === "string" ? data.to : baiduCode(to),
     translation,
+  };
+}
+
+/**
+ * Whether this deployment has anything it can translate with.
+ *
+ * One place, so the health endpoint and the factory cannot disagree: a
+ * deployment is ready as soon as it holds either an LLM key or the Baidu pair.
+ */
+export function upstreamConfigured(config) {
+  return Boolean(config.LLM_API_KEY || (config.BAIDU_APP_ID && config.BAIDU_KEY));
+}
+
+/**
+ * Builds the upstream the handler talks to.
+ *
+ * Both configured backends are kept and tried in order, LLM first because it
+ * translates better and the operator opted into it by setting a key. A backend
+ * that is down, throttled or out of quota therefore hands the request to the
+ * next one instead of failing the user.
+ */
+export function createUpstream(config) {
+  const fetchImpl = (...args) => fetch(...args);
+  const backends = [];
+
+  if (config.LLM_API_KEY) {
+    backends.push((input) =>
+      translateWithLlm({
+        fetchImpl,
+        key: config.LLM_API_KEY,
+        endpoint: config.LLM_ENDPOINT,
+        model: config.LLM_MODEL,
+        ...input,
+      }),
+    );
+  }
+
+  if (config.BAIDU_APP_ID && config.BAIDU_KEY) {
+    backends.push((input) =>
+      translateUpstream({
+        fetchImpl,
+        appId: config.BAIDU_APP_ID,
+        key: config.BAIDU_KEY,
+        endpoint: config.BAIDU_ENDPOINT,
+        ...input,
+      }),
+    );
+  }
+
+  return {
+    isLanguageTag,
+    configured: upstreamConfigured(config),
+    async translate(input) {
+      if (!backends.length) {
+        return { ok: false, code: "not_configured", message: "服务端还没有配置翻译密钥。" };
+      }
+
+      let last;
+      for (const backend of backends) {
+        last = await backend(input);
+        if (last.ok) return last;
+      }
+      return last;
+    },
   };
 }
