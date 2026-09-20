@@ -78,13 +78,8 @@ body {
 .logo {
   width: 34px;
   height: 34px;
-  display: grid;
-  place-items: center;
+  display: block;
   border-radius: 10px;
-  background: var(--g-logo-gradient);
-  color: var(--g-on-accent);
-  font-weight: 700;
-  font-size: 16px;
   box-shadow: 0 4px 12px var(--accent-soft);
 }
 

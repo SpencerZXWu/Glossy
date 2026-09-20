@@ -49,7 +49,9 @@ installed and used without anyone having to obtain an API key first.
   selection translates without anything being configured or obtained. Existing
   settings keep the provider they were saved with.
 - The new Glossy mark is the icon of the application, of the installer and of the
-  tray. `assets/icon.png` is the source; `npm.cmd run icon` rebuilds the whole set.
+  tray, and it replaces the drawn `G` at the top of the settings window and on the
+  start card. `assets/icon.png` is the source; `npm.cmd run icon` rebuilds the
+  whole icon set, and the windows show the copy in `src/images/logo.png`.
 
 ### Fixed
 

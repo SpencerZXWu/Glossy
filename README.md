@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="112" height="112" alt="Glossy">
+</p>
+
 [English](#en) · [中文](#zh-cn) · [Español](#es)
 
 <a id="en"></a>
@@ -366,6 +370,7 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
   js/popup.js            popup window logic
   js/notice.js           start card logic
   styles/tokens.css      the only place a colour, radius, shadow or duration is written
+  images/logo.png        the app icon, shown as the brand mark in both windows
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
@@ -670,6 +675,7 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
   js/popup.js            popup window logic
   js/notice.js           start card logic
   styles/tokens.css      the only place a colour, radius, shadow or duration is written
+  images/logo.png        the app icon, shown as the brand mark in both windows
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
@@ -1112,6 +1118,7 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
   js/popup.js            popup window logic
   js/notice.js           start card logic
   styles/tokens.css      the only place a colour, radius, shadow or duration is written
+  images/logo.png        the app icon, shown as the brand mark in both windows
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
