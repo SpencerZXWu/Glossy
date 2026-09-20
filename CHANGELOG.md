@@ -10,19 +10,24 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ### Added
 
-- **Channels: cloud and API.** The first choice in the settings window is now
-  where translations come from, and it is one selector with two answers. The cloud
-  channel fills nothing in: it picks between Glossy's own server, which holds the
-  provider credentials so no key of yours is involved, and a model running on this
-  machine over any OpenAI-compatible endpoint (Ollama's
-  `http://127.0.0.1:11434/v1` by default, model `qwen2.5:7b`), which keeps the
-  text on the computer and costs nothing. The API channel is the old sheet with
-  your own account behind it, and it sits below the cloud options in the same
-  panel. A new settings file starts on the cloud channel with Glossy's server,
-  and a file written before this release reads as the API channel it already was,
-  so nothing has to be re-entered. The server gained a second upstream to go with
-  it: it now translates through an LLM account when one is configured and falls
-  back to the Baidu credentials it had before, so a deployment works either way.
+- **Translation service, one list.** The settings window no longer asks whether
+  results come from a cloud or from your own account; it asks which service
+  translates, and the same dropdown holds all of them: Glossy's own server, which
+  holds the provider credentials so no key of yours is involved; a model running on
+  this machine over any OpenAI-compatible endpoint (Ollama's
+  `http://127.0.0.1:11434/v1` by default, model `qwen2.5:7b`), which keeps the text
+  on the computer and costs nothing; the free public Google endpoint, which needs no
+  key; and then the vendors that take the user's own key — Baidu, Zhipu, DeepL and
+  OpenAI. A new settings file starts on Glossy's server, and a file written before
+  this release keeps the provider it already had, so nothing has to be re-entered.
+  The credentials of the last group moved out of that panel into **Extensions · my
+  own API**, a panel of its own at the bottom of the settings window, where they sit
+  dimmed until one of those services is chosen. Under the stored shape nothing
+  changed — Glossy's server and the local model are still the cloud channel, the
+  rest still use the API channel — so an older build reads the file as it always
+  did. The server gained a second upstream to go with it: it now translates through
+  an LLM account when one is configured and falls back to the Baidu credentials it
+  had before, so a deployment works either way.
 
 ## [1.0.1] - 2026-09-20
 

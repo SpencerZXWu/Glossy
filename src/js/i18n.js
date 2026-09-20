@@ -98,17 +98,13 @@
     "option.units": "Convert measurements and money the target language does not use",
     "units.hint": "A measurement or an amount of money that reads the way the source language writes it is shown again the way the target language writes it, with the conversion rate. Currency rates are looked up live.",
 
-    "panel.language": "Language and provider",
+    "panel.language": "Language",
     "field.targetLang": "Translate into",
-    "field.channel": "Where results come from",
-    "channel.cloud": "Glossy Cloud · nothing to fill in",
-    "channel.api": "My own account · API key",
-    "field.cloudEngine": "Cloud engine",
-    "engine.builtin": "Glossy server · shared, nothing to set up",
-    "engine.local": "Local model · runs on this machine",
+    "field.service": "Translation service",
     "field.localEndpoint": "Local service address",
     "field.localModel": "Model name",
-    "field.provider": "Translation provider",
+    "provider.cloud": "Glossy Translate · recommended, nothing to set up",
+    "provider.local": "Local model · runs on this machine",
     "provider.google": "Google · free, no key",
     "provider.baidu": "Baidu 翻译 · free monthly quota, APP ID + key",
     "provider.zhipu": "Zhipu GLM · free tier, API key",
@@ -116,7 +112,7 @@
     "provider.openai": "OpenAI · API key",
     "providerName.google": "Google",
     "providerName.baidu": "Baidu Translate",
-    "providerName.cloud": "Glossy Cloud",
+    "providerName.cloud": "Glossy Translate",
     "providerName.zhipu": "Zhipu GLM",
     "providerName.deepl": "DeepL",
     "providerName.openai": "OpenAI",
@@ -125,8 +121,8 @@
     "field.cloudEndpoint": "Server address",
     "cloud.endpointPlaceholder": "https://glossy-cloud.example.workers.dev",
     "cloud.quota.checking": "Asking the server how much is left today…",
-    "cloud.quota.remaining": "Free cloud quota today: {0} of {1} characters left",
-    "cloud.quota.used": "Free cloud quota today: all {0} characters are used up, it resets at 00:00 UTC",
+    "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
+    "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
     "cloud.quota.retry": "Check again",
     "field.apiKey": "API key",
     "apiKey.placeholder": "Paste your key",
@@ -140,7 +136,7 @@
     "provider.hint.zhipu":
       "Paste a Zhipu (open.bigmodel.cn) API key. The free <code>glm-4.7-flash</code> model returns the translation, phonetics, definitions and an example in one call, and it is reachable from mainland China.",
     "cloud.hint.builtin":
-      "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. The address of a server deployed from <code>server/</code> goes above; each device gets a daily character allowance, and the other providers stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
+      "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. The address of a server deployed from <code>server/</code> goes above; each device gets a daily character allowance, and the other services stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
     "cloud.hint.local":
       "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
     "provider.hint.deepl":
@@ -211,6 +207,10 @@
     "update.failed": "Could not update: ",
     "update.downloading": "Downloading…",
     "update.unavailable": "This build carries no update signing key, so it cannot update itself yet.",
+
+    "panel.api": "Extensions · my own API",
+    "api.hint":
+      "An extension point, not a required step: only the services that ask for a key in Translation service read the fields below. Glossy Translate, the local model and Google work without anything filled in here. The key is kept on this machine and never leaves it except towards the service you picked.",
 
     "popup.copy": "Copy translation",
     "popup.close": "Close",
@@ -325,17 +325,13 @@
     "option.units": "把译文语言不常用的计量与货币换算过来",
     "units.hint": "原文中按源语言习惯书写、而译文语言不常用的计量或货币，会按译文语言的习惯再写一遍并注明换算率，货币汇率实时查询。",
 
-    "panel.language": "语言与翻译渠道",
+    "panel.language": "语言",
     "field.targetLang": "翻译为",
-    "field.channel": "译文从哪里来",
-    "channel.cloud": "Glossy 云端 · 无需填写任何内容",
-    "channel.api": "我自己的账号 · API Key",
-    "field.cloudEngine": "云端引擎",
-    "engine.builtin": "Glossy 服务器 · 共用，无需配置",
-    "engine.local": "本地模型 · 在这台电脑上运行",
+    "field.service": "翻译渠道",
     "field.localEndpoint": "本地服务地址",
     "field.localModel": "模型名称",
-    "field.provider": "翻译渠道",
+    "provider.cloud": "Glossy 翻译 · 推荐，无需配置",
+    "provider.local": "本地模型 · 在这台电脑上运行",
     "provider.google": "Google · 免费，无需密钥",
     "provider.baidu": "百度翻译 · 每月免费额度，APP ID + 密钥",
     "provider.zhipu": "智谱 GLM · 免费额度，API Key",
@@ -343,7 +339,7 @@
     "provider.openai": "OpenAI · API Key",
     "providerName.google": "Google",
     "providerName.baidu": "百度翻译",
-    "providerName.cloud": "Glossy 云端",
+    "providerName.cloud": "Glossy 翻译",
     "providerName.zhipu": "智谱 GLM",
     "providerName.deepl": "DeepL",
     "providerName.openai": "OpenAI",
@@ -352,8 +348,8 @@
     "field.cloudEndpoint": "服务器地址",
     "cloud.endpointPlaceholder": "https://glossy-cloud.example.workers.dev",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
-    "cloud.quota.remaining": "今日云端免费额度：剩余 {0} / {1} 字符",
-    "cloud.quota.used": "今日云端免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
+    "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
+    "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
     "cloud.quota.retry": "重新查询",
     "field.apiKey": "API Key",
     "apiKey.placeholder": "粘贴你的密钥",
@@ -367,7 +363,7 @@
     "provider.hint.zhipu":
       "填入智谱（open.bigmodel.cn）的 API Key。免费的 <code>glm-4.7-flash</code> 模型一次返回译文、音标、释义和例句，国内可直接访问。",
     "cloud.hint.builtin":
-      "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。上面填 <code>server/</code> 部署后的地址即可；每台设备每天有字符额度，用完后仍可换用其他渠道。音标、词性和例句会另外查询。",
+      "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。上面填 <code>server/</code> 部署后的地址即可；每台设备每天有字符额度，用完后仍可换用其他服务。音标、词性和例句会另外查询。",
     "cloud.hint.local":
       "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
     "provider.hint.deepl":
@@ -437,6 +433,10 @@
     "update.failed": "更新失败：",
     "update.downloading": "正在下载…",
     "update.unavailable": "此版本还没有更新签名公钥，暂时无法自动更新。",
+
+    "panel.api": "扩展 · 使用自己的 API",
+    "api.hint":
+      "这里是扩展入口，不是必须配置的步骤：只有「翻译渠道」里标明需要密钥的服务才会用到下面的输入框。Glossy 翻译、本地模型和 Google 都无需填写。密钥只保存在这台电脑上，除了你选择的那个服务之外不会发给任何地方。",
 
     "popup.copy": "复制译文",
     "popup.close": "关闭",

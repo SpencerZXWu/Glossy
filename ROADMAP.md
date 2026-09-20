@@ -128,7 +128,7 @@ Goal: make the reading use case actually good.
 | Work item | Details | State |
 | --- | --- | --- |
 | Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | planned |
-| Channels: cloud and API | Two ways in, chosen with one selector. The cloud channel carries no key of its own and only picks an engine — our server, or a model running on this machine over any OpenAI-compatible endpoint — while the API channel is where the vendor and the user's own credentials live. A new settings file starts on the cloud channel, and a file written before the split is read as the API channel it was | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
+| Translation service: one list | One dropdown holds every way a selection can be translated — our own server (nothing to fill in), a model running on this machine over any OpenAI-compatible endpoint, the free public Google endpoint, and the vendors that take the user's key. The credentials of the last group live in an **Extensions** panel at the bottom of the settings window, dimmed while a service that needs nothing is selected. Underneath, the stored shape stayed `channel` + `provider`, so a file written earlier keeps working and a new one starts on our server | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
 | Popup rebuild | The card rebuilt on the token layer: header actions, original/translation hierarchy, dictionary and conversion blocks, and a compact mode | partly, the conversion block is in the tree |
 | Icons, motion and accessibility | One icon set, transitions on the popup's appearance and dismissal, full keyboard operability, focus rings, high-contrast colours | planned |
 | Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | planned |
@@ -342,7 +342,7 @@ in it early.
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
 | 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 计划中 |
-| 渠道：云端与 API | 一个选择器决定译文来自哪里。云端渠道不带任何属于用户的密钥，只挑一个引擎——我们自己的服务器，或是通过任意 OpenAI 兼容接口跑在本机上的模型；API 渠道才是服务商和用户自己的凭据所在地。新建设置文件默认走云端渠道，而在这个拆分之前写下的文件会被当作它原本的 API 渠道读取 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
+| 翻译渠道：一个列表 | 一个下拉框就装下所有翻译方式——我们自己的服务器（无需填写）、通过任意 OpenAI 兼容接口跑在本机上的模型、免费的公开 Google 接口，以及需要用户密钥的服务。最后一类的凭据放在设置窗口最下面的 **扩展** 面板里，当前服务不需要凭据时会变暗。底层保存格式仍然是 `channel` + `provider`，因此旧文件照常可用，新文件默认走我们自己的服务器 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
 | 弹窗重建 | 在变量层上重建卡片：头部操作、原文/译文层级、词典与换算区块，以及一个紧凑模式 | 部分完成，换算区块已在代码库中 |
 | 图标、动效与无障碍 | 统一图标集、弹窗出现与消失的过渡、完整键盘操作、焦点环、高对比配色 | 计划中 |
 | 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 计划中 |

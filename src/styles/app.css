@@ -262,6 +262,12 @@ main::-webkit-scrollbar-thumb {
   pointer-events: none;
 }
 
+/* The Extensions panel is dimmed, but stays editable, while the selected service
+   needs no key. */
+#apiBlock[data-idle="true"] {
+  opacity: 0.6;
+}
+
 .check {
   display: flex;
   align-items: center;

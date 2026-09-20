@@ -34,15 +34,12 @@
     closeAfterCopy: $("closeAfterCopy"),
     unitsEnabled: $("unitsEnabled"),
     targetLang: $("targetLang"),
-    channel: $("channel"),
+    service: $("service"),
     cloudBlock: $("cloudBlock"),
-    cloudEngine: $("cloudEngine"),
-    cloudBuiltinBlock: $("cloudBuiltinBlock"),
     cloudLocalBlock: $("cloudLocalBlock"),
     localEndpoint: $("localEndpoint"),
     localModel: $("localModel"),
-    cloudHint: $("cloudHint"),
-    provider: $("provider"),
+    serviceHint: $("serviceHint"),
     apiBlock: $("apiBlock"),
     apiIdField: $("apiIdField"),
     apiId: $("apiId"),
@@ -51,7 +48,6 @@
     cloudEndpoint: $("cloudEndpoint"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
-    providerHint: $("providerHint"),
     uiLang: $("uiLang"),
     status: $("status"),
     statusText: $("statusText"),
@@ -93,7 +89,14 @@
 
   const LANGUAGES = Glossy.languageCodes;
 
-  const PROVIDER_HINTS = {
+  /**
+   * Everything the popup can translate through, in the order the dropdown
+   * offers it: the two services Glossy answers with, then the free Google
+   * endpoint, then the vendors that take the user's own key.
+   */
+  const SERVICE_HINTS = {
+    cloud: "cloud.hint.builtin",
+    local: "cloud.hint.local",
     google: "provider.hint.google",
     baidu: "provider.hint.baidu",
     zhipu: "provider.hint.zhipu",
@@ -101,14 +104,11 @@
     openai: "provider.hint.openai",
   };
 
-  /** Hints for the two cloud engines, shown under the channel block. */
-  const CLOUD_HINTS = {
-    builtin: "cloud.hint.builtin",
-    local: "cloud.hint.local",
-  };
+  /** Services that take the user's own credentials. */
+  const OWN_KEY_SERVICES = ["google", "baidu", "zhipu", "deepl", "openai"];
 
-  /** Providers that need a secret, and the one that also needs an APP ID. */
-  const PROVIDERS_WITH_KEY = ["baidu", "zhipu", "deepl", "openai"];
+  /** Of those, the ones that need a key; Baidu also needs an APP ID. */
+  const SERVICES_WITH_KEY = ["baidu", "zhipu", "deepl", "openai"];
 
   const POPUP_SIZES = [300, 356, 400, 460, 520];
   const FONT_SCALES = [90, 100, 115, 130, 150];
@@ -241,29 +241,30 @@
   }
 
   /**
-   * Shows the fields that belong to the chosen channel, and the hint that
-   * explains the chosen engine.
+   * Shows the fields and the hint that belong to the chosen service.
    *
-   * The cloud channel carries no key of the user's, so it only chooses between
-   * the shared server and a model running on this machine; the API channel is
-   * where the vendor and the user's own credentials live.
+   * The dropdown is one list, so a service either needs nothing (Glossy's own
+   * server, a model on this machine, the free Google endpoint), a key of the
+   * user's, or an address of their own for the local model.
    */
-  function syncChannel() {
-    const cloud = els.channel.value === "cloud";
-    const builtin = els.cloudEngine.value === "builtin";
-    els.cloudBlock.hidden = !cloud;
-    els.apiBlock.hidden = cloud;
-    els.cloudBuiltinBlock.hidden = !builtin;
-    els.cloudLocalBlock.hidden = builtin;
-    els.cloudHint.innerHTML = Glossy.i18n.t(CLOUD_HINTS[els.cloudEngine.value] || "");
-    syncProvider();
+  function syncService() {
+    const service = els.service.value;
+    const keyNeeded = SERVICES_WITH_KEY.indexOf(service) !== -1;
+    els.cloudBlock.hidden = service !== "cloud";
+    els.cloudLocalBlock.hidden = service !== "local";
+    els.serviceHint.innerHTML = Glossy.i18n.t(SERVICE_HINTS[service] || "");
+    els.apiIdField.hidden = service !== "baidu";
+    els.apiKeyField.hidden = !keyNeeded;
+    // The panel at the bottom sits dimmed until the chosen service reads it.
+    els.apiBlock.setAttribute("data-idle", keyNeeded ? "false" : "true");
   }
 
-  function syncProvider() {
-    const provider = els.provider.value;
-    els.apiIdField.hidden = provider !== "baidu";
-    els.apiKeyField.hidden = PROVIDERS_WITH_KEY.indexOf(provider) === -1;
-    els.providerHint.innerHTML = Glossy.i18n.t(PROVIDER_HINTS[provider] || "");
+  /** The dropdown value that matches what the settings file holds. */
+  function serviceOf(stored) {
+    if (stored.channel === "cloud") return stored.cloudProvider === "local" ? "local" : "cloud";
+    const provider = stored.provider;
+    if (!provider || provider === "cloud" || provider === "local") return "cloud";
+    return SERVICE_HINTS[provider] ? provider : "google";
   }
 
   /** Fetches the allowance again whenever the shared server comes into view. */
@@ -309,7 +310,7 @@
 
   /** Whether the shared server — and therefore its allowance — is on screen. */
   function cloudQuotaVisible() {
-    return els.channel.value === "cloud" && els.cloudEngine.value === "builtin";
+    return els.service.value === "cloud";
   }
 
   /** Drops blanks and duplicates, ignoring a trailing `.exe`. */
@@ -678,14 +679,14 @@
 
   /**
    * Copies what is typed in the credential fields into the entry of the
-   * provider they belong to, so every provider keeps its own key. The fields
-   * always show the provider picked last, which is why the key comes from
+   * service they belong to, so every service keeps its own key. The fields
+   * always show the service picked last, which is why the key comes from
    * `shownProvider` and not from the dropdown.
    */
   function rememberCredentials() {
     if (!settings) return;
     const map = Object.assign({}, settings.credentials || {});
-    const provider = shownProvider || els.provider.value;
+    const provider = shownProvider || els.service.value;
     const entry = { appId: els.apiId.value.trim(), apiKey: els.apiKey.value.trim() };
     if (entry.appId || entry.apiKey) map[provider] = entry;
     else delete map[provider];
@@ -698,7 +699,7 @@
     renderIgnored();
     renderSourceLangs();
     relabelRunningApps();
-    syncChannel();
+    syncService();
     showHotkey(lastStatus);
     fillSample();
     syncDemoLanguage();
@@ -737,8 +738,6 @@
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
     els.cloudEndpoint.value = next.cloudEndpoint || "";
-    els.channel.value = next.channel === "api" ? "api" : "cloud";
-    els.cloudEngine.value = next.cloudProvider === "local" ? "local" : "builtin";
     els.localEndpoint.value = next.localEndpoint || "";
     els.localModel.value = next.localModel || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
@@ -748,10 +747,10 @@
     applyTheme(els.theme.value);
     fillLanguages(next.targetLang);
     els.targetLang.value = next.targetLang;
-    els.provider.value = PROVIDER_HINTS[next.provider] ? next.provider : "google";
+    els.service.value = serviceOf(next);
     els.uiLang.value = next.uiLang === "zh" || next.uiLang === "en" ? next.uiLang : "system";
     Glossy.i18n.set(els.uiLang.value);
-    showCredentials(els.provider.value);
+    showCredentials(els.service.value);
     els.options.dataset.disabled = String(!next.enabled);
     applyLanguage();
     syncChannelQuota();
@@ -759,6 +758,7 @@
 
   function collect() {
     rememberCredentials();
+    const service = els.service.value;
     return {
       ...settings,
       enabled: els.enabled.checked,
@@ -778,17 +778,18 @@
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
       cloudEndpoint: els.cloudEndpoint.value.trim(),
-      channel: els.channel.value === "api" ? "api" : "cloud",
-      cloudProvider: els.cloudEngine.value === "local" ? "local" : "builtin",
+      // The stored shape still separates where the text goes from which vendor
+      // translates it: Glossy's own server and the local model both count as the
+      // cloud channel, everything else uses the user's account.
+      channel: OWN_KEY_SERVICES.indexOf(service) === -1 ? "cloud" : "api",
+      cloudProvider: service === "local" ? "local" : "builtin",
       localEndpoint: els.localEndpoint.value.trim(),
       localModel: els.localModel.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,
       historyLimit: numberOr(els.historyLimit.value, 50),
       checkUpdates: els.checkUpdates.checked,
       targetLang: els.targetLang.value,
-      provider: PROVIDER_HINTS[els.provider.value]
-        ? els.provider.value
-        : settings.provider || "google",
+      provider: OWN_KEY_SERVICES.indexOf(service) === -1 ? settings.provider || "google" : service,
       uiLang: els.uiLang.value,
     };
   }
@@ -1105,25 +1106,14 @@
     applyLanguage();
     scheduleSave();
   });
-  els.channel.addEventListener("change", () => {
-    // Switching channel can change which account is used, so the credentials of
-    // the provider that is about to be hidden are put away first.
+  els.service.addEventListener("change", () => {
+    // Switching service can change which account is used, so the credentials of
+    // the service that is about to be left are put away before the ones of the
+    // newly selected service are shown.
     rememberCredentials();
-    syncChannel();
+    showCredentials(els.service.value);
+    syncService();
     syncChannelQuota();
-    scheduleSave();
-  });
-  els.cloudEngine.addEventListener("change", () => {
-    syncChannel();
-    syncChannelQuota();
-    scheduleSave();
-  });
-  els.provider.addEventListener("change", () => {
-    // Keep what the previous provider had before showing the credentials of the
-    // newly selected one.
-    rememberCredentials();
-    showCredentials(els.provider.value);
-    syncProvider();
     scheduleSave();
   });
   els.cloudEndpoint.addEventListener("change", () => {
