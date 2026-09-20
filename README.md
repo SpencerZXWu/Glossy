@@ -83,6 +83,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | Shortest selection to translate | Character count below which a selection is ignored (`1`–`40`, default `2`). |
 | Global hotkey | Accelerator that translates the clipboard content, e.g. `Ctrl+Alt+C`. Clear the field to switch it off. The line under the field shows the registered combination or why Windows refused it. |
 | Never translate in these programs | A list of process names (`idea64.exe`, `mstsc`) in which selection capture is skipped. Add one by typing it (the `.exe` suffix is optional — the `Add` button normalises it), by choosing it from the dropdown of currently running programs, or by pressing `Pick with the mouse` and clicking the window to ignore. Each entry has an `×` to remove it; duplicates are dropped case-insensitively. |
+| Only translate these source languages | A list of languages, e.g. `English` and `日本語`. Empty means every language triggers a translation. A selection whose language cannot be pinned down — mixed scripts, digits, a word half a dozen languages share — is always let through, so a wrong guess never swallows a selection. The list is stored as a `sourceLangs` array. |
 | Colours | `system` follows the Windows light/dark preference; `light` and `dark` force one scheme in both windows. |
 | Text size | Multiplier for every text size in the popup (`90 %`–`150 %`). |
 | Width | Popup card width (`300`–`520` CSS px). |
@@ -212,6 +213,16 @@ clipboard if requested, and finally tells the popup window what to show. The
 captured text only ever goes to the translation provider you selected — which is a
 vendor for every provider except `cloud`, where it goes to the server the project
 runs instead ([`server/`](./server/README.md)).
+
+A gesture only opens the card when it really selected something. The release
+point is checked first: a double click on a shell surface — a desktop icon, the
+taskbar, the Start button — is ignored, so whatever the shell last put on the
+clipboard is never translated. The copied text has to hold a letter and must not
+look like the path of a file or folder, and a copy of files in Explorer counts as
+no selection at all. When `Put the clipboard back after reading a selection` is
+on, the previous content is restored once the application that was copied from has
+stopped writing — it is checked again for up to 80 ms — so a late write cannot
+leave the copied text behind.
 
 ## Development
 
@@ -463,6 +474,7 @@ process. Each release maps to a GitHub milestone of the same name.
 | 触发翻译的最短长度 | 低于该字符数的选区会被忽略（`1`–`40`，默认 `2`）。 |
 | 全局快捷键 | 用于翻译剪贴板内容的快捷键，例如 `Ctrl+Alt+C`。清空该字段即可关闭它。字段下方的一行显示已注册的组合，或 Windows 拒绝它的原因。 |
 | 以下程序中不翻译 | 一份进程名列表（`idea64.exe`、`mstsc`），其中的程序会跳过划词捕获。输入名字即可添加（`.exe` 后缀可选——`添加` 按钮会把它规范化），也可以从当前运行程序的下拉框中选择，或按下 `用鼠标拾取` 后点选要忽略的窗口。每个条目都有一个 `×` 可以删除；重复项按大小写不敏感处理并被丢弃。 |
+| 仅翻译以下原文语言 | 一份语言列表，例如 `英语` 和 `日语`。留空表示任何语言都会触发翻译。无法确定语言的选区——混排文字、数字、多种语言共有的词——一律放行，因此猜错也不会吞掉你的选区。该列表以 `sourceLangs` 数组保存。 |
 | 配色 | `跟随系统` 跟随 Windows 的浅色/深色偏好；`始终浅色` 和 `始终深色` 会在两个窗口中强制使用一种方案。 |
 | 文字大小 | 弹窗中所有文字大小的倍数（`90 %`–`150 %`）。 |
 | 宽度 | 弹窗卡片宽度（`300`–`520` CSS 像素）。 |
@@ -535,6 +547,8 @@ process. Each release maps to a GitHub milestone of the same name.
 ## 划词是如何捕获的
 
 Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道——除 `cloud` 之外都是厂商的接口，而 `cloud` 发往本项目自己运行的服务器（[`server/`](./server/README.md)）。
+
+只有当手势真的选中了东西时，卡片才会打开。首先检查松开鼠标的位置：在 shell 表面（桌面图标、任务栏、开始按钮）上的双击会被忽略，因此 shell 最后放进剪贴板的东西永远不会被拿去翻译。复制到的文本必须含有字母，且不能看起来像文件或文件夹的路径；在资源管理器里复制文件则一律视为没有选中内容。勾选 `读取选区后恢复剪贴板` 时，会在被复制的那个程序停止写入之后再恢复原内容——最多再检查 80 ms——因此迟到的写入不会把复制到的文本留在剪贴板里。
 
 ## 开发
 
@@ -804,6 +818,7 @@ encima de él cuando no hay espacio debajo.
 | Shortest selection to translate | Número de caracteres por debajo del cual se ignora una selección (`1`–`40`, por defecto `2`). |
 | Global hotkey | Combinación que traduce el contenido del portapapeles, p. ej. `Ctrl+Alt+C`. Vacía el campo para desactivarla. La línea que hay bajo el campo muestra la combinación registrada o por qué Windows la rechazó. |
 | Never translate in these programs | Una lista de nombres de proceso (`idea64.exe`, `mstsc`) en los que se omite la captura de selecciones. Añade uno escribiéndolo (el sufijo `.exe` es opcional: el botón `Add` lo normaliza), eligiéndolo en el desplegable de programas en ejecución o pulsando `Pick with the mouse` y haciendo clic en la ventana que quieras ignorar. Cada entrada tiene una `×` para eliminarla; los duplicados se descartan sin distinguir mayúsculas y minúsculas. |
+| Only translate these source languages | Una lista de idiomas, por ejemplo `English` y `日本語`. Vacía significa que cualquier idioma abre una traducción. Una selección cuyo idioma no se puede determinar —texto mezclado, dígitos, una palabra que comparten media docena de idiomas— pasa siempre, así que una suposición equivocada nunca se traga tu selección. La lista se guarda como un array `sourceLangs`. |
 | Colours | `system` sigue la preferencia de Windows para modo claro u oscuro; `light` y `dark` fuerzan un esquema en ambas ventanas. |
 | Text size | Multiplicador de todos los tamaños de texto del emergente (`90 %`–`150 %`). |
 | Width | Ancho de la tarjeta emergente (`300`–`520` px CSS). |
@@ -951,6 +966,17 @@ pedido y, por último, indica a la ventana emergente qué debe mostrar. El texto
 capturado solo se envía al proveedor de traducción que hayas elegido — para todos
 los proveedores es un tercero, salvo `cloud`, que lo envía al servidor que mantiene
 el proyecto ([`server/`](./server/README.md)).
+
+Un gesto solo abre la tarjeta cuando de verdad ha seleccionado algo. Primero se
+comprueba el punto donde se suelta el botón: un doble clic sobre una superficie del
+shell —un icono del escritorio, la barra de tareas, el botón Inicio— se ignora, así
+que lo último que el shell dejó en el portapapeles nunca se traduce. El texto
+copiado tiene que contener una letra y no puede parecer la ruta de un archivo o
+carpeta, y copiar archivos en el Explorador cuenta como que no hay selección.
+Con `Put the clipboard back after reading a selection` activado, el contenido
+anterior se restaura una vez que la aplicación de la que se copió ha dejado de
+escribir —se vuelve a comprobar hasta 80 ms—, así que una escritura tardía no
+puede dejar ahí el texto copiado.
 
 ## Desarrollo
 
