@@ -90,8 +90,9 @@ without one.
    writes all six places at once. `scripts/version.ps1 -Check` lists any that drifted
    apart, and CI fails on a file that does not agree.
 2. `git tag -a vX.Y.Z -m "Glossy vX.Y.Z"` and `git push origin vX.Y.Z`.
-3. Create the release on GitHub for that tag — paste `RELEASE_NOTES.md` into the
-   description, all three languages and the anchor links included.
+3. Create the release on GitHub for that tag. The tag keeps the `v`, the release title
+   does not: it is `Glossy X.Y.Z`, never `Glossy vX.Y.Z`. Paste `RELEASE_NOTES.md`
+   into the description, all three languages and the anchor links included.
 4. Attach the installer and `SHA256SUMS.txt`. The installer has to be the one **this
    version staged**, whose file name carries the version, and `SHA256SUMS.txt` is
    generated from that same file — a mismatched pair means the wrong build is going

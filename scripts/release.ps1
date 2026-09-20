@@ -194,6 +194,7 @@ Get-ChildItem -LiteralPath $stage -File | ForEach-Object {
     '  {0,-34} {1,10:N0} bytes' -f $_.Name, $_.Length
 }
 Write-Host ''
-Write-Host 'Upload: create the tag, then the release, paste RELEASE_NOTES.md into the'
-Write-Host 'description and attach the installer together with SHA256SUMS.txt.'
+Write-Host 'Upload: create the tag vX.Y.Z, then the release titled "Glossy X.Y.Z" (the tag'
+Write-Host 'keeps the v, the title does not), paste RELEASE_NOTES.md into the description'
+Write-Host 'and attach the installer together with SHA256SUMS.txt.'
 Write-Host 'The notes switch language through the links at the top; keep all three translated.'

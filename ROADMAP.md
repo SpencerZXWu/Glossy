@@ -199,8 +199,9 @@ in it early.
    translations are written by hand (Google Translate is fine as the starting point)
    before the release goes out.
 4. Tag `vX.Y.Z` on `main` and push the tag.
-5. Publish a GitHub release at that tag: paste `release/vX.Y.Z/RELEASE_NOTES.md` into
-   the description - all three languages, anchors included - and attach the installer
+5. Publish a GitHub release at that tag, titled `Glossy X.Y.Z` — the tag carries the
+   `v`, the title does not. Paste `release/vX.Y.Z/RELEASE_NOTES.md` into the
+   description - all three languages, anchors included - and attach the installer
    together with the checksum. Check that the installer is the one this version staged,
    that its name carries the version, and that `SHA256SUMS.txt` lists it: v0.3.1 went
    out with v0.3.0's installer attached, so the release did not contain the fixes the
