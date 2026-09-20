@@ -16,7 +16,8 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-    SetWindowLongPtrW, WindowFromPoint, GA_ROOT, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    SetWindowLongPtrW, WindowFromPoint, GA_PARENT, GA_ROOT, GWL_EXSTYLE, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
 };
 
 /// Native handle of a window, kept as a plain integer so callers never have to
@@ -218,24 +219,74 @@ const SHELL_PROCESSES: &[&str] = &[
 /// shell.
 ///
 /// Such a click selects nothing, yet the Ctrl+C Glossy sends afterwards still
-/// reaches the program in front, which may answer it by copying a stale
-/// clipboard entry - the popup that used to appear out of nowhere.
+/// reaches the program in front, which may answer it by copying the clicked item
+/// as text - the popup that used to appear out of nowhere.
+///
+/// The whole window chain is inspected, not just the top level window: a desktop
+/// icon is a list view nested inside `Progman`/`WorkerW`, and the window under
+/// the cursor reports its own class, which is a plain list.
 pub fn shell_surface_at(x: i32, y: i32) -> bool {
     unsafe {
         let window = WindowFromPoint(POINT { x, y });
         if window.0.is_null() {
             return true;
         }
-        // Child windows belong to the top level window the user clicked on.
-        let root = GetAncestor(window, GA_ROOT);
-        let target = if root.0.is_null() { window } else { root };
-        if SHELL_CLASSES
-            .iter()
-            .any(|name| window_class(target).eq_ignore_ascii_case(name))
-        {
+        chain_reaches_shell(window, &window_chain(window))
+    }
+}
+
+/// True when the program that would receive the copy shortcut is a shell
+/// surface, so the text it would produce is a shortcut name rather than a
+/// selection.
+///
+/// A double click on a desktop icon can hand the foreground to the desktop
+/// itself, which then answers Ctrl+C with the name of the icon.
+pub fn copy_target_is_shell() -> bool {
+    unsafe {
+        let foreground = GetForegroundWindow();
+        if foreground.0.is_null() {
             return true;
         }
-        process_name_of_window(target).is_some_and(|name| {
+        chain_reaches_shell(foreground, &window_chain(foreground))
+    }
+}
+
+/// Classes of `window` and every ancestor, innermost first.
+unsafe fn window_chain(window: HWND) -> Vec<String> {
+    let mut classes = Vec::new();
+    let mut current = window;
+    // The desktop window ends every chain; the bound only guards a cycle.
+    for _ in 0..16 {
+        classes.push(window_class(current));
+        let parent = GetAncestor(current, GA_PARENT);
+        if parent.0.is_null() || parent.0 == current.0 {
+            break;
+        }
+        current = parent;
+    }
+    classes
+}
+
+/// Splits the decision from the window calls so it can be tested.
+fn chain_reaches_shell(window: HWND, classes: &[String]) -> bool {
+    if classes.iter().any(|class| {
+        SHELL_CLASSES
+            .iter()
+            .any(|shell| class.eq_ignore_ascii_case(shell))
+    }) {
+        return true;
+    }
+    // The process check only applies to the outer window, the one Explorer owns.
+    let outer = unsafe {
+        let root = GetAncestor(window, GA_ROOT);
+        if root.0.is_null() {
+            window
+        } else {
+            root
+        }
+    };
+    unsafe {
+        process_name_of_window(outer).is_some_and(|name| {
             SHELL_PROCESSES
                 .iter()
                 .any(|shell| shell.eq_ignore_ascii_case(&name))
@@ -289,5 +340,56 @@ pub fn make_non_activating(handle: Handle) {
         let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         let updated = current | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::Foundation::HWND;
+
+    fn chain(classes: &[&str]) -> Vec<String> {
+        classes.iter().map(|class| class.to_string()).collect()
+    }
+
+    #[test]
+    fn a_desktop_icon_is_part_of_the_shell() {
+        // Windows 11 nests the icon list inside WorkerW, Windows 10 inside
+        // Progman; the window under the cursor is only the list itself.
+        assert!(chain_reaches_shell(
+            HWND::default(),
+            &chain(&["SysListView32", "SHELLDLL_DefView", "WorkerW", "#32769"])
+        ));
+        assert!(chain_reaches_shell(
+            HWND::default(),
+            &chain(&["SysListView32", "SHELLDLL_DefView", "Progman", "#32769"])
+        ));
+    }
+
+    #[test]
+    fn the_taskbar_and_its_children_are_part_of_the_shell() {
+        assert!(chain_reaches_shell(
+            HWND::default(),
+            &chain(&["MSTaskListWClass", "Shell_TrayWnd", "#32769"])
+        ));
+        assert!(chain_reaches_shell(
+            HWND::default(),
+            &chain(&["Windows.UI.Core.CoreWindow"])
+        ));
+    }
+
+    #[test]
+    fn a_text_field_inside_a_folder_window_is_not() {
+        // Folder windows host the same SHELLDLL_DefView class as the desktop, so
+        // only the outer window decides.
+        assert!(!chain_reaches_shell(
+            HWND::default(),
+            &chain(&["Edit", "DirectUIHWND", "SHELLDLL_DefView", "CabinetWClass"])
+        ));
+        assert!(!chain_reaches_shell(
+            HWND::default(),
+            &chain(&["Edit", "Notepad", "#32769"])
+        ));
+        assert!(!chain_reaches_shell(HWND::default(), &chain(&["Edit"])));
     }
 }

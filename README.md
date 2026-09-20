@@ -222,7 +222,9 @@ look like the path of a file or folder, and a copy of files in Explorer counts a
 no selection at all. When `Put the clipboard back after reading a selection` is
 on, the previous content is restored once the application that was copied from has
 stopped writing — it is checked again for up to 80 ms — so a late write cannot
-leave the copied text behind.
+leave the copied text behind. Glossy remembers the sequence number of every write
+it makes itself and skips those while waiting for the `Ctrl+C` to land, so putting
+the clipboard back can never be read back as a selection of its own.
 
 ## Development
 
@@ -548,7 +550,7 @@ process. Each release maps to a GitHub milestone of the same name.
 
 Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道——除 `cloud` 之外都是厂商的接口，而 `cloud` 发往本项目自己运行的服务器（[`server/`](./server/README.md)）。
 
-只有当手势真的选中了东西时，卡片才会打开。首先检查松开鼠标的位置：在 shell 表面（桌面图标、任务栏、开始按钮）上的双击会被忽略，因此 shell 最后放进剪贴板的东西永远不会被拿去翻译。复制到的文本必须含有字母，且不能看起来像文件或文件夹的路径；在资源管理器里复制文件则一律视为没有选中内容。勾选 `读取选区后恢复剪贴板` 时，会在被复制的那个程序停止写入之后再恢复原内容——最多再检查 80 ms——因此迟到的写入不会把复制到的文本留在剪贴板里。
+只有当手势真的选中了东西时，卡片才会打开。首先检查松开鼠标的位置：在 shell 表面（桌面图标、任务栏、开始按钮）上的双击会被忽略，因此 shell 最后放进剪贴板的东西永远不会被拿去翻译。复制到的文本必须含有字母，且不能看起来像文件或文件夹的路径；在资源管理器里复制文件则一律视为没有选中内容。勾选 `读取选区后恢复剪贴板` 时，会在被复制的那个程序停止写入之后再恢复原内容——最多再检查 80 ms——因此迟到的写入不会把复制到的文本留在剪贴板里。Glossy 会记下自己每一次写入的序列号，在等待 `Ctrl+C` 落地时跳过这些写入，因此"恢复剪贴板"这一步不会被它自己当成一次选区读取。
 
 ## 开发
 
@@ -976,7 +978,10 @@ carpeta, y copiar archivos en el Explorador cuenta como que no hay selección.
 Con `Put the clipboard back after reading a selection` activado, el contenido
 anterior se restaura una vez que la aplicación de la que se copió ha dejado de
 escribir —se vuelve a comprobar hasta 80 ms—, así que una escritura tardía no
-puede dejar ahí el texto copiado.
+puede dejar ahí el texto copiado. Glossy recuerda el número de secuencia de cada
+escritura que hace él mismo y las omite mientras espera a que llegue el `Ctrl+C`,
+así que devolver el portapapeles a su sitio nunca se puede leer como una selección
+propia.
 
 ## Desarrollo
 

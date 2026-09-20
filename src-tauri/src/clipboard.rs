@@ -1,6 +1,7 @@
 //! Clipboard access plus the "press Ctrl+C and watch the clipboard" trick that
 //! reads the current text selection out of the foreground application.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL};
@@ -41,6 +42,19 @@ const RESTORE_SETTLE_INTERVAL: Duration = Duration::from_millis(20);
 /// Upper bound for a single captured format; larger payloads are skipped rather
 /// than copied into memory (a 4K screenshot is well below this).
 const MAX_FORMAT_BYTES: usize = 1 << 26;
+
+/// Clipboard sequence number of the last write this program made.
+///
+/// A restore puts the text that was on the clipboard before the capture back,
+/// and a second trigger landing right afterwards would otherwise see that write
+/// as a fresh copy and translate the restored text - the popup that appeared out
+/// of nowhere when nothing had been selected.
+static OWN_SEQUENCE: AtomicU32 = AtomicU32::new(0);
+
+/// Remembers the sequence number of a write just performed.
+fn note_own_write() {
+    OWN_SEQUENCE.store(sequence_number(), Ordering::Relaxed);
+}
 
 fn open_retry() -> bool {
     // The clipboard is often briefly locked by the application that just wrote to it.
@@ -120,6 +134,9 @@ pub fn write_text(text: &str) -> bool {
         if !stored {
             let _ = GlobalFree(Some(block));
         }
+        if stored {
+            note_own_write();
+        }
         stored
     }
 }
@@ -185,6 +202,7 @@ impl Snapshot {
             }
             let _ = CloseClipboard();
         }
+        note_own_write();
     }
 
     /// Restores, then repairs the clipboard if it changes again right away.
@@ -292,13 +310,17 @@ pub fn capture_selection(restore: bool) -> Capture {
         None
     };
     let before = sequence_number();
+    // A restore of an earlier capture may still be in flight, and that write must
+    // not be mistaken for the answer to this copy.
+    let own = OWN_SEQUENCE.load(Ordering::Relaxed);
 
     crate::input::send_copy();
 
     let deadline = Instant::now() + Duration::from_millis(700);
     let mut changed = false;
     while Instant::now() < deadline {
-        if sequence_number() != before {
+        let current = sequence_number();
+        if current != before && current != own {
             changed = true;
             break;
         }

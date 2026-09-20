@@ -359,6 +359,11 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     if platform::shell_surface_at(x, y) {
         return;
     }
+    // The click can also hand the foreground to the desktop while the icon stays
+    // selected, so check where the copy would land as well.
+    if platform::copy_target_is_shell() {
+        return;
+    }
 
     let Capture::Text(text) = clipboard::capture_selection(settings.restore_clipboard) else {
         return;

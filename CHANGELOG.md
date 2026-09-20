@@ -35,6 +35,12 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 - The clipboard is really put back. Some programs fill it from a worker thread,
   so their write landed just after the restore and undid it; the restore now
   watches the clipboard for a moment longer and repairs it.
+- Glossy no longer reads its own clipboard writes as a copy. Putting the previous
+  content back happens after a selection has been read, and the write that does it
+  moves the clipboard along just like a real copy; a second trigger arriving in
+  that window used to see the restored text as a fresh selection and translate it.
+  Every write Glossy makes is now remembered by its sequence number and ignored
+  while waiting for an answer.
 
 ## [1.0.0] - 2026-09-20
 
