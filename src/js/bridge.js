@@ -161,6 +161,10 @@
           await navigator.clipboard.writeText(input.text || "").catch(() => {});
         }
         return true;
+      case "read_clipboard":
+        // The preview reads the browser clipboard; the app reads the Windows one.
+        if (!navigator.clipboard || !navigator.clipboard.readText) return "";
+        return await navigator.clipboard.readText().catch(() => "");
       case "popup_present":
       case "popup_resize":
         // The real backend reports the usable height of the monitor the popup

@@ -34,6 +34,52 @@
 
       <main>
         <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="panel.demo">Translate</h2>
+            <label class="unit-toggle">
+              <input type="checkbox" id="demoUnits" class="switch" />
+              <span data-i18n="demo.units">Convert units</span>
+            </label>
+          </div>
+          <p class="hint" data-i18n="demo.hint">
+            Type or paste a text, then select a word, a phrase or a sentence — or press
+            Translate — to see the result right here, in the same card as the popup.
+          </p>
+          <textarea id="demoText" class="demo-input" rows="5" spellcheck="false" data-i18n-placeholder="demo.placeholder"></textarea>
+          <div class="demo-actions">
+            <button type="button" id="demoRun" class="ghost" data-i18n="demo.run">Translate</button>
+            <button type="button" id="demoPaste" class="ghost" data-i18n="demo.paste">Paste</button>
+            <button type="button" id="demoClear" class="ghost" data-i18n="demo.clear">Clear</button>
+            <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
+            <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
+          </div>
+          <div class="card" id="demoCard" hidden>
+            <header class="bar">
+              <div class="grip">
+                <span class="headword" id="demoHeadword"></span>
+              </div>
+              <button class="icon-button" id="demoCopy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="12" height="12" rx="2.5" />
+                  <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+                </svg>
+              </button>
+            </header>
+            <div class="langbar" id="demoLangbar" hidden>
+              <select class="lang-select" id="demoFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
+              <button class="lang-swap" id="demoSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 8h13M14 5l3 3-3 3" />
+                  <path d="M20 16H7M10 13l-3 3 3 3" />
+                </svg>
+              </button>
+              <select class="lang-select" id="demoTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+            </div>
+            <div class="content" id="demoResult"></div>
+          </div>
+        </section>
+
+        <section class="panel">
           <label class="row master" for="enabled">
             <span class="row-text">
               <strong data-i18n="master.title">Enable text selection translation</strong>
@@ -177,44 +223,6 @@
             <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
           </div>
           <p class="hint" id="providerHint"></p>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.demo">Translate</h2>
-          <p class="hint" data-i18n="demo.hint">
-            Type or paste a text, then select a word, a phrase or a sentence — or press
-            Translate — to see the result right here, in the same card as the popup.
-          </p>
-          <textarea id="demoText" class="demo-input" rows="4" spellcheck="false" data-i18n-placeholder="demo.placeholder"></textarea>
-          <div class="demo-actions">
-            <button type="button" id="demoRun" class="ghost" data-i18n="demo.run">Translate</button>
-            <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
-            <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
-          </div>
-          <div class="card" id="demoCard" hidden>
-            <header class="bar">
-              <div class="grip">
-                <span class="headword" id="demoHeadword"></span>
-              </div>
-              <button class="icon-button" id="demoCopy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="12" height="12" rx="2.5" />
-                  <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
-                </svg>
-              </button>
-            </header>
-            <div class="langbar" id="demoLangbar" hidden>
-              <select class="lang-select" id="demoFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
-              <button class="lang-swap" id="demoSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 8h13M14 5l3 3-3 3" />
-                  <path d="M20 16H7M10 13l-3 3 3 3" />
-                </svg>
-              </button>
-              <select class="lang-select" id="demoTo" data-i18n-title="popup.targetLang" title="Target language"></select>
-            </div>
-            <div class="content" id="demoResult"></div>
-          </div>
         </section>
 
         <section class="panel">

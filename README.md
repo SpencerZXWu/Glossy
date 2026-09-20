@@ -157,11 +157,16 @@ comma-separated string is accepted and split on load.
 
 ### Translate inside the app
 
-The settings window contains the same translation feature as the popup: a text
-box for typing or pasting text. Select a word, a phrase or a sentence in that box
-— or press **Translate** to use the whole text — and the result appears right
-below, in a card identical to the popup one: the source/target language bar with
-its swap button, the copy button and the same word/sentence rendering. The
+The top of the settings window holds the same translation feature as the popup: a
+text box for typing or pasting text. Select a word, a phrase or a sentence in that
+box — or press **Translate** (Ctrl+Enter) to use the whole text — and the result
+appears right below, in a card identical to the popup one: the source/target
+language bar with its swap button, the copy button and the same word/sentence
+rendering. A pasted text is translated as soon as it lands, whether it arrives
+through **Paste** or through Ctrl+V; **Clear** empties the box and takes the card
+away. The switch on the heading turns unit conversion on and off for the whole
+app: it is the same setting as the one in **Units** further down, and it is the
+one place where the conversions of a card can be flipped on the spot. The
 language bar follows the popup rules, so the source starts on *Detect language*,
 the target follows the configured language, and a new selection resets the pair
 (the overrides are never saved). Press **Show in floating popup** to open the
@@ -491,7 +496,7 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 在应用内翻译
 
-设置窗口包含与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（这些临时覆盖永远不会被保存）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
+设置窗口顶部是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与下方**单位换算**面板里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（这些临时覆盖永远不会被保存）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
 
 ### 常见问题
 
@@ -852,17 +857,22 @@ heredada separada por comas se acepta y se divide al cargar.
 
 ### Traducir dentro de la aplicación
 
-La ventana de ajustes contiene la misma función de traducción que el emergente: un
-cuadro de texto para escribir o pegar texto. Selecciona una palabra, una frase o
-una oración en ese cuadro —o pulsa **Translate** para usar todo el texto— y el
-resultado aparece justo debajo, en una tarjeta idéntica a la del emergente: la
-barra de idioma de origen y destino con su botón de intercambio, el botón de copiar
-y la misma representación de palabra u oración. La barra de idioma sigue las reglas
-del emergente, así que el origen empieza en *Detect language*, el destino sigue al
-idioma configurado y una nueva selección restablece el par (las anulaciones nunca
-se guardan). Pulsa **Show in floating popup** para abrir el emergente real con la
-selección actual (o con todo el texto cuando no hay nada seleccionado): así se
-prueba el emergente sin el enganche global.
+La parte superior de la ventana de ajustes contiene la misma función de traducción
+que el emergente: un cuadro de texto para escribir o pegar texto. Selecciona una
+palabra, una frase o una oración en ese cuadro —o pulsa **Translate** (Ctrl+Enter)
+para usar todo el texto— y el resultado aparece justo debajo, en una tarjeta
+idéntica a la del emergente: la barra de idioma de origen y destino con su botón de
+intercambio, el botón de copiar y la misma representación de palabra u oración. El
+texto pegado se traduce en cuanto llega, ya sea mediante **Paste** o con Ctrl+V;
+**Clear** vacía el cuadro y retira la tarjeta. El interruptor que hay en el
+encabezado activa o desactiva la conversión de unidades para toda la aplicación: es
+el mismo ajuste que el del panel **Units** de más abajo, y es el único sitio donde
+las conversiones de una tarjeta se pueden cambiar al momento. La barra de idioma
+sigue las reglas del emergente, así que el origen empieza en *Detect language*, el
+destino sigue al idioma configurado y una nueva selección restablece el par (las
+anulaciones nunca se guardan). Pulsa **Show in floating popup** para abrir el
+emergente real con la selección actual (o con todo el texto cuando no hay nada
+seleccionado): así se prueba el emergente sin el enganche global.
 
 ### Solución de problemas
 

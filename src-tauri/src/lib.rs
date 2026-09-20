@@ -290,6 +290,12 @@ fn copy_text(text: String) -> bool {
     clipboard::copy_to_clipboard(&text)
 }
 
+/// What the clipboard holds, for the paste button of the settings window.
+#[tauri::command]
+fn read_clipboard() -> String {
+    clipboard::read_text().unwrap_or_default()
+}
+
 #[tauri::command]
 fn capture_status(state: State<'_, Arc<AppState>>) -> CaptureStatus {
     let (hotkey, hotkey_error) = hotkey::status();
@@ -460,6 +466,7 @@ pub fn run() {
             popup_close,
             popup_set_pinned,
             copy_text,
+            read_clipboard,
             history_list,
             history_clear,
             history_remove,

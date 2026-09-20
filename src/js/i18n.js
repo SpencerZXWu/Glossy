@@ -124,10 +124,14 @@
 
     "panel.demo": "Translate",
     "demo.hint":
-      "Type or paste text below, then select a part of it — a word, a phrase or a sentence — or press Translate. The result appears in the same card the floating popup draws.",
+      "Type or paste text below, then select a part of it — a word, a phrase or a sentence — or press Translate (Ctrl+Enter). A pasted text is translated as soon as it lands. The result appears in the same card the floating popup draws.",
     "demo.placeholder":
       "Type or paste the text to translate, then select a part of it…",
     "demo.run": "Translate",
+    "demo.paste": "Paste",
+    "demo.clear": "Clear",
+    "demo.pasteEmpty": "The clipboard holds no text.",
+    "demo.units": "Convert units",
     "demo.button": "Show in floating popup",
     "demo.nothing": "Nothing selected yet.",
     "demo.demoText":
@@ -321,9 +325,13 @@
 
     "panel.demo": "翻译",
     "demo.hint":
-      "在下面输入或粘贴文本，然后选中其中任意一部分——单词、短语或整句——也可以直接点「翻译」。结果会用与悬浮窗完全相同的卡片就地显示。",
+      "在下面输入或粘贴文本，然后选中其中任意一部分——单词、短语或整句——也可以直接点「翻译」（Ctrl+Enter）。粘贴进来的整段文本会立即翻译。结果会用与悬浮窗完全相同的卡片就地显示。",
     "demo.placeholder": "输入或粘贴要翻译的文本，然后选中其中一部分…",
     "demo.run": "翻译",
+    "demo.paste": "粘贴",
+    "demo.clear": "清空",
+    "demo.pasteEmpty": "剪贴板里没有文字。",
+    "demo.units": "单位换算",
     "demo.button": "在悬浮窗中显示",
     "demo.nothing": "还没有选中内容。",
     "demo.demoText":

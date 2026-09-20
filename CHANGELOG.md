@@ -8,6 +8,17 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+### Added
+
+- The translate box that the settings window already carried now sits at the top
+  of the window, above the enable switch, so the app can be used without
+  selecting text anywhere: it gained **Paste** (reads the Windows clipboard
+  through a new `read_clipboard` command), **Clear**, Ctrl+Enter to translate the
+  whole text, and a pasted text is translated as soon as it lands. A new
+  **Units** switch on the same heading turns unit conversion on and off from
+  there — it is bound to the existing setting below, so either switch moves both
+  and the visible card is redrawn with or without its conversions.
+
 ## [0.3.2] - 2026-09-20
 
 ### Fixed

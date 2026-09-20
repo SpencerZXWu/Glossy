@@ -41,6 +41,9 @@
     statusText: $("statusText"),
     demoText: $("demoText"),
     demoRun: $("demoRun"),
+    demoPaste: $("demoPaste"),
+    demoClear: $("demoClear"),
+    demoUnits: $("demoUnits"),
     demoCard: $("demoCard"),
     demoHeadword: $("demoHeadword"),
     demoCopy: $("demoCopy"),
@@ -576,6 +579,7 @@
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
     els.unitsEnabled.checked = next.unitsEnabled !== false;
+    els.demoUnits.checked = els.unitsEnabled.checked;
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
     els.checkUpdates.checked = !!next.checkUpdates;
     applyTheme(els.theme.value);
@@ -860,6 +864,61 @@
     sampleText = next;
   }
 
+  /** Draws the card again, so a units or a language change lands on the spot. */
+  function refreshDemo() {
+    if (demoValue) runDemo(demoValue);
+  }
+
+  /**
+   * The translate area carries its own units switch. Both switches write the one
+   * setting, so each mirrors the other. The backend attaches the conversions
+   * from the settings it holds, so the write is awaited before the card is
+   * redrawn — the conversions of the old switch would otherwise come back.
+   */
+  async function setUnits(enabled) {
+    els.unitsEnabled.checked = enabled;
+    els.demoUnits.checked = enabled;
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    pending = false;
+    await save();
+    refreshDemo();
+  }
+
+  /** Puts the clipboard in the box and translates it right away. */
+  async function pasteDemo() {
+    let text = "";
+    try {
+      text = String((await Glossy.invoke("read_clipboard")) || "");
+    } catch (error) {
+      text = "";
+    }
+    if (!text.trim()) {
+      showToast(Glossy.i18n.t("demo.pasteEmpty"));
+      return;
+    }
+    els.demoText.value = text;
+    resetDemoLanguages();
+    runDemo(text);
+  }
+
+  /** Empties the box and takes the card away. */
+  function clearDemo() {
+    // A translation still in flight must not draw into the emptied card.
+    demoTicket += 1;
+    demoValue = "";
+    demoResult = null;
+    demoDetected = "";
+    selection = "";
+    resetDemoLanguages();
+    els.demoText.value = "";
+    els.demoCard.hidden = true;
+    els.demoHeadword.textContent = "";
+    els.demoResult.innerHTML = "";
+    els.demoLangbar.hidden = true;
+    els.selectionHint.textContent = Glossy.i18n.t("demo.nothing");
+  }
+
   els.options.addEventListener("change", scheduleSave);
   els.enabled.addEventListener("change", () => {
     els.options.dataset.disabled = String(!els.enabled.checked);
@@ -943,6 +1002,8 @@
   ].forEach((element) => {
     element.addEventListener("change", scheduleSave);
   });
+  // Registered after the loop, so the mirror of the area's switch runs with it.
+  els.unitsEnabled.addEventListener("change", () => setUnits(els.unitsEnabled.checked));
 
   els.historySearch.addEventListener("input", renderHistory);
   els.historyClear.addEventListener("click", clearHistory);
@@ -993,6 +1054,23 @@
     const picked = highlighted().replace(/\s+/g, " ").trim();
     runDemo(picked.length >= 2 ? picked : els.demoText.value);
   });
+  els.demoPaste.addEventListener("click", pasteDemo);
+  els.demoClear.addEventListener("click", clearDemo);
+  els.demoText.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+    event.preventDefault();
+    runDemo(els.demoText.value);
+  });
+  els.demoText.addEventListener("paste", () => {
+    // The new text lands after the event, so the run waits a beat for it.
+    setTimeout(() => {
+      const value = els.demoText.value.trim();
+      if (value.length < 2) return;
+      resetDemoLanguages();
+      runDemo(value);
+    }, 0);
+  });
+  els.demoUnits.addEventListener("change", () => setUnits(els.demoUnits.checked));
   els.demoFrom.addEventListener("change", () => {
     demoPair.source = els.demoFrom.value;
     demoDetected = "";
