@@ -29,6 +29,15 @@ fn is_handle_format(format: u32) -> bool {
 
 const MAX_TEXT_BYTES: usize = 1 << 21;
 
+/// `CF_HDROP`, the list of files a copy in the file explorer publishes.
+const CF_HDROP: u32 = 15;
+
+/// How often the clipboard is looked at again after a restore, and how long to
+/// wait in between. Short enough that a copy the user makes right afterwards
+/// survives.
+const RESTORE_SETTLE_TRIES: usize = 4;
+const RESTORE_SETTLE_INTERVAL: Duration = Duration::from_millis(20);
+
 /// Upper bound for a single captured format; larger payloads are skipped rather
 /// than copied into memory (a 4K screenshot is well below this).
 const MAX_FORMAT_BYTES: usize = 1 << 26;
@@ -119,6 +128,26 @@ fn sequence_number() -> u32 {
     unsafe { GetClipboardSequenceNumber() }
 }
 
+/// Reads the text the copy shortcut just put on the clipboard.
+///
+/// A copy in the file explorer publishes the selected files as `CF_HDROP`
+/// alongside the path it also offers as text; that path is not a selection the
+/// user wants translated.
+fn read_copied_text() -> Option<String> {
+    if !open_retry() {
+        return None;
+    }
+    let text = if unsafe { GetClipboardData(CF_HDROP) }.is_ok() {
+        None
+    } else {
+        read_text_locked()
+    };
+    unsafe {
+        let _ = CloseClipboard();
+    }
+    text
+}
+
 /// A verbatim copy of everything the clipboard holds.
 ///
 /// The Ctrl+C used to read a selection replaces the whole clipboard, so keeping
@@ -155,6 +184,26 @@ impl Snapshot {
                 put_format(*format, bytes);
             }
             let _ = CloseClipboard();
+        }
+    }
+
+    /// Restores, then repairs the clipboard if it changes again right away.
+    ///
+    /// Some applications fill the clipboard from a worker thread, so their write
+    /// can land just after ours and undo the restore. A copy the user makes
+    /// themselves also bumps the sequence number, which is why this only watches
+    /// the clipboard for a moment instead of keeping an eye on it.
+    fn restore_settled(&self) {
+        self.restore();
+        let mut ours = sequence_number();
+        for _ in 0..RESTORE_SETTLE_TRIES {
+            std::thread::sleep(RESTORE_SETTLE_INTERVAL);
+            let current = sequence_number();
+            if current == ours {
+                return;
+            }
+            self.restore();
+            ours = sequence_number();
         }
     }
 }
@@ -262,7 +311,7 @@ pub fn capture_selection(restore: bool) -> Capture {
 
     // The foreground application may still be filling the clipboard.
     std::thread::sleep(Duration::from_millis(20));
-    let captured = read_text();
+    let captured = read_copied_text();
 
     let result = match captured {
         Some(text) if !text.trim().is_empty() => Capture::Text(text),
@@ -271,7 +320,7 @@ pub fn capture_selection(restore: bool) -> Capture {
 
     // An empty clipboard is left as it is, so the copied selection stays available.
     if let Some(snapshot) = snapshot.as_ref() {
-        snapshot.restore();
+        snapshot.restore_settled();
     }
 
     result

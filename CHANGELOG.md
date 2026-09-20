@@ -8,6 +8,34 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+### Added
+
+- **Only translate these source languages**, a new list in the Trigger panel of
+  the settings window. Add a language and Glossy stops translating selections
+  written in the others, which is how a reader who works in one language keeps a
+  second one out of the way. The language of a selection is guessed from its
+  script and its most frequent short words, and a selection that cannot be told
+  apart (a name, a number, a line of code) is translated anyway, so a wrong guess
+  never swallows text the user wanted. The list is stored as `sourceLangs`, and an
+  empty list means every language, which is what settings files written before
+  this release get.
+
+### Fixed
+
+- A double click that selects nothing no longer opens a popup. Clicks on the
+  desktop, the taskbar, the start menu and the other surfaces of the shell are
+  ignored, because the Ctrl+C Glossy sends afterwards still reaches the program in
+  front, and a program that answers it by copying a stale clipboard entry used to
+  bring the popup up out of nowhere.
+- Selections that carry no language are skipped: a run of digits or punctuation,
+  and - when the click happens over a program that copies it - the path of a file.
+- A copy of a file in the file explorer no longer counts as a selection. Explorer
+  publishes the files it copies as `CF_HDROP` while offering the path as text as
+  well; the text is what used to be translated.
+- The clipboard is really put back. Some programs fill it from a worker thread,
+  so their write landed just after the restore and undid it; the restore now
+  watches the clipboard for a moment longer and repairs it.
+
 ## [1.0.0] - 2026-09-20
 
 The first stable release: Glossy now ships with a server of its own, so it can be

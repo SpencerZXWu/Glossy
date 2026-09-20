@@ -9,6 +9,7 @@ mod history;
 mod hotkey;
 mod input;
 mod instance;
+mod lang;
 mod notice;
 mod platform;
 mod popup;

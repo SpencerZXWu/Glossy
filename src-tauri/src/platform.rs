@@ -14,7 +14,7 @@ use windows::Win32::System::Threading::{
     PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetAncestor, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
+    EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
     SetWindowLongPtrW, WindowFromPoint, GA_ROOT, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
@@ -185,6 +185,72 @@ unsafe fn process_name_of_window(window: HWND) -> Option<String> {
             .next()
             .filter(|name| !name.is_empty())
             .map(|name| name.to_string())
+    }
+}
+
+/// Window classes of the shell surfaces: the desktop, the taskbar, the system
+/// pop-ups. Nothing there can be selected, but a click still reaches the mouse
+/// hook.
+const SHELL_CLASSES: &[&str] = &[
+    "Progman",
+    "WorkerW",
+    "Shell_TrayWnd",
+    "Shell_SecondaryTrayWnd",
+    "NotifyIconOverflowWindow",
+    "XamlExplorerHostIslandWindow",
+    "Windows.UI.Core.CoreWindow",
+    "ForegroundStaging",
+];
+
+/// Programs that only draw the start menu, the search box and the lock screen.
+/// Explorer itself is absent: its file windows do show selectable text, so only
+/// the classes above rule it out.
+const SHELL_PROCESSES: &[&str] = &[
+    "StartMenuExperienceHost.exe",
+    "SearchHost.exe",
+    "ShellExperienceHost.exe",
+    "TextInputHost.exe",
+    "LockApp.exe",
+    "sihost.exe",
+];
+
+/// True when `(x, y)` lies on the desktop, the taskbar or another surface of the
+/// shell.
+///
+/// Such a click selects nothing, yet the Ctrl+C Glossy sends afterwards still
+/// reaches the program in front, which may answer it by copying a stale
+/// clipboard entry - the popup that used to appear out of nowhere.
+pub fn shell_surface_at(x: i32, y: i32) -> bool {
+    unsafe {
+        let window = WindowFromPoint(POINT { x, y });
+        if window.0.is_null() {
+            return true;
+        }
+        // Child windows belong to the top level window the user clicked on.
+        let root = GetAncestor(window, GA_ROOT);
+        let target = if root.0.is_null() { window } else { root };
+        if SHELL_CLASSES
+            .iter()
+            .any(|name| window_class(target).eq_ignore_ascii_case(name))
+        {
+            return true;
+        }
+        process_name_of_window(target).is_some_and(|name| {
+            SHELL_PROCESSES
+                .iter()
+                .any(|shell| shell.eq_ignore_ascii_case(&name))
+        })
+    }
+}
+
+unsafe fn window_class(window: HWND) -> String {
+    unsafe {
+        let mut buffer = [0u16; 256];
+        let length = GetClassNameW(window, &mut buffer);
+        if length <= 0 {
+            return String::new();
+        }
+        String::from_utf16_lossy(&buffer[..length as usize])
     }
 }
 

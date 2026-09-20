@@ -22,6 +22,10 @@
     ignoredAdd: $("ignoredAdd"),
     ignoredPick: $("ignoredPick"),
     ignoredHint: $("ignoredHint"),
+    sourceLangsList: $("sourceLangsList"),
+    sourceLangsAdd: $("sourceLangsAdd"),
+    sourceLangsClear: $("sourceLangsClear"),
+    sourceLangsHint: $("sourceLangsHint"),
     theme: $("theme"),
     fontScale: $("fontScale"),
     popupWidth: $("popupWidth"),
@@ -116,6 +120,8 @@
   let selection = "";
   /** Programs that never trigger a translation, as shown by the chip list. */
   let ignored = [];
+  /** Source languages that still trigger a translation; empty means all. */
+  let sourceLangs = [];
   /** Provider whose credentials the two input fields currently show. */
   let shownProvider = null;
   /** Number of running programs in the dropdown; -1 while it is being read. */
@@ -326,6 +332,73 @@
     els.ignoredHint.textContent = ignored.length
       ? Glossy.i18n.t("ignored.count", ignored.length)
       : Glossy.i18n.t("ignored.empty");
+  }
+
+  /** Fills the dropdown with the languages that can still be added. */
+  function fillSourceLangPicker() {
+    els.sourceLangsAdd.innerHTML = "";
+    els.sourceLangsAdd.appendChild(new Option(Glossy.i18n.t("source.add"), ""));
+    LANGUAGES.filter((code) => !isSourceLang(code)).forEach((code) => {
+      els.sourceLangsAdd.appendChild(new Option(Glossy.languageName(code), code));
+    });
+  }
+
+  /** Drops blanks and duplicates from the source-language list. */
+  function normalizeSourceLangs(list) {
+    const seen = Object.create(null);
+    const result = [];
+    (Array.isArray(list) ? list : [list]).forEach((entry) => {
+      String(entry || "")
+        .split(/[,;\s]+/)
+        .forEach((part) => {
+          const code = part.trim();
+          if (!code) return;
+          const key = code.toLowerCase();
+          if (seen[key]) return;
+          seen[key] = true;
+          result.push(code);
+        });
+    });
+    return result;
+  }
+
+  function isSourceLang(code) {
+    return sourceLangs.some((entry) => entry.toLowerCase() === code.toLowerCase());
+  }
+
+  function addSourceLang(code) {
+    const next = normalizeSourceLangs([code]);
+    if (!next.length || isSourceLang(next[0])) return false;
+    sourceLangs = sourceLangs.concat(next[0]);
+    return true;
+  }
+
+  function renderSourceLangs() {
+    els.sourceLangsList.innerHTML = "";
+    sourceLangs.forEach((code) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.setAttribute("role", "listitem");
+      chip.appendChild(document.createTextNode(Glossy.languageName(code)));
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "chip-remove";
+      remove.textContent = "×";
+      remove.title = Glossy.i18n.t("source.remove");
+      remove.setAttribute("aria-label", Glossy.i18n.t("source.remove"));
+      remove.addEventListener("click", () => {
+        sourceLangs = sourceLangs.filter((entry) => entry !== code);
+        renderSourceLangs();
+        scheduleSave();
+      });
+      chip.appendChild(remove);
+      els.sourceLangsList.appendChild(chip);
+    });
+    els.sourceLangsClear.disabled = !sourceLangs.length;
+    els.sourceLangsHint.textContent = sourceLangs.length
+      ? Glossy.i18n.t("source.count", sourceLangs.length)
+      : Glossy.i18n.t("source.empty");
+    fillSourceLangPicker();
   }
 
   /** Reads the history the backend keeps and shows it. */
@@ -590,6 +663,7 @@
   function applyLanguage() {
     Glossy.i18n.apply(document);
     renderIgnored();
+    renderSourceLangs();
     relabelRunningApps();
     syncProvider();
     showHotkey(lastStatus);
@@ -621,6 +695,7 @@
     els.autostart.checked = !!next.autostart;
     els.minSelectionLen.value = String(numberOr(next.minSelectionLen, 2));
     ignored = normalizeIgnored(next.ignoredApps);
+    sourceLangs = normalizeSourceLangs(next.sourceLangs);
     els.hotkey.value = next.hotkey || "";
     els.theme.value = themeOr(next.theme);
     els.fontScale.value = String(pick(FONT_SCALES, next.fontScale, 100));
@@ -656,6 +731,7 @@
       autostart: els.autostart.checked,
       minSelectionLen: numberOr(els.minSelectionLen.value, 2),
       ignoredApps: ignored,
+      sourceLangs: sourceLangs,
       hotkey: els.hotkey.value.trim(),
       theme: els.theme.value,
       fontScale: numberOr(els.fontScale.value, 100),
@@ -1019,6 +1095,19 @@
     if (event.key !== "Enter") return;
     event.preventDefault();
     els.ignoredAdd.click();
+  });
+  els.sourceLangsAdd.addEventListener("change", () => {
+    const code = els.sourceLangsAdd.value;
+    els.sourceLangsAdd.value = "";
+    if (!addSourceLang(code)) return;
+    renderSourceLangs();
+    scheduleSave();
+  });
+  els.sourceLangsClear.addEventListener("click", () => {
+    if (!sourceLangs.length) return;
+    sourceLangs = [];
+    renderSourceLangs();
+    scheduleSave();
   });
   els.ignoredPick.addEventListener("click", async () => {
     try {

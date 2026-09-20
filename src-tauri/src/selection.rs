@@ -353,13 +353,22 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     if is_ignored(&settings) {
         return;
     }
+    // A double click on the desktop, the taskbar or the start menu selects no
+    // text at all, and the Ctrl+C sent right after only copies whatever the
+    // clipboard happened to hold.
+    if platform::shell_surface_at(x, y) {
+        return;
+    }
 
     let Capture::Text(text) = clipboard::capture_selection(settings.restore_clipboard) else {
         return;
     };
 
     let text = text.trim().to_string();
-    if !long_enough(&settings, &text) {
+    if !selection_worth_translating(&settings, &text) {
+        return;
+    }
+    if !settings::allows_source(&settings.source_langs, &text) {
         return;
     }
 
@@ -397,6 +406,9 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
 
     let text = text.trim().to_string();
     if !long_enough(&settings, &text) {
+        return;
+    }
+    if !settings::allows_source(&settings.source_langs, &text) {
         return;
     }
 
@@ -439,6 +451,29 @@ fn long_enough(settings: &Settings, text: &str) -> bool {
     text.trim().chars().count() >= settings.min_selection_len
 }
 
+/// True when a selection is worth translating.
+///
+/// Stricter than `long_enough`, because the drag and double click triggers work
+/// without the user asking for a translation: a copy that was sent without a
+/// selection often leaves a run of digits, punctuation or the path of a file on
+/// the clipboard.
+fn selection_worth_translating(settings: &Settings, text: &str) -> bool {
+    long_enough(settings, text) && text.chars().any(char::is_alphabetic) && !looks_like_a_path(text)
+}
+
+/// True for the path of a file or folder, e.g. `C:\Windows` or `\\nas\share`.
+fn looks_like_a_path(text: &str) -> bool {
+    if text.contains('\n') {
+        return false;
+    }
+    let mut chars = text.chars();
+    let drive = matches!(
+        (chars.next(), chars.next()),
+        (Some(letter), Some(':')) if letter.is_ascii_alphabetic())
+        && matches!(chars.next(), Some('\\') | Some('/'));
+    drive || text.starts_with("\\\\") || text.starts_with("//")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477,6 +512,64 @@ mod tests {
         settings.min_selection_len = 4;
         assert!(!long_enough(&settings, "abc"));
         assert!(long_enough(&settings, "  abcd  "));
+    }
+
+    #[test]
+    fn a_selection_needs_a_letter_to_be_worth_translating() {
+        let settings = settings();
+        assert!(selection_worth_translating(&settings, "hello"));
+        assert!(selection_worth_translating(&settings, "你好"));
+        assert!(selection_worth_translating(&settings, "3 apples"));
+        // Numbers, punctuation and symbols carry no language.
+        assert!(!selection_worth_translating(&settings, "1234"));
+        assert!(!selection_worth_translating(&settings, "12.34%"));
+        assert!(!selection_worth_translating(&settings, "->"));
+    }
+
+    #[test]
+    fn a_file_path_is_not_a_selection() {
+        let settings = settings();
+        assert!(looks_like_a_path("C:\\Windows"));
+        assert!(looks_like_a_path("d:/photos/holiday.jpg"));
+        assert!(looks_like_a_path("\\\\nas\\share\\notes.txt"));
+        assert!(looks_like_a_path("//nas/share"));
+        assert!(!looks_like_a_path("The file is at C:\\Windows"));
+        assert!(!looks_like_a_path("Ratio 16:9"));
+        assert!(!looks_like_a_path("C:"));
+        assert!(!looks_like_a_path("hello"));
+        assert!(!looks_like_a_path("C:\\a\nD:\\b"));
+        assert!(!selection_worth_translating(
+            &settings,
+            "C:\\Windows\\System32"
+        ));
+    }
+
+    #[test]
+    fn a_source_language_whitelist_lets_other_languages_through_when_empty() {
+        let settings = settings();
+        assert!(settings.source_langs.is_empty());
+        assert!(settings::allows_source(&settings.source_langs, "hello"));
+    }
+
+    #[test]
+    fn only_the_listed_source_languages_trigger() {
+        let wanted = vec!["en".to_string()];
+        assert!(settings::allows_source(
+            &wanted,
+            "The quick brown fox is here"
+        ));
+        assert!(!settings::allows_source(
+            &wanted,
+            "Le chat est dans la maison"
+        ));
+        // A region variant of a listed language still matches.
+        assert!(settings::allows_source(
+            &["zh-CN".to_string()],
+            "翻译选中的文字"
+        ));
+        // A language that cannot be told apart is translated anyway.
+        assert!(settings::allows_source(&wanted, "ok"));
+        assert!(settings::allows_source(&wanted, "1234"));
     }
 
     #[test]

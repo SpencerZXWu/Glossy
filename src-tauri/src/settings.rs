@@ -196,6 +196,40 @@ pub fn ignores_process(names: &[String], process: &str) -> bool {
         .any(|name| name.strip_suffix(".exe").unwrap_or(name) == stem)
 }
 
+/// Normalizes the source-language list: canonical codes, no duplicates, no
+/// separators left inside an entry.
+pub fn language_codes(names: &[String]) -> Vec<String> {
+    let mut result: Vec<String> = Vec::new();
+    for raw in names {
+        for part in raw.split([',', ';', ' ', '\t', '\n', '\r']) {
+            let code = crate::translate::normalize_lang_code(part);
+            if !code.is_empty() && !result.contains(&code) {
+                result.push(code);
+            }
+        }
+    }
+    result
+}
+
+/// True when a selection in `text` may still be translated.
+///
+/// Only the "translate these source languages" setting is consulted. An empty
+/// list means every language, and a text whose language cannot be told apart is
+/// let through, because a wrong guess must not swallow a selection the user
+/// asked to translate.
+pub fn allows_source(names: &[String], text: &str) -> bool {
+    let wanted = language_codes(names);
+    if wanted.is_empty() {
+        return true;
+    }
+    match crate::lang::detect(text) {
+        Some(detected) => wanted
+            .iter()
+            .any(|code| crate::lang::same_base(code, &detected)),
+        None => true,
+    }
+}
+
 /// Accepts both the comma separated string older versions wrote and the list
 /// the current version stores.
 fn string_or_list<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -278,6 +312,11 @@ pub struct Settings {
     /// Programs that never trigger a translation.
     #[serde(default, deserialize_with = "string_or_list")]
     pub ignored_apps: Vec<String>,
+    /// Source languages that still trigger a translation. Empty means every
+    /// language, and a selection whose language cannot be told is translated as
+    /// well, so a wrong guess never swallows a selection.
+    #[serde(default, deserialize_with = "string_or_list")]
+    pub source_langs: Vec<String>,
     /// Language of the interface itself.
     pub ui_lang: UiLanguage,
     /// Whether Glossy has never been started before. Only the very first
@@ -324,6 +363,7 @@ impl Default for Settings {
             min_selection_len: MIN_SELECTION_LEN,
             units_enabled: true,
             ignored_apps: Vec::new(),
+            source_langs: Vec::new(),
             ui_lang: UiLanguage::default(),
             first_run: true,
             theme: Theme::default(),
@@ -557,6 +597,7 @@ impl Settings {
         self.migrate_legacy_credentials();
         self.min_selection_len = self.min_selection_len.clamp(1, 40);
         self.ignored_apps = ignored_processes(&self.ignored_apps);
+        self.source_langs = language_codes(&self.source_langs);
         self.font_scale = self.font_scale.clamp(80, 160);
         self.popup_width = self.popup_width.clamp(280, 560);
         self.popup_opacity = self.popup_opacity.clamp(50, 100);
@@ -752,6 +793,36 @@ mod tests {
         let settings = Settings::parse("{\"ignoredApps\":\"  Code.exe ,, code , mstsc \"}");
 
         assert_eq!(settings.ignored_apps, vec!["code.exe", "mstsc"]);
+    }
+
+    #[test]
+    fn normalizes_the_source_languages() {
+        let settings = Settings {
+            source_langs: vec![
+                " EN ".to_string(),
+                "en".to_string(),
+                "jp, zh-Hant".to_string(),
+                "".to_string(),
+            ],
+            ..Settings::default()
+        }
+        .sanitized();
+
+        assert_eq!(settings.source_langs, vec!["en", "ja", "zh-TW"]);
+    }
+
+    #[test]
+    fn an_older_settings_file_has_every_source_language() {
+        let settings = Settings::parse("{\"minSelectionLen\":3}");
+
+        assert!(settings.source_langs.is_empty());
+    }
+
+    #[test]
+    fn reads_the_source_languages_of_an_older_version() {
+        let settings = Settings::parse("{\"sourceLangs\":\"en, jp\"}");
+
+        assert_eq!(settings.source_langs, vec!["en", "ja"]);
     }
 
     #[test]
