@@ -5,7 +5,7 @@
   "description": "Glossy 的翻译代理：百度翻译的密钥留在服务端，App 免密钥直接调用。",
   "type": "module",
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
+    "test": "node --test",
     "dev": "wrangler dev",
     "dev:node": "node src/node.js",
     "build:scf": "node scripts/build-scf.mjs",
