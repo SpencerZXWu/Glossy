@@ -264,7 +264,7 @@ node --test                                                          # 130 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 135 Rust tests
+cargo test --locked                                                  # 149 Rust tests
 cd ..\server
 npm test                                                             # 49 server tests
 ```
@@ -363,7 +363,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 135 tests; see "Checks" above for lint and format runs
+cargo test   # 149 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -588,7 +588,7 @@ node --test                                                          # 130 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 135 Rust tests
+cargo test --locked                                                  # 149 Rust tests
 cd ..\server
 npm test                                                             # 49 server tests
 ```
@@ -671,7 +671,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 135 tests; see "Checks" above for lint and format runs
+cargo test   # 149 tests; see "Checks" above for lint and format runs
 ```
 
 ## 目录结构
@@ -1020,7 +1020,7 @@ node --test                                                          # 130 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 135 Rust tests
+cargo test --locked                                                  # 149 Rust tests
 cd ..\server
 npm test                                                             # 49 server tests
 ```
@@ -1126,7 +1126,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 135 tests; see "Checks" above for lint and format runs
+cargo test   # 149 tests; see "Checks" above for lint and format runs
 ```
 
 ## Estructura
