@@ -1,0 +1,4 @@
+Smart quotes are placed “like this” and the line wraps mid sentence, so the translator sees three lines.
+
+A second paragraph ends with a full stop.
+Another sentence follows.

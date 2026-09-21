@@ -1,9 +1,7 @@
 //! Translation providers and the orchestration that decides what to show.
 
-mod baidu;
 mod chat;
 mod cloud;
-mod deepl;
 mod dictionary;
 mod google;
 mod local;
@@ -14,7 +12,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::classify::{self, Kind};
-use crate::settings::{Channel, CloudProvider, Provider, Settings};
+use crate::settings::{Service, Settings};
 
 pub use self::cloud::{new_install_id, quota as cloud_quota, Quota as CloudQuota};
 
@@ -25,6 +23,15 @@ pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWeb
 /// Longer selections are rejected before hitting the network.
 pub const MAX_TEXT_CHARS: usize = 1800;
 
+/// Parts of speech shown on one card.
+const MAX_MEANINGS: usize = 4;
+
+/// Definitions shown under one part of speech.
+const MAX_DEFINITIONS: usize = 4;
+
+/// Synonyms shown under a word.
+const MAX_SYNONYMS: usize = 6;
+
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +39,14 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 pub struct Meaning {
     pub part_of_speech: String,
     pub definitions: Vec<String>,
+}
+
+/// One sentence of the original next to its translation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SentencePair {
+    pub source: String,
+    pub translation: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +62,24 @@ pub struct TranslationResult {
     pub meanings: Vec<Meaning>,
     pub example: Option<String>,
     pub provider: String,
+    /// Words that mean roughly the same as the selected one, in the language it
+    /// was written in.
+    #[serde(default)]
+    pub synonyms: Vec<String>,
+    /// The forms the word takes, English only.
+    #[serde(default)]
+    pub forms: Vec<crate::morphology::Form>,
+    /// The service the user chose, when another one had to answer because the
+    /// chosen one failed. `None` when the chosen service answered, or when it
+    /// is the only one that was asked.
+    #[serde(default)]
+    pub fallback_from: Option<String>,
+    /// The translation split sentence by sentence against the original, for the
+    /// optional side-by-side view. Empty unless the setting is on, and a single
+    /// pair when the two do not divide the same way, which reads as "no
+    /// sentence view".
+    #[serde(default)]
+    pub pairs: Vec<SentencePair>,
     /// Measurements in the translation that a reader of the target language
     /// would not expect, annotated with the switch to the units they do.
     #[serde(default)]
@@ -65,6 +98,10 @@ impl TranslationResult {
             meanings: Vec::new(),
             example: None,
             provider: provider.to_string(),
+            synonyms: Vec::new(),
+            forms: Vec::new(),
+            fallback_from: None,
+            pairs: Vec::new(),
             conversions: Vec::new(),
         }
     }
@@ -76,14 +113,76 @@ impl TranslationResult {
         }
         if self.meanings.is_empty() {
             self.meanings = other.meanings.clone();
+        } else {
+            merge_meanings(&mut self.meanings, &other.meanings);
         }
         if self.example.is_none() {
             self.example = other.example.clone();
+        }
+        merge_synonyms(&mut self.synonyms, &other.synonyms);
+        if self.forms.is_empty() {
+            self.forms = other.forms.clone();
         }
         if self.source_lang == "auto" && other.source_lang != "auto" {
             self.source_lang = normalize_lang_code(&other.source_lang);
         }
     }
+}
+
+/// Adds the definitions of `extra` to `meanings`, one part of speech at a time.
+///
+/// Two dictionaries describe the same word in different words, so whichever
+/// answered first is kept as it is and the other only adds what is not already
+/// there: a card that lists `noun` twice with the same sentence under both is
+/// worse than one source alone.
+fn merge_meanings(meanings: &mut Vec<Meaning>, extra: &[Meaning]) {
+    for meaning in extra {
+        let index = meanings.iter().position(|existing| {
+            existing
+                .part_of_speech
+                .trim()
+                .eq_ignore_ascii_case(meaning.part_of_speech.trim())
+        });
+        match index {
+            Some(index) => {
+                let existing = &mut meanings[index];
+                for definition in &meaning.definitions {
+                    let known = existing
+                        .definitions
+                        .iter()
+                        .any(|kept| kept.eq_ignore_ascii_case(definition));
+                    if !known && existing.definitions.len() < MAX_DEFINITIONS {
+                        existing.definitions.push(definition.clone());
+                    }
+                }
+            }
+            None if meanings.len() < MAX_MEANINGS => meanings.push(meaning.clone()),
+            None => {}
+        }
+    }
+}
+
+/// Adds the synonyms that are not already listed, keeping the first spelling of
+/// each.
+fn merge_synonyms(synonyms: &mut Vec<String>, extra: &[String]) {
+    for synonym in extra {
+        let synonym = synonym.trim();
+        if synonym.is_empty() || synonyms.len() >= MAX_SYNONYMS {
+            return;
+        }
+        let known = synonyms
+            .iter()
+            .any(|kept| kept.eq_ignore_ascii_case(synonym));
+        if !known {
+            synonyms.push(synonym.to_string());
+        }
+    }
+}
+
+/// Removes the synonyms that just repeat the headword in another spelling.
+fn drop_the_headword(synonyms: &mut Vec<String>, word: &str) {
+    let headword = word.trim().to_lowercase();
+    synonyms.retain(|synonym| synonym.trim().to_lowercase() != headword);
 }
 
 /// The dictionary style extra of a word: phonetic symbols, meanings and one
@@ -96,12 +195,36 @@ pub struct WordDetails {
     pub phonetic: Option<String>,
     pub meanings: Vec<Meaning>,
     pub example: Option<String>,
+    /// Words that mean roughly the same, in the language the word was written
+    /// in.
+    #[serde(default)]
+    pub synonyms: Vec<String>,
+    /// The forms the word takes, English only.
+    #[serde(default)]
+    pub forms: Vec<crate::morphology::Form>,
+    /// The sentence the word was selected from, translated, when the setting for
+    /// it is on and the program in front let the sentence be read.
+    #[serde(default)]
+    pub context: Option<SentenceContext>,
+}
+
+/// The sentence a word was selected from, with its own translation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SentenceContext {
+    pub text: String,
+    pub translation: String,
 }
 
 impl WordDetails {
     /// Whether the lookup came back with nothing worth sending to the card.
     pub fn is_empty(&self) -> bool {
-        self.phonetic.is_none() && self.meanings.is_empty() && self.example.is_none()
+        self.phonetic.is_none()
+            && self.meanings.is_empty()
+            && self.example.is_none()
+            && self.synonyms.is_empty()
+            && self.forms.is_empty()
+            && self.context.is_none()
     }
 }
 
@@ -199,6 +322,19 @@ pub async fn translate(
 
     result.kind = kind.as_str().to_string();
     result.target_lang = target;
+
+    // The sentence view only makes sense once the translation is there, and only
+    // for text that is long enough to have more than one sentence in it.
+    if settings.sentence_pairs && kind == Kind::Sentence && !result.translation.trim().is_empty() {
+        result.pairs = crate::context::pairs(text, &result.translation)
+            .into_iter()
+            .map(|(source, translation)| SentencePair {
+                source,
+                translation,
+            })
+            .collect();
+    }
+
     Ok(result)
 }
 
@@ -226,13 +362,15 @@ pub async fn word_details(
     };
 
     let mut result = TranslationResult::new(Kind::Word, "", text, &target);
-
     // The dictionary and the free endpoint answer independently, and the free
     // endpoint alone carries an example, so both are asked at once: together
     // they must not take longer than the slower of the two. The free endpoint
     // gets a short budget because on some networks it is simply unreachable,
     // and whatever has not arrived by then is left out.
-    let lookup = if settings.uses_google_api() {
+    // The free endpoint is not asked when it is the service the card is
+    // already using: it answered the translation itself, so the extra lookup
+    // would only pay for the same result twice.
+    let lookup = if settings.service() == Service::Google {
         None
     } else {
         let client = client.clone();
@@ -262,18 +400,61 @@ pub async fn word_details(
         }
     }
 
+    drop_the_headword(&mut result.synonyms, text);
+    // The forms follow the parts of speech the dictionary gave the word: a noun
+    // has a plural, a verb a past tense, and a word the dictionary does not
+    // know gets nothing guessed for it.
+    let parts: Vec<String> = result
+        .meanings
+        .iter()
+        .map(|meaning| meaning.part_of_speech.clone())
+        .collect();
+    let forms = crate::morphology::forms(text, &parts);
+
     Ok(WordDetails {
         phonetic: result.phonetic,
         meanings: result.meanings,
         example: result.example,
+        synonyms: result.synonyms,
+        forms,
+        // Filled in by the command layer, which has the sentence the selection
+        // came from.
+        context: None,
     })
 }
 
-/// Sends the text to whichever backend the settings name.
+/// Translates the sentence a word was selected from.
 ///
-/// The cloud channel is Glossy's own: either the built in service the app
-/// ships with, or a model on this machine - neither asks the user for a key.
-/// The api channel is the user's own account with a provider.
+/// The sentence itself is read out of the program in front by the selection
+/// hook, which is the only place that still sees it; this only translates what
+/// it brought back. A failure, or a card that was opened from the history
+/// rather than from a selection, simply leaves the card without the line.
+pub async fn sentence_context(
+    settings: &Settings,
+    languages: &Languages,
+    sentence: Option<String>,
+) -> Option<SentenceContext> {
+    if !settings.word_sentence {
+        return None;
+    }
+    let text = sentence.filter(|text| !text.trim().is_empty())?;
+    let client = client().ok()?;
+    let source = languages.source_code();
+    let (target, _) = resolve_target(&text, &settings.target_lang, languages);
+    let result = call_provider(client, settings, &text, source, &target, Kind::Sentence)
+        .await
+        .ok()?;
+    let translation = result.translation.trim().to_string();
+    (!translation.is_empty()).then_some(SentenceContext { text, translation })
+}
+
+/// Sends the text to whichever backend the settings name, and to the next one
+/// in the fallback order when it fails.
+///
+/// A public endpoint that rate-limits or drops a request is the normal case
+/// rather than an error, so the chosen service is tried first and, unless the
+/// fallback is switched off, the others after it. The card names the service
+/// that answered; `fallback_from` tells it whether that was the chosen one.
 async fn call_provider(
     client: &reqwest::Client,
     settings: &Settings,
@@ -282,83 +463,64 @@ async fn call_provider(
     target: &str,
     kind: Kind,
 ) -> Result<TranslationResult, String> {
-    if settings.channel == Channel::Cloud {
-        return match settings.cloud_provider {
-            CloudProvider::Builtin => {
-                cloud::translate(
-                    client,
-                    cloud::Request {
-                        text,
-                        source,
-                        target,
-                        kind,
-                        vendor: &settings.cloud_vendor,
-                    },
-                    &settings.cloud_endpoint,
-                    &settings.cloud_id,
-                )
-                .await
+    let chosen = settings.service();
+    let order = settings.service_order();
+    let mut last: Option<String> = None;
+
+    for (index, service) in order.iter().enumerate() {
+        match call_service(client, settings, *service, text, source, target, kind).await {
+            Ok(mut result) => {
+                if *service != chosen {
+                    result.fallback_from = Some(chosen.id().to_string());
+                }
+                return Ok(result);
             }
-            CloudProvider::Local => {
-                local::translate(
-                    client,
-                    &settings.local_endpoint,
-                    &settings.local_model,
-                    text,
-                    source,
-                    target,
-                    kind,
-                )
-                .await
+            Err(error) => {
+                if index + 1 < order.len() {
+                    eprintln!(
+                        "glossy: {} failed ({error}), trying the next service",
+                        service.id()
+                    );
+                }
+                last = Some(error);
             }
-        };
+        }
     }
 
-    call_api_provider(client, settings, text, source, target, kind).await
+    // Only the first failure is worth showing: the ones after it are the same
+    // problem met again by another service.
+    Err(last.unwrap_or_else(|| "No translation service is available.".to_string()))
 }
 
-async fn call_api_provider(
+/// Sends the text to one service, whoever it is.
+async fn call_service(
     client: &reqwest::Client,
     settings: &Settings,
+    service: Service,
     text: &str,
     source: &str,
     target: &str,
     kind: Kind,
 ) -> Result<TranslationResult, String> {
-    let credentials = settings.active_credentials();
-    match settings.provider {
-        Provider::Google => google::translate(client, text, source, target, kind).await,
-        Provider::Zhipu => {
-            chat::translate(
+    match service {
+        Service::Google => google::translate(client, text, source, target, kind).await,
+        Service::Local => {
+            local::translate(
                 client,
-                &chat::zhipu(),
+                &settings.local_endpoint,
+                &settings.local_model,
                 text,
                 source,
                 target,
                 kind,
-                &credentials.api_key,
             )
             .await
         }
-        Provider::Baidu => {
-            baidu::translate(
-                client,
-                text,
-                source,
-                target,
-                kind,
-                &credentials.app_id,
-                &credentials.api_key,
-            )
-            .await
-        }
-        Provider::DeepL => {
-            deepl::translate(client, text, source, target, kind, &credentials.api_key).await
-        }
-        // Kept so a settings file written before the channels existed, one
-        // naming `cloud` as its provider, still translates. The cloud channel
-        // handles that case long before here.
-        Provider::Cloud => {
+        Service::CloudBaidu | Service::CloudYoudao => {
+            let vendor = match service {
+                Service::CloudYoudao => "youdao",
+                _ => "baidu",
+            };
             cloud::translate(
                 client,
                 cloud::Request {
@@ -366,22 +528,10 @@ async fn call_api_provider(
                     source,
                     target,
                     kind,
-                    vendor: &settings.cloud_vendor,
+                    vendor,
                 },
                 &settings.cloud_endpoint,
                 &settings.cloud_id,
-            )
-            .await
-        }
-        Provider::OpenAI => {
-            chat::translate(
-                client,
-                &chat::openai(),
-                text,
-                source,
-                target,
-                kind,
-                &credentials.api_key,
             )
             .await
         }
@@ -575,22 +725,6 @@ mod tests {
         assert_eq!(normalize_lang_code("zh_TW"), "zh-TW");
         assert_eq!(normalize_lang_code("fil"), "fil");
         assert_eq!(normalize_lang_code(""), "");
-    }
-
-    #[test]
-    fn a_normalized_code_is_understood_by_every_provider() {
-        // The popup feeds the detected language back in when the user swaps the
-        // languages, so a private code of one provider must never reach another
-        // one: it goes through the shared spelling first.
-        let detected = normalize_lang_code("cht");
-        assert_eq!(detected, "zh-TW");
-        assert_eq!(baidu::baidu_target(&detected), "cht");
-        assert_eq!(deepl::deepl_target(&detected), "ZH-HANT");
-
-        let detected = normalize_lang_code("kor");
-        assert_eq!(detected, "ko");
-        assert_eq!(baidu::baidu_target(&detected), "kor");
-        assert_eq!(deepl::deepl_target(&detected), "KO");
     }
 
     #[test]

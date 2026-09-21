@@ -6,7 +6,89 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
-## [Unreleased]
+## [1.1.0] - 2026-09-21
+
+### Added
+
+- **The word card shows how the word behaves.** A word entry now carries its
+  inflections (plural, third person, participles, past, comparative, superlative),
+  the words that mean roughly the same, and — when **Reading** is on — the sentence
+  the selection was taken from next to a translation of that sentence. The Rust side
+  does the work: `morphology.rs` derives the forms, `translate/dictionary.rs` and
+  `translate/mod.rs` collect and de-duplicate the alternatives, and `context.rs`
+  looks the sentence up.
+
+- **Sentence by sentence.** A paragraph whose translation divides differently than
+  the original is no longer a wall of text: with **Sentence by sentence** on, the
+  card lists the original and the translation one aligned row at a time. A
+  translation that comes back as a single row is left as the plain paragraph, since
+  a one-row table would only repeat the card.
+
+- **Read it out loud.** Every card carries a pronunciation button for the original
+  and one for the translation. The text is spoken through Windows SAPI at the rate
+  chosen in the settings window (**Speaking rate**: Slow / Normal / Fast / Very
+  fast), and pressing the button again stops it, as does closing the card.
+
+- **A fallback order you can set.** When the chosen service fails, Glossy now walks
+  a list of the other services instead of giving up. The settings window shows that
+  list under **Fallback**: the service chosen above is always tried first and cannot
+  be moved, the rest can be reordered with the arrows, and the whole thing can be
+  turned off. The card names the service that answered when it was not the one
+  asked for.
+
+- **A compact card.** **Compact popup** keeps the translation, the phonetic symbols
+  and the meanings, and leaves out the example, the inflections, the synonyms, the
+  context sentence, the sentence-by-sentence view and the unit conversions — for a
+  popup that is meant to be read at a glance.
+
+- **Reading, and how much of it.** The settings window has a **Reading** panel that
+  decides what a word card is allowed to show: **Word in its sentence** (the context
+  lookup), **Sentence by sentence** (the aligned view) and **Compact popup**, plus
+  the **Speaking rate** of the pronunciation buttons.
+
+- **The selection is cleaned up before it is sent.** `text.rs` reduces what
+  Ctrl+C handed over to the sentences the author wrote: soft hyphens and zero-width
+  spaces, terminal escape sequences, line breaks the window width inserted, runs of
+  non-breaking spaces and stray control characters are removed, so the provider is
+  not asked to translate the layout of the page.
+
+### Changed
+
+- **Exporting the settings file no longer asks about keys.** With no field left
+  anywhere that takes an API key, there is nothing an export could carry: the
+  checkbox, its warning and the confirmation dialog are gone, and
+  `export_settings` has no `include_credentials` argument any more. The file holds
+  the choices and nothing secret.
+
+- **Four translation services, and no key field anywhere.** The dropdown in the
+  settings window now holds exactly four entries — **Baidu Translate** and **Youdao
+  Translate** (the project's server, each naming the upstream it should use, so
+  there is nothing to fill in), **Local translation · Ollama** (any
+  OpenAI-compatible endpoint on this machine) and **Google** (the free public
+  endpoint) — and the **Extensions · my own API** panel is gone, along with the
+  Zhipu, DeepL and OpenAI entries it served. A new install starts on Baidu
+  Translate. Nothing about the stored shape changed: `channel` + `cloudProvider` +
+  `cloudVendor` / `provider` are written exactly as before, so a settings file from
+  an older build keeps working — a `provider` this build no longer offers reads as
+  the built-in Baidu entry and is replaced the next time the file is written, and a
+  `cloudVendor` that is not `youdao` reads as Baidu. README and ROADMAP were updated
+  in all three languages to match.
+
+- **The original line in the card is capped at four lines.** A long selection used
+  to push the translation down and out of view; the source block now scrolls inside
+  itself once it would grow past four lines, in the floating popup and in the card
+  of the settings window alike. The translation is what the card is read for, so it
+  keeps its place.
+
+### Fixed
+
+- The confirmation that appears at the bottom of the settings window was invisible
+  in dark mode while the window sat on the Mica backdrop: the toast drew its
+  background from `--fg` and its text from `--bg`, and Mica remaps `--bg` to a 6 %
+  white, so dark-mode text landed on a dark surface. The toast has its own
+  `--g-toast-surface` / `--g-toast-text` / `--g-toast-outline` tokens now, and
+  dialog boxes switched to a solid surface with the dialog shadow, so both read the
+  same in either theme and under any backdrop.
 
 ## [1.0.2] - 2026-09-20
 

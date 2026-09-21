@@ -309,6 +309,20 @@ body.dragging .card {
   color: var(--muted);
   font-size: calc(12px * var(--popup-font));
   line-height: 1.5;
+  /* Four lines at most; a longer selection scrolls inside the block. */
+  max-height: 6em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.original::-webkit-scrollbar {
+  width: 6px;
+}
+
+.original::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
 }
 
 .translation {
@@ -316,6 +330,125 @@ body.dragging .card {
   font-size: calc(15px * var(--popup-font));
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* Inflections of a word and the words that mean roughly the same. */
+.forms,
+.synonyms,
+.context,
+.pairs {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.forms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.block-title {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: calc(10px * var(--popup-font));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.form {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: calc(13px * var(--popup-font));
+}
+
+.form-tag {
+  flex: none;
+  min-width: 74px;
+  color: var(--muted);
+  font-size: calc(11px * var(--popup-font));
+}
+
+.form-text {
+  color: var(--fg-soft);
+}
+
+.synonym-list {
+  color: var(--fg-soft);
+  font-size: calc(13px * var(--popup-font));
+  line-height: 1.5;
+}
+
+.context-source {
+  color: var(--muted);
+  font-size: calc(12.5px * var(--popup-font));
+  line-height: 1.5;
+}
+
+.context-translation {
+  margin-top: 3px;
+  color: var(--fg-soft);
+  font-size: calc(12.5px * var(--popup-font));
+  line-height: 1.5;
+}
+
+.pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.pair {
+  padding-left: 9px;
+  border-left: 2px solid var(--line);
+}
+
+.pair-source {
+  color: var(--muted);
+  font-size: calc(12.5px * var(--popup-font));
+  line-height: 1.5;
+}
+
+.pair-translation {
+  color: var(--fg-soft);
+  font-size: calc(12.5px * var(--popup-font));
+  line-height: 1.5;
+}
+
+/* Pronunciation buttons, one per side of the card. */
+.says {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.say {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-pill);
+  background: transparent;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: calc(11.5px * var(--popup-font));
+  cursor: pointer;
+}
+
+.say:hover {
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.say:active {
+  background: var(--g-surface-pressed);
+}
+
+.say[data-state="on"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* Conversion of a unit or an amount of money the reader would not use. */
@@ -371,6 +504,13 @@ body.dragging .card {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: calc(10.5px * var(--popup-font));
+}
+
+/* Why the answer did not come from the service that was asked first. */
+.foot.fallback {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .note {

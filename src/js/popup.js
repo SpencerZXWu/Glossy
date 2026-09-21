@@ -40,6 +40,7 @@
     popupOpacity: 100,
     autoCloseSecs: 0,
     closeAfterCopy: false,
+    compactPopup: false,
     uiLang: "system",
   };
   let size = { width: 0, height: 0 };
@@ -295,7 +296,7 @@
       current = result;
       detected = result.sourceLang || "";
       document.body.dataset.state = result.kind === "sentence" ? "sentence" : "word";
-      Glossy.render.result(content, result, { showOriginal: preferences.showOriginal });
+      draw(result);
       if (result.sourceText) headword.textContent = String(result.sourceText);
 
       showLanguages(result);
@@ -329,6 +330,7 @@
     const waiting = { ...result, phonetic: null, meanings: [], example: null };
     Glossy.render.result(content, waiting, {
       showOriginal: preferences.showOriginal,
+      compact: preferences.compactPopup === true,
       pending: true,
     });
     await place(false);
@@ -353,11 +355,24 @@
         ? current.meanings
         : (details && details.meanings) || [],
       example: current.example || (details && details.example) || null,
+      synonyms: (current.synonyms || []).length
+        ? current.synonyms
+        : (details && details.synonyms) || [],
+      forms: (current.forms || []).length ? current.forms : (details && details.forms) || [],
+      context: current.context || (details && details.context) || null,
     };
     // Drawn either way: the card has to lose its placeholder even when the
     // lookups came back with nothing.
-    Glossy.render.result(content, current, { showOriginal: preferences.showOriginal });
+    draw(current);
     await place(false);
+  }
+
+  /** Draws the card the way the reading and compactness settings ask for. */
+  function draw(result) {
+    Glossy.render.result(content, result, {
+      showOriginal: preferences.showOriginal,
+      compact: preferences.compactPopup === true,
+    });
   }
 
   /** Shows a translation the history already has, without asking the provider
@@ -373,7 +388,7 @@
     detected = result.sourceLang || "";
     headword.textContent = text;
     document.body.dataset.state = result.kind === "sentence" ? "sentence" : "word";
-    Glossy.render.result(content, result, { showOriginal: preferences.showOriginal });
+    draw(result);
     showLanguages(result);
 
     size = { width: 0, height: 0 };
@@ -472,7 +487,7 @@
     Glossy.invoke("translate_text", { text: value }).then((result) => {
       current = result;
       detected = result.sourceLang || "";
-      Glossy.render.result(content, result, { showOriginal: preferences.showOriginal });
+      draw(result);
       showLanguages(result);
     });
   }

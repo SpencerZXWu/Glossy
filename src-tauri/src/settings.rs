@@ -82,6 +82,78 @@ pub enum CloudProvider {
     Local,
 }
 
+/// One entry of the translation-service list.
+///
+/// The window shows a single dropdown and its entries are exactly these four.
+/// What is stored keeps the shape it has always had - `channel`,
+/// `cloudProvider` and `cloudVendor` - so a settings file written earlier still
+/// reads; this type is what the window, the fallback order and the tests speak,
+/// and every id matches the `value` of an `<option>`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Service {
+    /// Glossy's own server, asking Baidu.
+    #[serde(rename = "cloud-baidu")]
+    CloudBaidu,
+    /// Glossy's own server, asking Youdao.
+    #[serde(rename = "cloud-youdao")]
+    CloudYoudao,
+    /// A model running on this machine.
+    Local,
+    /// The free public Google endpoint.
+    Google,
+}
+
+impl Service {
+    /// Every entry, in the order the dropdown shows them.
+    ///
+    /// The window builds its dropdown from the markup, so only the tests walk
+    /// the whole list.
+    #[cfg(test)]
+    pub const ALL: [Service; 4] = [
+        Service::CloudBaidu,
+        Service::CloudYoudao,
+        Service::Local,
+        Service::Google,
+    ];
+
+    /// The id the window and the settings file use.
+    pub fn id(self) -> &'static str {
+        match self {
+            Service::CloudBaidu => "cloud-baidu",
+            Service::CloudYoudao => "cloud-youdao",
+            Service::Local => "local",
+            Service::Google => "google",
+        }
+    }
+
+    /// The service a stored file names.
+    ///
+    /// Anything this build no longer offers - a provider that wanted the user's
+    /// own key, a vendor the server dropped - reads as the built-in engine, so
+    /// the window has an entry to show and the first save replaces it.
+    pub fn stored(
+        channel: Channel,
+        cloud: CloudProvider,
+        vendor: &str,
+        provider: Provider,
+    ) -> Self {
+        if channel == Channel::Api {
+            return match provider {
+                Provider::Google => Service::Google,
+                _ => Service::CloudBaidu,
+            };
+        }
+        match cloud {
+            CloudProvider::Local => Service::Local,
+            CloudProvider::Builtin if vendor.trim().eq_ignore_ascii_case("youdao") => {
+                Service::CloudYoudao
+            }
+            CloudProvider::Builtin => Service::CloudBaidu,
+        }
+    }
+}
+
 /// Address a local service is asked at when the user has not set one.
 pub const DEFAULT_LOCAL_ENDPOINT: &str = "http://127.0.0.1:11434/v1";
 
@@ -323,8 +395,9 @@ pub struct Settings {
     /// What the cloud channel translates with.
     pub cloud_provider: CloudProvider,
     /// Which vendor Glossy's own server should translate with — `baidu`,
-    /// `youdao`, or empty to let the server pick. The server falls back to its
-    /// own order when it cannot serve the one named here.
+    /// `youdao`, or empty to let the server pick. A fresh install starts on
+    /// `baidu`. The server falls back to its own order when it cannot serve the
+    /// one named here.
     pub cloud_vendor: String,
     /// Backend of the api channel. The cloud channel ignores it, so it is kept
     /// rather than cleared and switching back lands on what was picked before.
@@ -398,6 +471,19 @@ pub struct Settings {
     pub history_limit: u32,
     /// Accelerator such as `Ctrl+Alt+C` that translates the clipboard.
     pub hotkey: String,
+    /// Ask the other services when the chosen one fails or rate-limits.
+    pub fallback_enabled: bool,
+    /// The services to try, in order, after the chosen one failed. The chosen
+    /// one is not repeated here; it is always tried first.
+    pub fallback_order: Vec<Service>,
+    /// Show the sentence the selected word sits in, next to the word itself.
+    pub word_sentence: bool,
+    /// Pair the original with the translation sentence by sentence.
+    pub sentence_pairs: bool,
+    /// Draw the popup without the blocks that are only nice to have.
+    pub compact_popup: bool,
+    /// Speaking rate of the pronunciation buttons, -10 (slowest) to 10.
+    pub speech_rate: i32,
 }
 
 impl Default for Settings {
@@ -409,7 +495,7 @@ impl Default for Settings {
             target_lang: default_target_lang(),
             channel: Channel::default(),
             cloud_provider: CloudProvider::default(),
-            cloud_vendor: String::new(),
+            cloud_vendor: "baidu".to_string(),
             provider: Provider::default(),
             local_endpoint: DEFAULT_LOCAL_ENDPOINT.to_string(),
             local_model: DEFAULT_LOCAL_MODEL.to_string(),
@@ -436,11 +522,70 @@ impl Default for Settings {
             check_updates: false,
             history_limit: 50,
             hotkey: "Ctrl+Alt+C".to_string(),
+            fallback_enabled: true,
+            fallback_order: vec![Service::CloudYoudao, Service::Google],
+            word_sentence: false,
+            sentence_pairs: false,
+            compact_popup: false,
+            speech_rate: 0,
         }
     }
 }
 
 impl Settings {
+    /// The entry of the service list this file names.
+    pub fn service(&self) -> Service {
+        Service::stored(
+            self.channel,
+            self.cloud_provider,
+            &self.cloud_vendor,
+            self.provider,
+        )
+    }
+
+    /// Makes `service` the active one, in the stored shape.
+    ///
+    /// The api channel is only left for the free endpoint; everything else is
+    /// the cloud channel, which is why picking a service never asks for a key.
+    pub fn set_service(&mut self, service: Service) {
+        match service {
+            Service::CloudBaidu => self.uses_cloud("baidu"),
+            Service::CloudYoudao => self.uses_cloud("youdao"),
+            Service::Local => {
+                self.channel = Channel::Cloud;
+                self.cloud_provider = CloudProvider::Local;
+            }
+            Service::Google => {
+                self.channel = Channel::Api;
+                self.provider = Provider::Google;
+            }
+        }
+    }
+
+    fn uses_cloud(&mut self, vendor: &str) {
+        self.channel = Channel::Cloud;
+        self.cloud_provider = CloudProvider::Builtin;
+        self.cloud_vendor = vendor.to_string();
+    }
+
+    /// The services a translation may be asked of, the chosen one first.
+    ///
+    /// A fallback that repeats the choice, names a service twice or picks the
+    /// local model as its own stand-in would only cost a second attempt on the
+    /// same backend, so the list is de-duplicated here.
+    pub fn service_order(&self) -> Vec<Service> {
+        let active = self.service();
+        let mut order = vec![active];
+        if self.fallback_enabled {
+            for service in &self.fallback_order {
+                if !order.contains(service) {
+                    order.push(*service);
+                }
+            }
+        }
+        order
+    }
+
     fn path(app: &AppHandle) -> Option<PathBuf> {
         app.path()
             .app_config_dir()
@@ -638,17 +783,16 @@ impl Settings {
     }
 
     /// Credentials saved for the provider that is currently selected.
+    ///
+    /// No service in this build asks the user for a key, so nothing the app
+    /// does needs this; only the tests read back what a file written by an
+    /// older version carried over into the map.
+    #[cfg(test)]
     pub fn active_credentials(&self) -> Credentials {
         self.credentials
             .get(self.provider.key())
             .cloned()
             .unwrap_or_default()
-    }
-
-    /// Whether the api channel is on Google, whose free endpoint is the
-    /// provider itself: the word details must not ask it behind its own back.
-    pub fn uses_google_api(&self) -> bool {
-        self.channel == Channel::Api && self.provider == Provider::Google
     }
 
     /// Moves the single credential pair written by older versions into the
@@ -726,6 +870,25 @@ impl Settings {
         if !self.trigger_on_drag && !self.trigger_on_double_click {
             self.trigger_on_drag = true;
         }
+        // The order is a list the window lets the user shuffle, so a hand edit
+        // is as likely as a click; a duplicate would only be tried twice.
+        let mut seen: Vec<Service> = Vec::new();
+        self.fallback_order.retain(|service| {
+            if seen.contains(service) {
+                false
+            } else {
+                seen.push(*service);
+                true
+            }
+        });
+        // The window only shows the four services of `Service`, and a file
+        // written by an earlier version can name a provider this build no
+        // longer offers. Writing the stored fields back in the shape the chosen
+        // service has means a save never leaves a stale channel, vendor or
+        // provider behind for the next read to interpret.
+        let selected = self.service();
+        self.set_service(selected);
+        self.speech_rate = self.speech_rate.clamp(-10, 10);
         self
     }
 }
@@ -929,9 +1092,10 @@ mod tests {
 
         assert_eq!(vendor(" Youdao "), "youdao");
         assert_eq!(vendor("BAIDU"), "baidu");
-        // Anything else means the server chooses, which is the empty string.
-        assert_eq!(vendor(""), "");
-        assert_eq!(vendor("deepl"), "");
+        // A vendor this build no longer offers - or none at all - reads as the
+        // built-in engine, and the file is rewritten to name it.
+        assert_eq!(vendor(""), "baidu");
+        assert_eq!(vendor("deepl"), "baidu");
     }
 
     #[test]
@@ -1080,5 +1244,83 @@ mod tests {
         assert!(Settings::import("not json at all").is_err());
         assert!(Settings::import("[1, 2, 3]").is_err());
         assert!(Settings::import("{\"somethingElse\":true}").is_err());
+    }
+
+    #[test]
+    fn a_fresh_install_starts_on_the_built_in_engine() {
+        let settings = Settings::default();
+
+        assert_eq!(settings.service(), Service::CloudBaidu);
+        assert_eq!(settings.service().id(), "cloud-baidu");
+    }
+
+    #[test]
+    fn every_service_survives_a_round_trip_through_the_stored_shape() {
+        for service in Service::ALL {
+            let mut settings = Settings::default();
+            settings.set_service(service);
+
+            assert_eq!(settings.service(), service, "{} was lost", service.id());
+        }
+    }
+
+    #[test]
+    fn a_provider_this_build_dropped_reads_as_the_built_in_engine() {
+        let settings = Settings::parse("{\"channel\":\"api\",\"provider\":\"deepl\"}");
+
+        assert_eq!(settings.service(), Service::CloudBaidu);
+    }
+
+    #[test]
+    fn the_free_endpoint_is_the_one_entry_that_leaves_the_cloud_channel() {
+        let mut settings = Settings::default();
+        settings.set_service(Service::Google);
+
+        assert_eq!(settings.channel, Channel::Api);
+        assert_eq!(settings.provider, Provider::Google);
+    }
+
+    #[test]
+    fn the_fallback_order_uses_every_service_once() {
+        let settings = Settings {
+            fallback_order: vec![
+                Service::Google,
+                Service::CloudYoudao,
+                Service::Google,
+                Service::CloudBaidu,
+            ],
+            ..Settings::default()
+        };
+        let settings = settings.sanitized();
+
+        assert_eq!(
+            settings.fallback_order,
+            vec![Service::Google, Service::CloudYoudao, Service::CloudBaidu]
+        );
+        // The chosen service comes first and is not repeated by the fallbacks.
+        assert_eq!(
+            settings.service_order(),
+            vec![Service::CloudBaidu, Service::Google, Service::CloudYoudao,]
+        );
+    }
+
+    #[test]
+    fn switching_the_fallback_off_leaves_only_the_chosen_service() {
+        let settings = Settings {
+            fallback_enabled: false,
+            ..Settings::default()
+        };
+
+        assert_eq!(settings.service_order(), vec![settings.service()]);
+    }
+
+    #[test]
+    fn the_speaking_rate_stays_within_what_sapi_accepts() {
+        let settings = Settings {
+            speech_rate: 42,
+            ..Settings::default()
+        };
+
+        assert_eq!(settings.sanitized().speech_rate, 10);
     }
 }

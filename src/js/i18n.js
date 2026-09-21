@@ -103,51 +103,52 @@
     "field.service": "Translation service",
     "field.localEndpoint": "Local service address",
     "field.localModel": "Model name",
-    "provider.cloud": "Glossy Translate · recommended, nothing to set up",
     "provider.cloudBaidu": "Baidu Translate · nothing to set up",
     "provider.cloudYoudao": "Youdao Translate · nothing to set up",
-    "provider.local": "Local model · runs on this machine",
+    "provider.local": "Local translation · Ollama (recommended)",
     "provider.google": "Google · free, no key",
-    "provider.baidu": "Baidu 翻译 · free monthly quota, APP ID + key",
-    "provider.zhipu": "Zhipu GLM · free tier, API key",
-    "provider.deepl": "DeepL · API key",
-    "provider.openai": "OpenAI · API key",
     "providerName.google": "Google",
     "providerName.baidu": "Baidu Translate",
     "providerName.youdao": "Youdao Translate",
-    "providerName.cloud": "Glossy Translate",
-    "providerName.zhipu": "Zhipu GLM",
-    "providerName.deepl": "DeepL",
-    "providerName.openai": "OpenAI",
-    "providerName.local": "Local model",
-    "field.appId": "APP ID",
+    "providerName.local": "Local translation",
     "cloud.quota.checking": "Asking the server how much is left today…",
     "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
     "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
     "cloud.quota.retry": "Check again",
-    "field.apiKey": "API key",
-    "apiKey.placeholder": "Paste your key",
-    "apiKey.keep": "The key you saved for this provider is already filled in.",
     "language.hint": "The source language is detected automatically.",
 
     "provider.hint.google":
       "The free public Google endpoint. Phonetics, parts of speech, definitions and an example come from the same call. No key needed.",
-    "provider.hint.baidu":
-      "Fill the APP ID and the 密钥 from fanyi-api.baidu.com into the extensions at the bottom of this window. The free tier gives 50,000 characters per month, or 1,000,000 after the free 个人认证. Reachable from mainland China, but the API returns the translation only: phonetic symbols and parts of speech need Zhipu GLM, which brings them along in the same call.",
-    "provider.hint.zhipu":
-      "Paste a Zhipu (open.bigmodel.cn) API key. The free <code>glm-4.7-flash</code> model returns the translation, phonetics, definitions and an example in one call, and it is reachable from mainland China.",
-    "cloud.hint.builtin":
-      "Glossy's own server translates through the account behind this build, so there is nothing to fill in here and the keys stay out of the app. Each device gets a daily character allowance, and the other services stay available when it runs out. Phonetics, parts of speech and an example are looked up separately.",
     "provider.hint.cloudBaidu":
-      "The same server as Glossy Translate, only asked to translate with Baidu. Nothing to fill in — the account stays behind the build — and the server falls back to another engine when Baidu cannot answer.",
+      "Nothing to fill in: the translation runs on the account behind this build, so no key ever reaches the app and each device gets a daily character allowance. Another engine answers when Baidu cannot.",
     "provider.hint.cloudYoudao":
-      "The same server as Glossy Translate, only asked to translate with Youdao. Nothing to fill in, and the server falls back to another engine when Youdao cannot answer.",
+      "Nothing to fill in: the translation runs on the account behind this build, so no key ever reaches the app. Another engine answers when Youdao cannot.",
     "cloud.hint.local":
       "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
-    "provider.hint.deepl":
-      "Paste a DeepL API key. Keys ending in <code>:fx</code> use the free endpoint.",
-    "provider.hint.openai":
-      "Paste an OpenAI API key. Phonetic symbols, parts of speech and an example come back in the same call.",
+
+    "panel.fallback": "Fallback",
+    "option.fallback": "Ask another service when the chosen one fails",
+    "fallback.hint":
+      "The service picked above is always tried first. The entries below are asked in this order when it fails, rate-limits or answers with nothing.",
+    "fallback.up": "Move up",
+    "fallback.down": "Move down",
+    "fallback.first": "always first",
+    "service.cloud-baidu": "Baidu Translate",
+    "service.cloud-youdao": "Youdao Translate",
+    "service.local": "Local model",
+    "service.google": "Google",
+
+    "panel.reading": "Reading",
+    "option.wordSentence": "Show the sentence a word was selected from",
+    "option.sentencePairs": "Pair the original and the translation sentence by sentence",
+    "option.compactPopup": "Draw a compact card, without the extras",
+    "field.speechRate": "Speaking rate",
+    "speech.slow": "Slow",
+    "speech.normal": "Normal",
+    "speech.fast": "Fast",
+    "speech.fastest": "Very fast",
+    "reading.hint":
+      "Pronunciation uses the voices Windows already has; the language of a text picks the voice. A word is only looked up in its sentence when the program in front lets Glossy read it.",
 
     "panel.demo": "Translate",
     "demo.hint":
@@ -195,13 +196,6 @@
     "backup.exportFailed": "Could not export: ",
     "backup.imported": "Settings imported",
     "backup.importFailed": "Could not import: ",
-    "option.exportKeys": "Include my API keys in the exported file",
-    "backup.keysWarning": "The file would hold your API keys in plain text.",
-    "backup.confirmTitle": "Export your API keys?",
-    "backup.confirmText": "The JSON file will hold them as plain text, and anyone who opens it can use them.",
-    "backup.confirmOk": "Export with keys",
-    "backup.cancel": "Cancel",
-
     "panel.updates": "Updates",
     "option.checkUpdates": "Check for a new version when Glossy starts",
     "update.check": "Check now",
@@ -212,10 +206,6 @@
     "update.failed": "Could not update: ",
     "update.downloading": "Downloading…",
     "update.unavailable": "This build carries no update signing key, so it cannot update itself yet.",
-
-    "panel.api": "Extensions · my own API",
-    "api.hint":
-      "An extension point, not a required step: only the services that ask for a key in Translation service read the fields below. Glossy Translate, the local model and Google work without anything filled in here. The key is kept on this machine and never leaves it except towards the service you picked.",
 
     "popup.copy": "Copy translation",
     "popup.close": "Close",
@@ -230,6 +220,23 @@
     "render.empty": "No translation returned.",
     "render.failed": "Translation failed.",
     "render.lookup": "Looking up the dictionary…",
+    "render.forms": "Forms",
+    "render.synonyms": "Synonyms",
+    "render.context": "In this sentence",
+    "render.pairs": "Sentence by sentence",
+    "render.speakOriginal": "Read the original out loud",
+    "render.speakTranslation": "Read the translation out loud",
+    "render.stop": "Stop reading",
+    "render.fallback": "Answered by {0} after the chosen service failed",
+
+    "form.plural": "plural",
+    "form.thirdPerson": "third person",
+    "form.presentParticiple": "present participle",
+    "form.past": "past",
+    "form.pastParticiple": "past participle",
+    "form.comparative": "comparative",
+    "form.superlative": "superlative",
+    "form.other": "other form",
 
     "units.title": "Units",
     "units.approx": "≈",
@@ -335,51 +342,52 @@
     "field.service": "翻译渠道",
     "field.localEndpoint": "本地服务地址",
     "field.localModel": "模型名称",
-    "provider.cloud": "Glossy 翻译 · 推荐，无需配置",
     "provider.cloudBaidu": "百度翻译 · 无需配置",
     "provider.cloudYoudao": "有道翻译 · 无需配置",
-    "provider.local": "本地模型 · 在这台电脑上运行",
+    "provider.local": "本地翻译 · Ollama（推荐）",
     "provider.google": "Google · 免费，无需密钥",
-    "provider.baidu": "百度翻译 · 每月免费额度，APP ID + 密钥",
-    "provider.zhipu": "智谱 GLM · 免费额度，API Key",
-    "provider.deepl": "DeepL · API Key",
-    "provider.openai": "OpenAI · API Key",
     "providerName.google": "Google",
     "providerName.baidu": "百度翻译",
     "providerName.youdao": "有道翻译",
-    "providerName.cloud": "Glossy 翻译",
-    "providerName.zhipu": "智谱 GLM",
-    "providerName.deepl": "DeepL",
-    "providerName.openai": "OpenAI",
-    "providerName.local": "本地模型",
-    "field.appId": "APP ID",
+    "providerName.local": "本地翻译",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
     "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
     "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
     "cloud.quota.retry": "重新查询",
-    "field.apiKey": "API Key",
-    "apiKey.placeholder": "粘贴你的密钥",
-    "apiKey.keep": "已填入你为该渠道保存的密钥。",
     "language.hint": "源语言会自动识别。",
 
     "provider.hint.google":
       "免费的 Google 公共接口：音标、词性、释义和例句都在同一次请求里返回，无需密钥。",
-    "provider.hint.baidu":
-      "在 fanyi-api.baidu.com 申请后，在窗口最下面的「扩展」里填入 APP ID 和密钥。免费版每月 5 万字符，完成个人认证后每月 100 万字符，国内可直接访问。不过这个接口只返回译文：音标和词性需要智谱 GLM，它会在同一次请求里一起返回。",
-    "provider.hint.zhipu":
-      "填入智谱（open.bigmodel.cn）的 API Key。免费的 <code>glm-4.7-flash</code> 模型一次返回译文、音标、释义和例句，国内可直接访问。",
-    "cloud.hint.builtin":
-      "由 Glossy 自己的服务器用本软件内置的账号翻译，这里无需填写任何密钥，密钥也不会进入客户端。每台设备每天有字符额度，用完后仍可换用其他服务。音标、词性和例句会另外查询。",
     "provider.hint.cloudBaidu":
-      "用的还是 Glossy 翻译的服务器，只是指定它用百度翻译来译。无需填写任何密钥，账号留在服务端；百度答不上来时服务器会自动改用别的引擎。",
+      "无需填写任何密钥：翻译由本软件内置的账号完成，密钥不会进入客户端，每台设备每天有字符额度；百度答不上来时服务器会自动改用别的引擎。",
     "provider.hint.cloudYoudao":
-      "用的还是 Glossy 翻译的服务器，只是指定它用有道智云来译。无需填写任何密钥，有道答不上来时服务器会自动改用别的引擎。",
+      "无需填写任何密钥：翻译由本软件内置的账号完成，密钥不会进入客户端；有道答不上来时服务器会自动改用别的引擎。",
     "cloud.hint.local":
       "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
-    "provider.hint.deepl":
-      "填入 DeepL API Key。以 <code>:fx</code> 结尾的密钥会使用免费接口。",
-    "provider.hint.openai":
-      "填入 OpenAI API Key。音标、词性和例句会在同一次请求里一起返回。",
+
+    "panel.fallback": "备用服务",
+    "option.fallback": "所选服务失败时改用其他服务",
+    "fallback.hint":
+      "上面选中的服务总是先试。当它失败、被限流或没有返回内容时，按下面的顺序逐个尝试。",
+    "fallback.up": "上移",
+    "fallback.down": "下移",
+    "fallback.first": "始终最先尝试",
+    "service.cloud-baidu": "百度翻译",
+    "service.cloud-youdao": "有道翻译",
+    "service.local": "本地模型",
+    "service.google": "Google",
+
+    "panel.reading": "阅读",
+    "option.wordSentence": "显示所查单词所在的句子",
+    "option.sentencePairs": "原文与译文逐句对照",
+    "option.compactPopup": "精简卡片，不显示附加信息",
+    "field.speechRate": "朗读语速",
+    "speech.slow": "慢",
+    "speech.normal": "正常",
+    "speech.fast": "快",
+    "speech.fastest": "很快",
+    "reading.hint":
+      "朗读使用 Windows 自带的语音，文本的语言决定用哪一种嗓音。只有当光标所在的程序允许 Glossy 读取时，才会去查单词所在的句子。",
 
     "panel.demo": "翻译",
     "demo.hint":
@@ -426,13 +434,6 @@
     "backup.exportFailed": "导出失败：",
     "backup.imported": "设置已导入",
     "backup.importFailed": "导入失败：",
-    "option.exportKeys": "导出文件中包含我的 API 密钥",
-    "backup.keysWarning": "文件中会以明文保存你的 API 密钥。",
-    "backup.confirmTitle": "要导出 API 密钥吗？",
-    "backup.confirmText": "JSON 文件会以明文保存这些密钥，任何打开它的人都能使用。",
-    "backup.confirmOk": "仍然导出",
-    "backup.cancel": "取消",
-
     "panel.updates": "更新",
     "option.checkUpdates": "启动 Glossy 时检查新版本",
     "update.check": "立即检查",
@@ -443,10 +444,6 @@
     "update.failed": "更新失败：",
     "update.downloading": "正在下载…",
     "update.unavailable": "此版本还没有更新签名公钥，暂时无法自动更新。",
-
-    "panel.api": "扩展 · 使用自己的 API",
-    "api.hint":
-      "这里是扩展入口，不是必须配置的步骤：只有「翻译渠道」里标明需要密钥的服务才会用到下面的输入框。Glossy 翻译、本地模型和 Google 都无需填写。密钥只保存在这台电脑上，除了你选择的那个服务之外不会发给任何地方。",
 
     "popup.copy": "复制译文",
     "popup.close": "关闭",
@@ -461,6 +458,23 @@
     "render.empty": "没有返回译文。",
     "render.failed": "翻译失败。",
     "render.lookup": "词典查询中…",
+    "render.forms": "词形变化",
+    "render.synonyms": "近义词",
+    "render.context": "所在句子",
+    "render.pairs": "逐句对照",
+    "render.speakOriginal": "朗读原文",
+    "render.speakTranslation": "朗读译文",
+    "render.stop": "停止朗读",
+    "render.fallback": "所选服务失败，由 {0} 回答",
+
+    "form.plural": "复数",
+    "form.thirdPerson": "第三人称单数",
+    "form.presentParticiple": "现在分词",
+    "form.past": "过去式",
+    "form.pastParticiple": "过去分词",
+    "form.comparative": "比较级",
+    "form.superlative": "最高级",
+    "form.other": "其他形式",
 
     "units.title": "单位换算",
     "units.approx": "≈",

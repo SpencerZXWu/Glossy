@@ -5,19 +5,23 @@ mod autostart;
 mod classify;
 mod clipboard;
 pub mod console;
+mod context;
 mod history;
 mod hotkey;
 mod input;
 mod instance;
 mod lang;
+mod morphology;
 mod notice;
 mod platform;
 mod popup;
 mod secrets;
 mod selection;
 mod settings;
+mod speech;
 mod state;
 mod surface;
+mod text;
 mod translate;
 mod tray;
 mod units;
@@ -94,18 +98,11 @@ fn save_settings(
 }
 
 /// Writes the settings to `Documents\glossy-settings.json` and answers with the
-/// path it used. `include_credentials` is asked for separately because the file
-/// is plain JSON: without it the export holds everything but the API keys.
+/// path it used. The file is plain JSON, so nothing secret ever goes into it.
 #[tauri::command]
-fn export_settings(
-    app: AppHandle,
-    state: State<'_, Arc<AppState>>,
-    include_credentials: bool,
-) -> Result<String, String> {
+fn export_settings(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<String, String> {
     let mut settings = state.settings();
-    if !include_credentials {
-        settings.credentials.clear();
-    }
+    settings.credentials.clear();
     let path = app
         .path()
         .document_dir()
@@ -209,13 +206,18 @@ async fn word_details(
     text: String,
     source_lang: Option<String>,
     target_lang: Option<String>,
+    context: Option<String>,
 ) -> Result<translate::WordDetails, String> {
     let settings = state.settings();
     let languages = translate::Languages {
         source: source_lang,
         target: target_lang,
     };
-    let details = translate::word_details(&text, &settings, &languages).await?;
+    let mut details = translate::word_details(&text, &settings, &languages).await?;
+    // The sentence was read out of the program in front by the selection hook,
+    // while that program still had the focus; translating it belongs here, with
+    // the rest of the word lookup.
+    details.context = translate::sentence_context(&settings, &languages, context).await;
     history::patch_details(&app, text.trim(), &details);
     Ok(details)
 }
@@ -262,7 +264,9 @@ async fn history_reopen(
 #[tauri::command]
 fn show_popup(app: AppHandle, state: State<'_, Arc<AppState>>, text: String) {
     let (x, y) = platform::cursor_pos();
-    popup::reveal(&app, &state, text, (x as f64, y as f64));
+    // The demo pane stands in for a selection, so there is no program in front
+    // to read a sentence out of.
+    popup::reveal(&app, &state, text, None, (x as f64, y as f64));
 }
 
 /// Sizes and shows the popup; returns the usable height of its monitor in CSS
@@ -310,6 +314,26 @@ fn popup_set_pinned(pinned: bool) {
 #[tauri::command]
 fn copy_text(text: String) -> bool {
     clipboard::copy_to_clipboard(&text)
+}
+
+/// Reads text out loud, using the voices Windows already has.
+///
+/// `language` is the language of the text, so a voice that pronounces it can be
+/// chosen; the default voice answers when the machine has none for it.
+#[tauri::command]
+fn say(
+    state: State<'_, Arc<AppState>>,
+    text: String,
+    language: Option<String>,
+) -> Result<(), String> {
+    let rate = state.settings().speech_rate;
+    speech::speak(&text, rate, language.as_deref())
+}
+
+/// Stops the reading that is in progress, if any.
+#[tauri::command]
+fn stop_speaking() {
+    speech::stop();
 }
 
 /// What the clipboard holds, for the paste button of the settings window.
@@ -523,6 +547,8 @@ pub fn run() {
             popup_close,
             popup_set_pinned,
             copy_text,
+            say,
+            stop_speaking,
             read_clipboard,
             history_list,
             history_clear,

@@ -1,0 +1,4 @@
+This docu-
+ment was hyphenated by the layout engine.
+Another sen-
+tence continues on the next line, too.

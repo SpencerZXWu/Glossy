@@ -61,7 +61,9 @@ test("both dictionaries have the same size and no duplicate keys", () => {
 });
 
 test("dictionary keys use the namespace.name convention", () => {
-  const malformed = EN_KEYS.filter((key) => !/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+)+$/.test(key));
+  // A trailing segment may carry dashes, since a service id is spelled that way
+  // ("service.cloud-baidu").
+  const malformed = EN_KEYS.filter((key) => !/^[a-z][a-zA-Z0-9]*(\.[a-zA-Z0-9]+[a-zA-Z0-9-]*)+$/.test(key));
   assert.deepEqual(malformed, []);
 });
 
@@ -218,10 +220,10 @@ test("t ignores extra arguments and substitutes inside Chinese text", () => {
 test("providerName is case-insensitive and localized", () => {
   i18n.set("en");
   assert.equal(i18n.providerName("GOOGLE"), "Google");
-  assert.equal(i18n.providerName("zhipu"), "Zhipu GLM");
+  assert.equal(i18n.providerName("local"), "Local translation");
   i18n.set("zh");
   assert.equal(i18n.providerName("baidu"), "百度翻译");
-  assert.equal(i18n.providerName("OpenAI"), "OpenAI");
+  assert.equal(i18n.providerName("Youdao"), "有道翻译");
   i18n.set("en");
 });
 
@@ -269,7 +271,7 @@ function attach(dataset) {
 
 test("apply fills text, placeholders and titles from the dictionary", () => {
   const text = attach({ i18n: "status.paused" });
-  const placeholder = attach({ i18nPlaceholder: "apiKey.placeholder" });
+  const placeholder = attach({ i18nPlaceholder: "history.search" });
   const title = attach({ i18nTitle: "popup.copy" });
   const plain = attach({ i18n: "render.retry" });
 
@@ -277,7 +279,7 @@ test("apply fills text, placeholders and titles from the dictionary", () => {
   i18n.apply();
 
   assert.equal(text.innerHTML, "Paused");
-  assert.equal(placeholder.placeholder, "Paste your key");
+  assert.equal(placeholder.placeholder, "Text or translation");
   assert.equal(title.title, "Copy translation");
   assert.equal(plain.placeholder, "");
   assert.equal(plain.title, "");
@@ -301,9 +303,9 @@ test("apply leaves the key in place for an unknown key", () => {
 });
 
 test("apply writes dictionary values as markup, not as escaped text", () => {
-  const element = attach({ i18n: "provider.hint.deepl" });
+  const element = attach({ i18n: "cloud.hint.local" });
   i18n.apply();
-  assert.ok(element.innerHTML.includes("<code>:fx</code>"));
+  assert.ok(element.innerHTML.includes("<code>http://127.0.0.1:11434/v1</code>"));
   assert.ok(!element.innerHTML.includes("&lt;code&gt;"));
 });
 

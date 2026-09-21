@@ -128,17 +128,17 @@ Goal: make the reading use case actually good.
 | Work item | Details | State |
 | --- | --- | --- |
 | Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | planned |
-| Translation service: one list | One dropdown holds every way a selection can be translated — our own server (nothing to fill in), a model running on this machine over any OpenAI-compatible endpoint, the free public Google endpoint, and the vendors that take the user's key. The credentials of the last group live in an **Extensions** panel at the bottom of the settings window, dimmed while a service that needs nothing is selected. Underneath, the stored shape stayed `channel` + `provider` (plus `cloudVendor` for the server-backed entries), so a file written earlier keeps working and a new one starts on our server | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
+| Translation service: one list | Four entries only: our own server with Baidu (`cloud-baidu`) or with Youdao (`cloud-youdao`), a model running on this machine over any OpenAI-compatible endpoint, and the free public Google endpoint. Nothing in the window asks for a key any more. Underneath, the stored shape stayed `channel` + `provider` (plus `cloudVendor` for the server-backed entries), so a file written earlier keeps working — a provider this build no longer offers reads as the built-in Baidu entry — and a new one starts on `cloud-baidu` | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
 | Named vendor channels | Baidu and Youdao appear in the same dropdown as channels that need nothing set up, because they are our server with a vendor attached: the app sends `cloudVendor`, the server tries that upstream first and falls back to the others, and the card names the one that answered | done, in `server/src/upstream.js`, `server/src/youdao.js` and `src-tauri/src/translate/cloud.rs` |
 | Server address is no longer a field | The one service that needs nothing set up should not come with a box that lets people break it, so the address travels with the build: the `DEFAULT_ENDPOINT` the app was compiled with wins, a leftover address in an older settings file is ignored, and the window keeps only the allowance line and its `Check again` button. Pointing the app at your own deployment means editing that one line in `src-tauri/src/translate/cloud.rs`; a build made without an address still reads the setting | done, in `src-tauri/src/translate/cloud.rs` |
-| Popup rebuild | The card rebuilt on the token layer: header actions, original/translation hierarchy, dictionary and conversion blocks, and a compact mode | partly, the conversion block is in the tree |
+| Popup rebuild | The card rebuilt on the token layer: header actions, original/translation hierarchy, dictionary and conversion blocks, and a compact mode that keeps the translation, the phonetic and the meanings and drops the rest | done |
 | Icons, motion and accessibility | One icon set, transitions on the popup's appearance and dismissal, full keyboard operability, focus rings, high-contrast colours | planned |
-| Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | done server-side, in `server/src/upstream.js`; the app-side order is still planned |
+| Provider fallback | When the active provider fails or rate-limits (Google answering `429`), fall back through a configurable order and name the provider that answered in the card footer | done, in `server/src/upstream.js` and in the app: the **Fallback** panel holds the order, the first entry is the chosen service and cannot be moved |
 | More providers | At least two more free tiers (Tencent, Volcengine, or a self-hosted LibreTranslate), plus a custom base URL per provider. Youdao is in: `server/src/youdao.js` serves it, and the app reaches it through the named vendor channels. Tencent was dropped — its machine translation API no longer has a text action, only `ImageTranslateLLM` | partly done |
-| Richer word cards | Inflections, synonyms and merged definitions from several sources; an optional sentence-by-sentence view that pairs the original with the translation | planned |
-| Word to sentence | Optionally translate the sentence the selected word sits in, alongside the word itself | planned |
-| Text to speech | A pronunciation button for the original and the translation, via Windows SAPI or edge-tts | planned |
-| Selection robustness | A dedicated pass over rich text, browsers, Office and terminals, where `stripTags` is currently a simple cleanup; backed by a set of real-world fixtures | planned |
+| Richer word cards | Inflections, synonyms and merged definitions from several sources; an optional sentence-by-sentence view that pairs the original with the translation | done, `morphology.rs` and the `forms`, `synonyms` and `pairs` blocks |
+| Word to sentence | Optionally translate the sentence the selected word sits in, alongside the word itself | done, `context.rs`, behind the **Show the sentence a word was selected from** switch in the **Reading** panel |
+| Text to speech | A pronunciation button for the original and the translation, via Windows SAPI or edge-tts | done, `speech.rs` and the `say` / `stop_speaking` commands |
+| Selection robustness | A dedicated pass over rich text, browsers, Office and terminals, where `stripTags` is currently a simple cleanup; backed by a set of real-world fixtures | partly, `text.rs` and the fixtures under `src-tauri/tests/fixtures/text/` cover the clipboard shapes |
 
 Estimated effort: 6–10 days.
 
@@ -344,17 +344,17 @@ in it early.
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
 | 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 计划中 |
-| 翻译渠道：一个列表 | 一个下拉框就装下所有翻译方式——我们自己的服务器（无需填写）、通过任意 OpenAI 兼容接口跑在本机上的模型、免费的公开 Google 接口，以及需要用户密钥的服务。最后一类的凭据放在设置窗口最下面的 **扩展** 面板里，当前服务不需要凭据时会变暗。底层保存格式仍然是 `channel` + `provider`（走服务器的几个渠道另有 `cloudVendor`），因此旧文件照常可用，新文件默认走我们自己的服务器 | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
-| 点名上游的渠道 | 「百度翻译」「有道翻译」和「Glossy 翻译」并列在同一个下拉框里，同样是「无需配置」——因为它们就是我们自己的服务器，只是指定了用哪家上游：应用发送 `cloudVendor`，服务器先试点名的那个，答不上来再按顺序兜底，卡片页脚会注明这次是谁译的 | 已完成，见 `server/src/upstream.js`、`server/src/youdao.js` 与 `src-tauri/src/translate/cloud.rs` |
+| 翻译渠道：一个列表 | 下拉框里只留四项：我们自己的服务器配百度（`cloud-baidu`）或有道（`cloud-youdao`）、通过任意 OpenAI 兼容接口跑在本机上的模型，以及免费的公开 Google 接口。窗口里再也没有任何地方要求填密钥。底层保存格式仍然是 `channel` + `provider`（走服务器的两个渠道另有 `cloudVendor`），因此旧文件照常可用——这个构建不再提供的 `provider` 会读作内置的百度渠道——新文件默认走 `cloud-baidu` | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
+| 点名上游的渠道 | 「百度翻译」和「有道翻译」并列在同一个下拉框里，同样是「无需配置」——因为它们就是我们自己的服务器，只是指定了用哪家上游：应用发送 `cloudVendor`，服务器先试点名的那个，答不上来再按顺序兜底，卡片页脚会注明这次是谁译的 | 已完成，见 `server/src/upstream.js`、`server/src/youdao.js` 与 `src-tauri/src/translate/cloud.rs` |
 | 服务器地址不再是一个输入框 | 唯一一个「无需配置」的服务不该给用户留下把它填坏的机会，所以地址改为跟着构建走：构建时的 `DEFAULT_ENDPOINT` 优先，旧设置文件里残留的地址被忽略，窗口只保留额度提示行与「重新检查」。想用自己的部署就改 `src-tauri/src/translate/cloud.rs` 里的那一行；不带地址的构建仍然读设置文件 | 已完成，见 `src-tauri/src/translate/cloud.rs` |
-| 弹窗重建 | 在变量层上重建卡片：头部操作、原文/译文层级、词典与换算区块，以及一个紧凑模式 | 部分完成，换算区块已在代码库中 |
+| 弹窗重建 | 在变量层上重建卡片：头部操作、原文/译文层级、词典与换算区块，以及一个只保留译文、音标和释义、其余全部省略的紧凑模式 | 已完成 |
 | 图标、动效与无障碍 | 统一图标集、弹窗出现与消失的过渡、完整键盘操作、焦点环、高对比配色 | 计划中 |
-| 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 服务端已完成，见 `server/src/upstream.js`；客户端可配置顺序仍计划中 |
+| 服务商回退 | 当前服务商失败或限流时（Google 返回 `429`），按可配置顺序回退，并在卡片页脚注明是哪家服务的 | 已完成：服务端见 `server/src/upstream.js`，客户端见「回退」面板——列表首项是上面选中的服务且不可移动 |
 | 更多服务商 | 至少再接入两个免费档（腾讯、火山引擎，或自建 LibreTranslate），并支持为每个服务商自定义 base URL。有道已接入：`server/src/youdao.js` 提供上游，客户端通过点名上游的渠道使用它。腾讯已放弃——它的机器翻译接口只剩 `ImageTranslateLLM`，没有文本翻译动作了 | 部分完成 |
-| 更丰富的单词卡片 | 词形变化、同义词，以及合并多个来源的释义；可选的逐句对照视图，把原文与译文配对 | 计划中 |
-| 单词所在句 | 可选地，在显示单词本身的同时翻译它所在的句子 | 计划中 |
-| 朗读 | 原文与译文各一个发音按钮，通过 Windows SAPI 或 edge-tts | 计划中 |
-| 选区健壮性 | 针对富文本、浏览器、Office 和终端做一轮专门梳理，目前 `stripTags` 只是简单清理；并用一组真实场景的样本作支撑 | 计划中 |
+| 更丰富的单词卡片 | 词形变化、同义词，以及合并多个来源的释义；可选的逐句对照视图，把原文与译文配对 | 已完成，见 `morphology.rs` 与卡片里的 `forms`、`synonyms`、`pairs` 区块 |
+| 单词所在句 | 可选地，在显示单词本身的同时翻译它所在的句子 | 已完成，见 `context.rs`，由「阅读」面板中的「显示所查单词所在的句子」开关控制 |
+| 朗读 | 原文与译文各一个发音按钮，通过 Windows SAPI 或 edge-tts | 已完成，见 `speech.rs` 与 `say` / `stop_speaking` 命令 |
+| 选区健壮性 | 针对富文本、浏览器、Office 和终端做一轮专门梳理，目前 `stripTags` 只是简单清理；并用一组真实场景的样本作支撑 | 部分完成：`text.rs` 与 `src-tauri/tests/fixtures/text/` 下的样本已覆盖剪贴板的各种形态 |
 
 预计工作量：6–10 天。
 

@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "1.0.2"
+version = "1.1.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"
@@ -37,7 +37,14 @@ windows = { version = "0.61", features = [
     "Win32_System_Console",
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
+    # COM is initialised on the speech worker thread and by the UI Automation
+    # sentence reader.
+    "Win32_System_Com",
     "Win32_System_Threading",
+    # `ISpVoice` reads a translation out loud.
+    "Win32_Media_Speech",
+    # `TextPattern` expands the selected word to the sentence around it.
+    "Win32_UI_Accessibility",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }

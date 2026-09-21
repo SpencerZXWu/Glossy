@@ -18,13 +18,16 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_LBUTTONDOWN, WM_LBUTTONUP,
 };
 
+use crate::classify;
 use crate::clipboard::{self, Capture};
+use crate::context;
 use crate::hotkey;
 use crate::notice;
 use crate::platform;
 use crate::popup;
 use crate::settings::{self, Settings};
 use crate::state::AppState;
+use crate::text;
 
 /// Minimum pointer travel (physical px) for a press/drag/release to count.
 const DRAG_MIN_PX: i32 = 5;
@@ -369,7 +372,7 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
         return;
     };
 
-    let text = text.trim().to_string();
+    let text = text::normalize(&text);
     if !selection_worth_translating(&settings, &text) {
         return;
     }
@@ -382,7 +385,20 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
         return;
     }
 
-    popup::reveal(app, state, text, (x as f64, y as f64));
+    let context = enclosing_sentence(&state.settings(), &text);
+    popup::reveal(app, state, text, context, (x as f64, y as f64));
+}
+
+/// The sentence the selection stands in, when that was asked for.
+///
+/// Read here rather than when the card asks for the word details, because the
+/// program the text came from still has the focus at this point: a moment later
+/// the popup is on screen and the focused element may be its own webview.
+fn enclosing_sentence(settings: &Settings, text: &str) -> Option<String> {
+    if !settings.word_sentence || classify::classify(text) != classify::Kind::Word {
+        return None;
+    }
+    context::sentence(text)
 }
 
 /// Translates the text the user has selected when the hotkey is pressed.
@@ -409,7 +425,7 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
         return;
     };
 
-    let text = text.trim().to_string();
+    let text = text::normalize(&text);
     if !long_enough(&settings, &text) {
         return;
     }
@@ -418,7 +434,8 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
     }
 
     let (x, y) = platform::cursor_pos();
-    popup::reveal(app, state, text, (x as f64, y as f64));
+    let context = enclosing_sentence(&settings, &text);
+    popup::reveal(app, state, text, context, (x as f64, y as f64));
 }
 
 /// The text to translate: the selection that was just copied, or the clipboard

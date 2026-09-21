@@ -16,11 +16,10 @@ const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en/";
 /// endpoint's slower answers, which are as long as twenty seconds.
 const TIMEOUT: Duration = Duration::from_secs(8);
 
-const MAX_MEANINGS: usize = 4;
-const MAX_DEFINITIONS: usize = 4;
+use super::{MAX_DEFINITIONS, MAX_MEANINGS};
 
 pub async fn enrich(client: &reqwest::Client, text: &str, result: &mut TranslationResult) {
-    if result.phonetic.is_some() && result.example.is_some() {
+    if result.phonetic.is_some() && result.example.is_some() && !result.meanings.is_empty() {
         return;
     }
     let Some(word) = english_word(text) else {
@@ -48,46 +47,86 @@ pub async fn enrich(client: &reqwest::Client, text: &str, result: &mut Translati
         result.phonetic = entries.iter().find_map(phonetic_of);
     }
 
-    if result.meanings.is_empty() {
-        for entry in entries.iter().take(1) {
-            let Some(meanings) = entry.get("meanings").and_then(|value| value.as_array()) else {
+    // Whatever the other dictionary already found is kept, and this one only
+    // adds what is missing from it.
+    let mut found: Vec<(super::Meaning, Vec<String>)> = Vec::new();
+    for entry in entries.iter().take(1) {
+        let Some(meanings) = entry.get("meanings").and_then(|value| value.as_array()) else {
+            continue;
+        };
+        for meaning in meanings.iter().take(MAX_MEANINGS) {
+            let definitions: Vec<String> = meaning
+                .get("definitions")
+                .and_then(|value| value.as_array())
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|definition| {
+                            definition
+                                .get("definition")
+                                .and_then(|value| value.as_str())
+                        })
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty())
+                        .take(MAX_DEFINITIONS)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let synonyms = synonyms_of(meaning);
+            if definitions.is_empty() && synonyms.is_empty() {
                 continue;
-            };
-            for meaning in meanings.iter().take(MAX_MEANINGS) {
-                let definitions: Vec<String> = meaning
-                    .get("definitions")
-                    .and_then(|value| value.as_array())
-                    .map(|list| {
-                        list.iter()
-                            .filter_map(|definition| {
-                                definition
-                                    .get("definition")
-                                    .and_then(|value| value.as_str())
-                            })
-                            .map(|value| value.trim().to_string())
-                            .filter(|value| !value.is_empty())
-                            .take(MAX_DEFINITIONS)
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                if definitions.is_empty() {
-                    continue;
-                }
-                result.meanings.push(super::Meaning {
+            }
+            found.push((
+                super::Meaning {
                     part_of_speech: meaning
                         .get("partOfSpeech")
                         .and_then(|value| value.as_str())
                         .unwrap_or_default()
                         .to_string(),
                     definitions,
-                });
-            }
+                },
+                synonyms,
+            ));
         }
+    }
+    for (meaning, synonyms) in found {
+        super::merge_meanings(&mut result.meanings, std::slice::from_ref(&meaning));
+        super::merge_synonyms(&mut result.synonyms, &synonyms);
     }
 
     if result.example.is_none() {
         result.example = entries.iter().find_map(example_of);
     }
+}
+
+/// The synonyms that belong to one part of speech.
+///
+/// The endpoint lists them both on the part of speech itself and on each of its
+/// definitions; the two are the same kind of word and are shown as one list.
+fn synonyms_of(meaning: &Value) -> Vec<String> {
+    let mut synonyms: Vec<String> = Vec::new();
+    let mut collect = |value: Option<&Value>| {
+        let Some(list) = value.and_then(|value| value.as_array()) else {
+            return;
+        };
+        for entry in list {
+            let Some(word) = entry.as_str() else { continue };
+            let word = word.trim();
+            if !word.is_empty() && !synonyms.iter().any(|kept| kept.eq_ignore_ascii_case(word)) {
+                synonyms.push(word.to_string());
+            }
+        }
+    };
+    collect(meaning.get("synonyms"));
+    if let Some(definitions) = meaning
+        .get("definitions")
+        .and_then(|value| value.as_array())
+    {
+        for definition in definitions {
+            collect(definition.get("synonyms"));
+        }
+    }
+    synonyms.truncate(super::MAX_SYNONYMS);
+    synonyms
 }
 
 fn phonetic_of(entry: &Value) -> Option<String> {

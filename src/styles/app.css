@@ -262,12 +262,6 @@ main::-webkit-scrollbar-thumb {
   pointer-events: none;
 }
 
-/* The Extensions panel is dimmed, but stays editable, while the selected service
-   needs no key. */
-#apiBlock[data-idle="true"] {
-  opacity: 0.6;
-}
-
 .check {
   display: flex;
   align-items: center;
@@ -353,6 +347,73 @@ main::-webkit-scrollbar-thumb {
 }
 
 /* ------------------------------------------------------- ignored programs */
+
+/* The order the fallbacks are asked in, one service per row. */
+.order {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.order[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-md);
+  background: var(--panel);
+  font-size: 12.5px;
+}
+
+.order-name {
+  flex: 1 1 auto;
+  color: var(--fg);
+}
+
+.order-fixed {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.order-move {
+  flex: none;
+  width: var(--g-hit-size);
+  height: var(--g-hit-size);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--g-radius-sm);
+  background: transparent;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.order-move:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.order-move:disabled {
+  color: var(--g-text-disabled);
+  cursor: default;
+}
+
+.order-move:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
 
 .chips {
   display: flex;
@@ -703,6 +764,21 @@ input:focus-visible {
   margin-bottom: 7px;
   color: var(--muted);
   font-size: 12.5px;
+  line-height: 1.5;
+  /* Four lines at most; a longer selection scrolls inside the block. */
+  max-height: 6em;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.original::-webkit-scrollbar {
+  width: 6px;
+}
+
+.original::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
 }
 
 .translation {
@@ -710,6 +786,125 @@ input:focus-visible {
   font-size: 15px;
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* Inflections of a word and the words that mean roughly the same. */
+.forms,
+.synonyms,
+.context,
+.pairs {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.forms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.block-title {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.form {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.form-tag {
+  flex: none;
+  min-width: 74px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.form-text {
+  color: var(--fg-soft);
+}
+
+.synonym-list {
+  color: var(--fg-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.context-source {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.context-translation {
+  margin-top: 3px;
+  color: var(--fg-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.pair {
+  padding-left: 9px;
+  border-left: 2px solid var(--line);
+}
+
+.pair-source {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.pair-translation {
+  color: var(--fg-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Pronunciation buttons, one per side of the card. */
+.says {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.say {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-pill);
+  background: transparent;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.say:hover {
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.say:active {
+  background: var(--g-surface-pressed);
+}
+
+.say[data-state="on"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* Conversion of a unit or an amount of money the reader would not use. */
@@ -767,6 +962,13 @@ input:focus-visible {
   font-size: 10.5px;
 }
 
+/* Why the answer did not come from the service that was asked first. */
+.foot.fallback {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
+}
+
 .skeleton {
   display: flex;
   flex-direction: column;
@@ -811,9 +1013,10 @@ input:focus-visible {
   bottom: 22px;
   transform: translateX(-50%);
   padding: 8px 16px;
+  border: 1px solid var(--g-toast-outline);
   border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
+  background: var(--g-toast-surface);
+  color: var(--g-toast-text);
   font-size: 12px;
   box-shadow: var(--shadow);
   animation: rise 160ms ease-out;
@@ -935,8 +1138,8 @@ input:focus-visible {
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow);
+  background: var(--g-surface-solid);
+  box-shadow: var(--g-shadow-dialog);
 }
 
 .confirm-box h3 {

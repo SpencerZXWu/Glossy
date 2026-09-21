@@ -20,10 +20,10 @@
     targetLang: "zh-CN",
     channel: "cloud",
     cloudProvider: "builtin",
-    cloudVendor: "",
+    cloudVendor: "baidu",
     localEndpoint: "http://127.0.0.1:11434/v1",
     localModel: "qwen2.5:7b",
-    provider: "google",
+    provider: "baidu",
     credentials: {},
     restoreClipboard: true,
     showOriginal: true,
@@ -36,6 +36,12 @@
     autoCloseSecs: 0,
     closeAfterCopy: false,
     unitsEnabled: true,
+    wordSentence: true,
+    sentencePairs: true,
+    compactPopup: false,
+    speechRate: 0,
+    fallbackEnabled: true,
+    fallbackOrder: ["google", "local"],
     hotkey: "Ctrl+Alt+C",
     uiLang: "system",
   };
@@ -94,10 +100,24 @@
           { partOfSpeech: "adjective", definitions: ["跑动的", "流动的"] },
         ],
         example: "marathon " + source,
+        synonyms: ["jogging", "sprinting", "dashing"],
+        forms: [
+          { tag: "plural", text: "runnings" },
+          { tag: "thirdPerson", text: "runs" },
+          { tag: "presentParticiple", text: "running" },
+          { tag: "past", text: "ran" },
+          { tag: "pastParticiple", text: "run" },
+        ],
+        context: settings.wordSentence === false
+          ? null
+          : {
+              text: `${source} keeps the whole street awake at night.`,
+              translation: `这个${source}整夜吵得整条街都睡不着。`,
+            },
         conversions: [],
       };
     }
-    return {
+    const sentence = {
       ...base,
       kind: "sentence",
       translation: "敏捷的棕色狐狸跳过了那只懒狗。这句话包含了英文里所有字母，常被用来测试字体和键盘。",
@@ -107,6 +127,19 @@
       // What the backend annotates on a sentence that mixes units and money.
       conversions: settings.unitsEnabled === false ? [] : MOCK_CONVERSIONS,
     };
+    if (settings.sentencePairs !== false) {
+      sentence.pairs = [
+        { source: "The quick brown fox jumps over the lazy dog.", translation: "敏捷的棕色狐狸跳过了那只懒狗。" },
+        { source: "Then it keeps on running.", translation: "然后它继续跑着。" },
+      ];
+    }
+    if (previewWantsFallback()) sentence.fallbackFrom = "Baidu Cloud";
+    return sentence;
+  }
+
+  /** Whether the preview was asked to show a card answered by a fallback. */
+  function previewWantsFallback() {
+    return /(^|[?&])fallback(=|&|$)/.test(window.location.search || "");
   }
 
   async function mockInvoke(command, args) {
@@ -149,7 +182,24 @@
           phonetic: "ˈrəniNG",
           meanings: [{ partOfSpeech: "noun", definitions: ["赛跑", "跑步"] }],
           example: "marathon " + String(input.text || "").trim(),
+          synonyms: ["jogging", "sprinting"],
+          forms: [
+            { tag: "past", text: "ran" },
+            { tag: "pastParticiple", text: "run" },
+          ],
+          context: settings.wordSentence === false
+            ? null
+            : {
+                text: `${String(input.text || "").trim()} keeps the whole street awake at night.`,
+                translation: "它整夜吵得整条街都睡不着。",
+              },
         };
+      case "say":
+        // The browser preview has no voice; answering keeps the buttons alive.
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return true;
+      case "stop_speaking":
+        return true;
       case "capture_status":
         return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
       case "cloud_status":

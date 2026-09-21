@@ -207,6 +207,29 @@
         </section>
 
         <section class="panel">
+          <h2 data-i18n="panel.reading">Reading</h2>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="wordSentence" /><span data-i18n="option.wordSentence">Show the sentence a word was selected from</span></label>
+            <label class="check"><input type="checkbox" id="sentencePairs" /><span data-i18n="option.sentencePairs">Pair the original and the translation sentence by sentence</span></label>
+            <label class="check"><input type="checkbox" id="compactPopup" /><span data-i18n="option.compactPopup">Draw a compact card, without the extras</span></label>
+          </div>
+          <div class="field">
+            <label for="speechRate" data-i18n="field.speechRate">Speaking rate</label>
+            <select id="speechRate">
+              <option value="-4" data-i18n="speech.slow">Slow</option>
+              <option value="0" data-i18n="speech.normal">Normal</option>
+              <option value="4" data-i18n="speech.fast">Fast</option>
+              <option value="8" data-i18n="speech.fastest">Very fast</option>
+            </select>
+          </div>
+          <p class="hint" data-i18n="reading.hint">
+            Pronunciation uses the voices Windows already has; the language of a text picks the
+            voice. A word is only looked up in its sentence when the program in front lets
+            Glossy read it.
+          </p>
+        </section>
+
+        <section class="panel">
           <h2 data-i18n="panel.language">Language</h2>
           <div class="grid">
             <div class="field">
@@ -216,15 +239,10 @@
             <div class="field">
               <label for="service" data-i18n="field.service">Translation service</label>
               <select id="service">
-                <option value="cloud" data-i18n="provider.cloud">Glossy Translate · recommended, nothing to set up</option>
-                <option value="cloud-baidu" data-i18n="provider.cloudBaidu">Baidu 翻译 · nothing to set up</option>
-                <option value="cloud-youdao" data-i18n="provider.cloudYoudao">Youdao 有道 · nothing to set up</option>
-                <option value="local" data-i18n="provider.local">Local model · runs on this machine</option>
+                <option value="cloud-baidu" data-i18n="provider.cloudBaidu">Baidu Translate · nothing to set up</option>
+                <option value="cloud-youdao" data-i18n="provider.cloudYoudao">Youdao Translate · nothing to set up</option>
+                <option value="local" data-i18n="provider.local">Local translation · Ollama (recommended)</option>
                 <option value="google" data-i18n="provider.google">Google · free, no key</option>
-                <option value="baidu" data-i18n="provider.baidu">Baidu 翻译 · free monthly quota, APP ID + key</option>
-                <option value="zhipu" data-i18n="provider.zhipu">Zhipu GLM · free tier, API key</option>
-                <option value="deepl" data-i18n="provider.deepl">DeepL · API key</option>
-                <option value="openai" data-i18n="provider.openai">OpenAI · API key</option>
               </select>
             </div>
           </div>
@@ -248,6 +266,18 @@
           </div>
 
           <p class="hint" id="serviceHint"></p>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.fallback">Fallback</h2>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="fallbackEnabled" /><span data-i18n="option.fallback">Ask another service when the chosen one fails</span></label>
+          </div>
+          <p class="hint" data-i18n="fallback.hint">
+            The service picked above is always tried first. The entries below are asked in this
+            order when it fails, rate-limits or answers with nothing.
+          </p>
+          <ul class="order" id="fallbackList" role="list"></ul>
         </section>
 
         <section class="panel">
@@ -281,12 +311,6 @@
           <p class="hint" data-i18n="backup.hint">
             Export writes Documents\glossy-settings.json. Import reads back a file you pick.
           </p>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="exportKeys" /><span data-i18n="option.exportKeys">Include my API keys in the exported file</span></label>
-          </div>
-          <p class="hint warn" id="exportKeysHint" data-i18n="backup.keysWarning" hidden>
-            The file would hold your API keys in plain text.
-          </p>
           <div class="demo-actions">
             <button type="button" id="settingsExport" class="ghost" data-i18n="backup.export">Export…</button>
             <button type="button" id="settingsImport" class="ghost" data-i18n="backup.import">Import…</button>
@@ -307,36 +331,7 @@
             <span class="hint" id="updateStatus"></span>
           </div>
         </section>
-        <section class="panel">
-          <h2 data-i18n="panel.api">Extensions · my own API</h2>
-          <p class="hint" data-i18n="api.hint">
-            Only the services that ask for a key in Translation service read this. Glossy Translate, the local model and Google need nothing.
-          </p>
-          <div id="apiBlock" data-idle="true">
-            <div class="field" id="apiIdField" hidden>
-              <label for="apiId" data-i18n="field.appId">APP ID</label>
-              <input type="text" id="apiId" spellcheck="false" autocomplete="off" placeholder="Baidu 翻译开放平台 APP ID" />
-            </div>
-            <div class="field" id="apiKeyField" hidden>
-              <label for="apiKey" data-i18n="field.apiKey">API key</label>
-              <input type="password" id="apiKey" spellcheck="false" autocomplete="off" data-i18n-placeholder="apiKey.placeholder" placeholder="Paste your key" />
-            </div>
-          </div>
-        </section>
       </main>
-    </div>
-
-    <div class="confirm" id="exportConfirm" role="dialog" aria-modal="true" aria-labelledby="exportConfirmTitle" hidden>
-      <div class="confirm-box">
-        <h3 id="exportConfirmTitle" data-i18n="backup.confirmTitle">Export your API keys?</h3>
-        <p data-i18n="backup.confirmText">
-          The JSON file will hold them as plain text, and anyone who opens it can use them.
-        </p>
-        <div class="confirm-actions">
-          <button type="button" id="exportCancel" class="ghost" data-i18n="backup.cancel">Cancel</button>
-          <button type="button" id="exportConfirmOk" data-i18n="backup.confirmOk">Export with keys</button>
-        </div>
-      </div>
     </div>
 
     <div class="toast" id="toast" hidden></div>

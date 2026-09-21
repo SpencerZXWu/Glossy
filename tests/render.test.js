@@ -192,7 +192,7 @@ test("result skips the phonetic row for a whitespace-only phonetic", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "fox", phonetic: "   " });
   assert.equal(findByClass(node, "phonetic"), null);
-  assert.deepEqual(classesOf(node), ["translation"]);
+  assert.deepEqual(classesOf(node), ["translation", "says", "say"]);
 });
 
 test("result renders meanings with part of speech and joined definitions", () => {
@@ -495,7 +495,7 @@ test("result clears whatever the target held before", () => {
   const node = target();
   node.appendChild(env.document.createElement("p"));
   Glossy.render.result(node, { kind: "sentence", translation: "Hello" });
-  assert.deepEqual(classesOf(node), ["translation"]);
+  assert.deepEqual(classesOf(node), ["translation", "says", "say"]);
   assert.equal(node.firstChild.className, "translation");
 });
 
@@ -551,4 +551,156 @@ test("clear removes every child and is safe on an empty target", () => {
   assert.equal(node.firstChild, null);
   Glossy.render.clear(node);
   assert.equal(node.childNodes.length, 0);
+});
+
+test("result draws the inflections of a word", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "word",
+    translation: "跑",
+    forms: [
+      { tag: "past", text: "ran" },
+      { tag: "plural", text: "" },
+      { tag: "other", text: "runs" },
+    ],
+  });
+  const forms = findByClass(node, "forms");
+  assert.ok(forms);
+  assert.equal(findByClass(forms, "block-title").textContent, "Forms");
+  const rows = descendantsOf(forms, []).filter((child) => child.className === "form");
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].childNodes[0].textContent, "past");
+  assert.equal(rows[0].childNodes[1].textContent, "ran");
+  assert.equal(rows[1].textContent, "other formruns");
+});
+
+test("result leaves the inflections out when there are none", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "fox", forms: [] });
+  assert.equal(findByClass(node, "forms"), null);
+});
+
+test("result draws the synonyms of a word", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "fox", synonyms: ["tod", "reynard"] });
+  assert.equal(findByClass(node, "synonym-list").textContent, "tod · reynard");
+});
+
+test("result draws the sentence a word came from", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "word",
+    translation: "跑",
+    context: { text: "He kept running.", translation: "他一直在跑。" },
+  });
+  const block = findByClass(node, "context");
+  assert.ok(block);
+  assert.equal(findByClass(block, "context-source").textContent, "He kept running.");
+  assert.equal(findByClass(block, "context-translation").textContent, "他一直在跑。");
+});
+
+test("result leaves the context out when it has no original", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "fox", context: { translation: "x" } });
+  assert.equal(findByClass(node, "context"), null);
+});
+
+test("result draws the aligned pairs of a sentence", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "整段",
+    pairs: [
+      { source: "One.", translation: "一。" },
+      { source: "Two.", translation: "二。" },
+    ],
+  });
+  const pairs = findByClass(node, "pairs");
+  assert.ok(pairs);
+  const rows = descendantsOf(pairs, []).filter((child) => child.className === "pair");
+  assert.equal(rows.length, 2);
+  assert.equal(findByClass(rows[0], "pair-source").textContent, "One.");
+  assert.equal(findByClass(rows[0], "pair-translation").textContent, "一。");
+});
+
+test("result ignores a single pair, which repeats the whole card", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "整段",
+    pairs: [{ source: "One.", translation: "一。" }],
+  });
+  assert.equal(findByClass(node, "pairs"), null);
+});
+
+test("the compact card keeps the translation and drops the extras", () => {
+  const node = target();
+  Glossy.render.result(
+    node,
+    {
+      kind: "word",
+      translation: "跑",
+      phonetic: "ˈrəniNG",
+      meanings: [{ partOfSpeech: "noun", definitions: ["跑步"] }],
+      example: "keep running",
+      forms: [{ tag: "past", text: "ran" }],
+      synonyms: ["jogging"],
+      context: { text: "He kept running." },
+      conversions: [{ category: "length", original: "1 ft", converted: "0.3 m" }],
+    },
+    { compact: true },
+  );
+  assert.equal(findByClass(node, "phonetic").textContent, "/ˈrəniNG/");
+  assert.ok(findByClass(node, "meanings"));
+  assert.equal(findByClass(node, "example"), null);
+  assert.equal(findByClass(node, "forms"), null);
+  assert.equal(findByClass(node, "synonyms"), null);
+  assert.equal(findByClass(node, "context"), null);
+  assert.equal(findByClass(node, "units"), null);
+  assert.ok(findByClass(node, "translation"));
+  assert.ok(findByClass(node, "says"));
+});
+
+test("result draws a pronunciation button for each side of the card", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    sourceText: "Hello there.",
+    translation: "你好。",
+    sourceLang: "en",
+    targetLang: "zh-CN",
+  });
+  const says = findByClass(node, "says");
+  const buttons = says.childNodes;
+  assert.equal(buttons.length, 2);
+  assert.equal(buttons[0].textContent, "Read the original out loud");
+  assert.equal(buttons[0].getAttribute("data-say"), "render.speakOriginal");
+  assert.equal(buttons[1].getAttribute("data-say"), "render.speakTranslation");
+  assert.equal(buttons[0].type, "button");
+});
+
+test("a card with nothing to read out has no pronunciation buttons", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "", sourceText: "" });
+  assert.equal(findByClass(node, "says"), null);
+});
+
+test("result names the service that answered after a fallback", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    provider: "Youdao",
+    fallbackFrom: "Baidu",
+  });
+  assert.equal(
+    findByClass(node, "foot fallback").textContent,
+    "Answered by Baidu Translate after the chosen service failed",
+  );
+});
+
+test("result says nothing about a fallback when none happened", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "sentence", translation: "你好。", provider: "Baidu" });
+  assert.equal(findByClass(node, "foot fallback"), null);
 });

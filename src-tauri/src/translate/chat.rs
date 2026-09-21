@@ -1,5 +1,5 @@
-//! OpenAI compatible chat completion providers (OpenAI, Zhipu GLM), used as the
-//! key based alternative to the free endpoint.
+//! An OpenAI compatible chat completion service, which is how a model running
+//! on this machine is asked to translate.
 
 use std::time::Duration;
 
@@ -24,29 +24,6 @@ pub struct Chat {
     /// Whether the service authenticates with a key. A model running on this
     /// machine usually does not.
     pub needs_key: bool,
-}
-
-pub fn openai() -> Chat {
-    Chat {
-        id: "openai",
-        label: "OpenAI",
-        endpoint: "https://api.openai.com/v1/chat/completions".to_string(),
-        model: "gpt-4o-mini".to_string(),
-        json_mode: true,
-        needs_key: true,
-    }
-}
-
-/// Zhipu's free text tier, which is reachable from mainland China.
-pub fn zhipu() -> Chat {
-    Chat {
-        id: "zhipu",
-        label: "Zhipu",
-        endpoint: "https://open.bigmodel.cn/api/paas/v4/chat/completions".to_string(),
-        model: "glm-4.7-flash".to_string(),
-        json_mode: false,
-        needs_key: true,
-    }
 }
 
 /// A service on this machine, which answers the same shape as the two above.

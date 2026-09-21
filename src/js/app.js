@@ -33,6 +33,12 @@
     autoCloseSecs: $("autoCloseSecs"),
     closeAfterCopy: $("closeAfterCopy"),
     unitsEnabled: $("unitsEnabled"),
+    wordSentence: $("wordSentence"),
+    sentencePairs: $("sentencePairs"),
+    compactPopup: $("compactPopup"),
+    speechRate: $("speechRate"),
+    fallbackEnabled: $("fallbackEnabled"),
+    fallbackList: $("fallbackList"),
     targetLang: $("targetLang"),
     service: $("service"),
     cloudBlock: $("cloudBlock"),
@@ -40,11 +46,6 @@
     localEndpoint: $("localEndpoint"),
     localModel: $("localModel"),
     serviceHint: $("serviceHint"),
-    apiBlock: $("apiBlock"),
-    apiIdField: $("apiIdField"),
-    apiId: $("apiId"),
-    apiKeyField: $("apiKeyField"),
-    apiKey: $("apiKey"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
     uiLang: $("uiLang"),
@@ -70,14 +71,9 @@
     historyList: $("historyList"),
     historyClear: $("historyClear"),
     historyCount: $("historyCount"),
-    exportKeys: $("exportKeys"),
-    exportKeysHint: $("exportKeysHint"),
     settingsExport: $("settingsExport"),
     settingsImport: $("settingsImport"),
     settingsFile: $("settingsFile"),
-    exportConfirm: $("exportConfirm"),
-    exportCancel: $("exportCancel"),
-    exportConfirmOk: $("exportConfirmOk"),
     checkUpdates: $("checkUpdates"),
     updateCheck: $("updateCheck"),
     updateInstall: $("updateInstall"),
@@ -90,37 +86,24 @@
 
   /**
    * Everything the popup can translate through, in the order the dropdown
-   * offers it: the two services Glossy answers with, then the free Google
-   * endpoint, then the vendors that take the user's own key.
+   * offers it: the two engines Glossy answers with, then the local model, then
+   * the free Google endpoint.
    */
   const SERVICE_HINTS = {
-    cloud: "cloud.hint.builtin",
     "cloud-baidu": "provider.hint.cloudBaidu",
     "cloud-youdao": "provider.hint.cloudYoudao",
     local: "cloud.hint.local",
     google: "provider.hint.google",
-    baidu: "provider.hint.baidu",
-    zhipu: "provider.hint.zhipu",
-    deepl: "provider.hint.deepl",
-    openai: "provider.hint.openai",
   };
 
-  /**
-   * The dropdown entries that are still Glossy's own server, only asking it to
-   * translate with one particular vendor. `""` lets the server choose.
-   */
-  const CLOUD_VENDORS = { cloud: "", "cloud-baidu": "baidu", "cloud-youdao": "youdao" };
-
-  /** Services that take the user's own credentials. */
-  const OWN_KEY_SERVICES = ["google", "baidu", "zhipu", "deepl", "openai"];
-
-  /** Of those, the ones that need a key; Baidu also needs an APP ID. */
-  const SERVICES_WITH_KEY = ["baidu", "zhipu", "deepl", "openai"];
+  /** The dropdown entries that go through one particular online engine. */
+  const CLOUD_VENDORS = { "cloud-baidu": "baidu", "cloud-youdao": "youdao" };
 
   const POPUP_SIZES = [300, 356, 400, 460, 520];
   const FONT_SCALES = [90, 100, 115, 130, 150];
   const AUTO_CLOSE = [0, 3, 5, 10, 20, 30];
   const OPACITIES = [50, 60, 70, 80, 90, 95, 100];
+  const SPEECH_RATES = [-4, 0, 4, 8];
   const HISTORY_LIMITS = [0, 20, 50, 100, 200, 500];
 
   /** Source value that lets the provider detect the language itself. */
@@ -136,8 +119,8 @@
   let ignored = [];
   /** Source languages that still trigger a translation; empty means all. */
   let sourceLangs = [];
-  /** Provider whose credentials the two input fields currently show. */
-  let shownProvider = null;
+  /** Services asked, in order, after the chosen one failed. */
+  let fallbackOrder = [];
   /** Number of running programs in the dropdown; -1 while it is being read. */
   let runningApps = -1;
   let lastStatus = null;
@@ -255,20 +238,16 @@
   /**
    * Shows the fields and the hint that belong to the chosen service.
    *
-   * The dropdown is one list, so a service either needs nothing (Glossy's own
-   * server, a model on this machine, the free Google endpoint), a key of the
-   * user's, or an address of their own for the local model.
+   * The dropdown is one list, so a service either needs nothing (an online
+   * engine, the free Google endpoint) or an address of the user's own for the
+   * local model.
    */
   function syncService() {
     const service = els.service.value;
-    const keyNeeded = SERVICES_WITH_KEY.indexOf(service) !== -1;
     els.cloudBlock.hidden = !isCloudService(service);
     els.cloudLocalBlock.hidden = service !== "local";
     els.serviceHint.innerHTML = Glossy.i18n.t(SERVICE_HINTS[service] || "");
-    els.apiIdField.hidden = service !== "baidu";
-    els.apiKeyField.hidden = !keyNeeded;
-    // The panel at the bottom sits dimmed until the chosen service reads it.
-    els.apiBlock.setAttribute("data-idle", keyNeeded ? "false" : "true");
+    renderFallbackOrder();
   }
 
   /** The dropdown value that matches what the settings file holds. */
@@ -276,12 +255,13 @@
     if (stored.channel === "cloud") {
       if (stored.cloudProvider === "local") return "local";
       const vendor = String(stored.cloudVendor || "").toLowerCase();
-      // An unknown vendor means the deployment moved on; the plain entry still works.
-      return vendor === "baidu" || vendor === "youdao" ? `cloud-${vendor}` : "cloud";
+      // An unknown vendor means the deployment moved on; Baidu still answers.
+      return vendor === "youdao" ? "cloud-youdao" : "cloud-baidu";
     }
-    const provider = stored.provider;
-    if (!provider || provider === "cloud" || provider === "local") return "cloud";
-    return SERVICE_HINTS[provider] ? provider : "google";
+    // Anything that asked for the user's own key is gone: a settings file that
+    // still names one of those providers shows the built-in engine instead, so
+    // the first save replaces it.
+    return stored.provider === "google" ? "google" : "cloud-baidu";
   }
 
   /** Fetches the allowance again whenever the shared server comes into view. */
@@ -452,6 +432,86 @@
     fillSourceLangPicker();
   }
 
+  /** The four services of the dropdown, in the order it offers them. */
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "local", "google"];
+
+  /** Keeps every service once, and drops anything this build does not offer. */
+  function normalizeFallbackOrder(list) {
+    const seen = Object.create(null);
+    return (Array.isArray(list) ? list : []).filter((service) => {
+      if (SERVICES.indexOf(service) === -1 || seen[service]) return false;
+      seen[service] = true;
+      return true;
+    });
+  }
+
+  /** Short name of one service, the way the order list spells it. */
+  function serviceLabel(service) {
+    return Glossy.i18n.t(`service.${service}`);
+  }
+
+  /**
+   * Draws the fallback order: the service chosen above always comes first and
+   * cannot be moved, then the ones asked after it, each with the two buttons
+   * that move it up or down.
+   */
+  function renderFallbackOrder() {
+    els.fallbackList.innerHTML = "";
+    els.fallbackList.dataset.disabled = String(!els.fallbackEnabled.checked);
+
+    const chosen = document.createElement("li");
+    chosen.className = "order-row chosen";
+    chosen.setAttribute("role", "listitem");
+    chosen.appendChild(serviceName(serviceLabel(els.service.value), "order-name"));
+    chosen.appendChild(serviceName(Glossy.i18n.t("fallback.first"), "order-fixed"));
+    els.fallbackList.appendChild(chosen);
+
+    fallbackOrder.forEach((service, index) => {
+      const row = document.createElement("li");
+      row.className = "order-row";
+      row.setAttribute("role", "listitem");
+      row.appendChild(serviceName(serviceLabel(service), "order-name"));
+      row.appendChild(orderMove("up", index, index === 0));
+      row.appendChild(orderMove("down", index, index === fallbackOrder.length - 1));
+      els.fallbackList.appendChild(row);
+    });
+  }
+
+  /** The text holder of one row of the order list. */
+  function serviceName(text, className) {
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = text;
+    return span;
+  }
+
+  /** One of the two arrows that move an entry of the order list. */
+  function orderMove(direction, index, disabled) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "order-move";
+    button.dataset.direction = direction;
+    const label = Glossy.i18n.t(direction === "up" ? "fallback.up" : "fallback.down");
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.textContent = direction === "up" ? "↑" : "↓";
+    button.disabled = disabled || !els.fallbackEnabled.checked;
+    button.addEventListener("click", () => moveFallback(index, direction === "up" ? -1 : 1));
+    return button;
+  }
+
+  /** Moves one entry of the order list and saves the new order. */
+  function moveFallback(index, step) {
+    const target = index + step;
+    if (target < 0 || target >= fallbackOrder.length) return;
+    const next = fallbackOrder.slice();
+    const moved = next.splice(index, 1)[0];
+    next.splice(target, 0, moved);
+    fallbackOrder = next;
+    renderFallbackOrder();
+    scheduleSave();
+  }
+
   /** Reads the history the backend keeps and shows it. */
   async function loadHistory() {
     try {
@@ -563,11 +623,9 @@
   }
 
   /** Writes the settings to Documents and reports where they landed. */
-  async function exportSettings(includeKeys) {
+  async function exportSettings() {
     try {
-      const path = await Glossy.invoke("export_settings", {
-        includeCredentials: includeKeys,
-      });
+      const path = await Glossy.invoke("export_settings");
       showToast(Glossy.i18n.t("backup.exported", path));
     } catch (error) {
       showToast(Glossy.i18n.t("backup.exportFailed") + Glossy.errorMessage(error));
@@ -681,35 +739,6 @@
     head.textContent = Glossy.i18n.t(key);
   }
 
-  /** Credentials the user saved earlier for the selected provider. */
-  function rememberedCredentials(provider) {
-    const map = (settings && settings.credentials) || {};
-    return map[provider] || {};
-  }
-
-  function showCredentials(provider) {
-    shownProvider = provider;
-    const saved = rememberedCredentials(provider);
-    els.apiId.value = saved.appId || "";
-    els.apiKey.value = saved.apiKey || "";
-  }
-
-  /**
-   * Copies what is typed in the credential fields into the entry of the
-   * service they belong to, so every service keeps its own key. The fields
-   * always show the service picked last, which is why the key comes from
-   * `shownProvider` and not from the dropdown.
-   */
-  function rememberCredentials() {
-    if (!settings) return;
-    const map = Object.assign({}, settings.credentials || {});
-    const provider = shownProvider || els.service.value;
-    const entry = { appId: els.apiId.value.trim(), apiKey: els.apiKey.value.trim() };
-    if (entry.appId || entry.apiKey) map[provider] = entry;
-    else delete map[provider];
-    settings.credentials = map;
-  }
-
   /** Re-applies the interface language to everything the script writes itself. */
   function applyLanguage() {
     Glossy.i18n.apply(document);
@@ -758,6 +787,12 @@
     els.localModel.value = next.localModel || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
     els.demoUnits.checked = els.unitsEnabled.checked;
+    els.wordSentence.checked = !!next.wordSentence;
+    els.sentencePairs.checked = !!next.sentencePairs;
+    els.compactPopup.checked = !!next.compactPopup;
+    els.speechRate.value = String(pick(SPEECH_RATES, next.speechRate, 0));
+    els.fallbackEnabled.checked = next.fallbackEnabled !== false;
+    fallbackOrder = normalizeFallbackOrder(next.fallbackOrder);
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
     els.checkUpdates.checked = !!next.checkUpdates;
     applyTheme(els.theme.value);
@@ -766,14 +801,12 @@
     els.service.value = serviceOf(next);
     els.uiLang.value = next.uiLang === "zh" || next.uiLang === "en" ? next.uiLang : "system";
     Glossy.i18n.set(els.uiLang.value);
-    showCredentials(els.service.value);
     els.options.dataset.disabled = String(!next.enabled);
     applyLanguage();
     syncChannelQuota();
   }
 
   function collect() {
-    rememberCredentials();
     const service = els.service.value;
     return {
       ...settings,
@@ -793,19 +826,25 @@
       popupOpacity: numberOr(els.popupOpacity.value, 100),
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
-      // The stored shape still separates where the text goes from which vendor
-      // translates it: Glossy's own server and the local model both count as the
-      // cloud channel, everything else uses the user's account.
-      channel: OWN_KEY_SERVICES.indexOf(service) === -1 ? "cloud" : "api",
+      // The stored shape still separates where the text goes from which engine
+      // translates it: the online engines and the local model both count as the
+      // server channel, while the free Google endpoint dials out from here.
+      channel: service === "google" ? "api" : "cloud",
       cloudProvider: service === "local" ? "local" : "builtin",
       cloudVendor: CLOUD_VENDORS[service] || "",
       localEndpoint: els.localEndpoint.value.trim(),
       localModel: els.localModel.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,
+      wordSentence: els.wordSentence.checked,
+      sentencePairs: els.sentencePairs.checked,
+      compactPopup: els.compactPopup.checked,
+      speechRate: numberOr(els.speechRate.value, 0),
+      fallbackEnabled: els.fallbackEnabled.checked,
+      fallbackOrder: fallbackOrder.slice(),
       historyLimit: numberOr(els.historyLimit.value, 50),
       checkUpdates: els.checkUpdates.checked,
       targetLang: els.targetLang.value,
-      provider: OWN_KEY_SERVICES.indexOf(service) === -1 ? settings.provider || "google" : service,
+      provider: service === "google" ? "google" : "baidu",
       uiLang: els.uiLang.value,
     };
   }
@@ -900,7 +939,10 @@
       if (mine !== demoTicket) return;
       demoResult = result;
       demoDetected = result.sourceLang || "";
-      Glossy.render.result(els.demoResult, result, { showOriginal: els.showOriginal.checked });
+      Glossy.render.result(els.demoResult, result, {
+        showOriginal: els.showOriginal.checked,
+        compact: els.compactPopup.checked,
+      });
       if (result.sourceText) els.demoHeadword.textContent = String(result.sourceText);
       showLanguages(result);
       refineDemo(result, mine);
@@ -923,6 +965,7 @@
     const waiting = { ...result, phonetic: null, meanings: [], example: null };
     Glossy.render.result(els.demoResult, waiting, {
       showOriginal: els.showOriginal.checked,
+      compact: els.compactPopup.checked,
       pending: true,
     });
 
@@ -945,10 +988,23 @@
         ? demoResult.meanings
         : (details && details.meanings) || [],
       example: demoResult.example || (details && details.example) || null,
+      synonyms: (demoResult.synonyms || []).length
+        ? demoResult.synonyms
+        : (details && details.synonyms) || [],
+      forms: (demoResult.forms || []).length ? demoResult.forms : (details && details.forms) || [],
+      context: demoResult.context || (details && details.context) || null,
     };
     // Drawn either way, so the card loses its placeholder when the lookups have
     // nothing to add.
-    Glossy.render.result(els.demoResult, demoResult, { showOriginal: els.showOriginal.checked });
+    drawDemo();
+  }
+
+  /** Draws the sample card, with the switches of the popup applied to it. */
+  function drawDemo() {
+    Glossy.render.result(els.demoResult, demoResult, {
+      showOriginal: els.showOriginal.checked,
+      compact: els.compactPopup.checked,
+    });
   }
 
   async function copyDemo() {
@@ -1123,11 +1179,6 @@
     scheduleSave();
   });
   els.service.addEventListener("change", () => {
-    // Switching service can change which account is used, so the credentials of
-    // the service that is about to be left are put away before the ones of the
-    // newly selected service are shown.
-    rememberCredentials();
-    showCredentials(els.service.value);
     syncService();
     syncChannelQuota();
     scheduleSave();
@@ -1193,8 +1244,6 @@
   });
   [
     els.targetLang,
-    els.apiId,
-    els.apiKey,
     els.restoreClipboard,
     els.showOriginal,
     els.autostart,
@@ -1208,6 +1257,11 @@
     els.localEndpoint,
     els.localModel,
     els.unitsEnabled,
+    els.wordSentence,
+    els.sentencePairs,
+    els.compactPopup,
+    els.speechRate,
+    els.fallbackEnabled,
     els.historyLimit,
     els.checkUpdates,
   ].forEach((element) => {
@@ -1215,6 +1269,10 @@
   });
   // Registered after the loop, so the mirror of the area's switch runs with it.
   els.unitsEnabled.addEventListener("change", () => setUnits(els.unitsEnabled.checked));
+  els.fallbackEnabled.addEventListener("change", renderFallbackOrder);
+  els.compactPopup.addEventListener("change", () => {
+    if (demoResult) drawDemo();
+  });
 
   els.historySearch.addEventListener("input", renderHistory);
   els.historyClear.addEventListener("click", clearHistory);
@@ -1222,32 +1280,7 @@
   els.updateCheck.addEventListener("click", () => checkForUpdate(true));
   els.updateInstall.addEventListener("click", installUpdate);
 
-  /** Only an export that carries the keys needs the second look. */
-  function closeExportConfirm() {
-    els.exportConfirm.hidden = true;
-  }
-
-  els.exportKeys.addEventListener("change", () => {
-    els.exportKeysHint.hidden = !els.exportKeys.checked;
-  });
-  els.settingsExport.addEventListener("click", () => {
-    if (els.exportKeys.checked) {
-      els.exportConfirm.hidden = false;
-      return;
-    }
-    exportSettings(false);
-  });
-  els.exportConfirmOk.addEventListener("click", () => {
-    closeExportConfirm();
-    exportSettings(true);
-  });
-  els.exportCancel.addEventListener("click", closeExportConfirm);
-  els.exportConfirm.addEventListener("click", (event) => {
-    if (event.target === els.exportConfirm) closeExportConfirm();
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !els.exportConfirm.hidden) closeExportConfirm();
-  });
+  els.settingsExport.addEventListener("click", () => exportSettings());
   els.settingsImport.addEventListener("click", () => els.settingsFile.click());
   els.settingsFile.addEventListener("change", () => {
     const file = els.settingsFile.files && els.settingsFile.files[0];

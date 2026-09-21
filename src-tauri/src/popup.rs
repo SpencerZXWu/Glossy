@@ -117,6 +117,11 @@ pub fn track_move(x: i32, y: i32) {
 #[serde(rename_all = "camelCase")]
 pub struct SelectionPayload {
     pub text: String,
+    /// The sentence the selection stands in, when the setting for it is on and
+    /// the program in front let it be read. It is read at the moment of the
+    /// selection, while that program still has the focus, and travels with the
+    /// text so the card can translate it without asking the screen again.
+    pub context: Option<String>,
 }
 
 fn popup_window(app: &AppHandle) -> Option<WebviewWindow> {
@@ -187,12 +192,18 @@ fn clamp_point(
 }
 
 /// Tells the popup window about a new selection and remembers where it belongs.
-pub fn reveal(app: &AppHandle, state: &AppState, text: String, anchor: (f64, f64)) {
+pub fn reveal(
+    app: &AppHandle,
+    state: &AppState,
+    text: String,
+    context: Option<String>,
+    anchor: (f64, f64),
+) {
     let Some(window) = popup_window(app) else {
         return;
     };
     state.set_anchor(anchor);
-    let _ = window.emit("glossy://selection", SelectionPayload { text });
+    let _ = window.emit("glossy://selection", SelectionPayload { text, context });
 }
 
 /// Shows the card for a translation that was already made, which is how the

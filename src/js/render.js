@@ -146,6 +146,9 @@
   function result(target, value, options) {
     const opts = options || {};
     const data = value || {};
+    // The compact card keeps what the selection was translated into, and drops
+    // the blocks that only add context.
+    const extras = opts.compact !== true;
     clear(target);
 
     const translation = String(data.translation || "").trim();
@@ -157,6 +160,7 @@
         target.appendChild(node("div", "original", data.sourceText));
       }
       target.appendChild(node("div", "translation", translation || empty()));
+      if (extras) pairs(target, data.pairs);
     } else {
       target.appendChild(node("div", "translation", translation || empty()));
 
@@ -183,8 +187,14 @@
         }
       }
 
-      if (data.example) {
+      if (data.example && extras) {
         target.appendChild(node("div", "example", String(data.example)));
+      }
+
+      if (extras) {
+        forms(target, data.forms);
+        synonyms(target, data.synonyms);
+        context(target, data.context);
       }
 
       // The dictionary lookups a word card needs answer seconds later, so the
@@ -196,11 +206,156 @@
       }
     }
 
-    units(target, data.conversions);
+    if (extras) units(target, data.conversions);
+    if (opts.speak !== false) readOut(target, data);
 
     const parts = [];
     if (data.provider) parts.push(Glossy.i18n.providerName(data.provider));
     if (parts.length) target.appendChild(node("div", "foot", parts.join(" · ")));
+
+    // The card names the service that answered, and says so when that is not the
+    // one the settings picked.
+    if (data.fallbackFrom && data.provider) {
+      target.appendChild(
+        node(
+          "div",
+          "foot fallback",
+          Glossy.i18n.t("render.fallback", Glossy.i18n.providerName(data.fallbackFrom)),
+        ),
+      );
+    }
+  }
+
+  /** The inflections of a word, labelled by the tag the backend wrote. */
+  function forms(target, value) {
+    const rows = (Array.isArray(value) ? value : []).filter(
+      (form) => form && String(form.text || "").trim(),
+    );
+    if (!rows.length) return;
+
+    const block = node("div", "forms");
+    block.appendChild(node("div", "block-title", Glossy.i18n.t("render.forms")));
+    rows.forEach((form) => {
+      const row = node("div", "form");
+      row.appendChild(
+        node("span", "form-tag", Glossy.i18n.t(`form.${form.tag || "other"}`)),
+      );
+      row.appendChild(node("span", "form-text", String(form.text)));
+      block.appendChild(row);
+    });
+    target.appendChild(block);
+  }
+
+  /** Words that mean roughly the same, in the language of the original. */
+  function synonyms(target, value) {
+    const rows = (Array.isArray(value) ? value : []).filter((word) =>
+      String(word || "").trim(),
+    );
+    if (!rows.length) return;
+
+    const block = node("div", "synonyms");
+    block.appendChild(node("div", "block-title", Glossy.i18n.t("render.synonyms")));
+    block.appendChild(node("div", "synonym-list", rows.join(" · ")));
+    target.appendChild(block);
+  }
+
+  /** The sentence a word was selected from, next to its own translation. */
+  function context(target, value) {
+    const source = String((value && value.text) || "").trim();
+    if (!source) return;
+
+    const block = node("div", "context");
+    block.appendChild(node("div", "block-title", Glossy.i18n.t("render.context")));
+    block.appendChild(node("div", "context-source", source));
+    const translation = String((value && value.translation) || "").trim();
+    if (translation) block.appendChild(node("div", "context-translation", translation));
+    target.appendChild(block);
+  }
+
+  /** The original and the translation, one sentence per row. */
+  function pairs(target, value) {
+    const rows = (Array.isArray(value) ? value : []).filter(
+      (pair) => pair && (String(pair.source || "").trim() || String(pair.translation || "").trim()),
+    );
+    // A translation that divides differently comes back as one row, which is
+    // the whole text again and says nothing the card does not say already.
+    if (rows.length < 2) return;
+
+    const block = node("div", "pairs");
+    block.appendChild(node("div", "block-title", Glossy.i18n.t("render.pairs")));
+    rows.forEach((pair) => {
+      const row = node("div", "pair");
+      row.appendChild(node("div", "pair-source", String(pair.source || "")));
+      row.appendChild(node("div", "pair-translation", String(pair.translation || "")));
+      block.appendChild(row);
+    });
+    target.appendChild(block);
+  }
+
+  /** The button that is currently reading something out loud, if any. */
+  let reading = null;
+
+  /** The pronunciation buttons: the original, the translation, or both. */
+  function readOut(target, data) {
+    const rows = [];
+    const original = String(data.sourceText || "").trim();
+    const translation = String(data.translation || "").trim();
+    if (original) {
+      rows.push({ key: "render.speakOriginal", text: original, language: data.sourceLang });
+    }
+    if (translation) {
+      rows.push({
+        key: "render.speakTranslation",
+        text: translation,
+        language: data.targetLang,
+      });
+    }
+    if (!rows.length) return;
+
+    const block = node("div", "says");
+    rows.forEach((row) => {
+      const button = node("button", "say", Glossy.i18n.t(row.key));
+      button.type = "button";
+      button.setAttribute("data-say", row.key);
+      button.setAttribute("title", Glossy.i18n.t(row.key));
+      button.addEventListener("click", () => toggleReading(button, row));
+      block.appendChild(button);
+    });
+    target.appendChild(block);
+  }
+
+  /** Reads one text out loud, or stops the one already playing. */
+  async function toggleReading(button, row) {
+    if (typeof Glossy.invoke !== "function") return;
+    const stop = reading === button;
+    stopReading();
+    if (stop) {
+      Glossy.invoke("stop_speaking").catch(() => {});
+      return;
+    }
+
+    reading = button;
+    button.dataset.state = "on";
+    button.textContent = Glossy.i18n.t("render.stop");
+    try {
+      await Glossy.invoke("say", {
+        text: row.text,
+        language: row.language || null,
+      });
+    } catch (error) {
+      // A machine without a voice for that language answers with an error, and
+      // there is nothing to show for it beyond the button going back.
+      console.warn("glossy: unable to read the text out loud", error);
+    }
+    if (reading === button) stopReading();
+  }
+
+  /** Puts the button that is reading back to its resting look. */
+  function stopReading() {
+    if (!reading) return;
+    reading.dataset.state = "off";
+    reading.textContent = Glossy.i18n.t(reading.getAttribute("data-say"));
+    reading = null;
   }
 
   /** The source of a live currency rate, spelled the way the interface does. */

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::classify::Kind;
 
-use super::{Meaning, TranslationResult};
+use super::{Meaning, TranslationResult, MAX_DEFINITIONS, MAX_MEANINGS, MAX_SYNONYMS};
 
 const BASE: &str = "https://translate.googleapis.com/translate_a/single?client=";
 
@@ -17,9 +17,6 @@ const BASE: &str = "https://translate.googleapis.com/translate_a/single?client="
 /// the same JSON shape. The older `gtx` client replies `429 Too Many Requests`
 /// to most non-curl HTTP clients, so it is only kept as a fallback.
 const CLIENTS: [&str; 2] = ["dict-chrome-ex", "gtx"];
-
-const MAX_MEANINGS: usize = 4;
-const MAX_DEFINITIONS: usize = 4;
 
 /// Returned when the endpoint answers with its "we are sorry" HTML page instead
 /// of JSON, which is how it refuses automated queries.
@@ -246,6 +243,8 @@ pub fn parse(
 
     result.meanings = parse_meanings(&data);
 
+    result.synonyms = parse_synonyms(&data);
+
     result.example = data
         .get(13)
         .and_then(|value| value.get(0))
@@ -295,9 +294,39 @@ fn parse_meanings(data: &serde_json::Value) -> Vec<Meaning> {
     meanings
 }
 
+/// The words that mean roughly the same as the selected one.
+///
+/// Every sense of the entry carries them as `[<the sense translated>,
+/// [<synonym>, ...], ...]`, so the second field of a sense lists its synonyms in
+/// the language the word was written in — which is the language the card shows
+/// the headword in.
+fn parse_synonyms(data: &serde_json::Value) -> Vec<String> {
+    let Some(entries) = data.get(1).and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+
+    let mut synonyms: Vec<String> = Vec::new();
+    for entry in entries.iter().take(MAX_MEANINGS) {
+        let Some(groups) = entry.get(2).and_then(|value| value.as_array()) else {
+            continue;
+        };
+        for group in groups {
+            let Some(list) = group.get(1).and_then(|value| value.as_array()) else {
+                continue;
+            };
+            for word in list.iter().filter_map(|value| value.as_str()).map(clean) {
+                let known = synonyms.iter().any(|kept| kept.eq_ignore_ascii_case(&word));
+                if !word.is_empty() && !known && synonyms.len() < MAX_SYNONYMS {
+                    synonyms.push(word);
+                }
+            }
+        }
+    }
+    synonyms
+}
+
 /// Longest run of bytes that is still read as a tag.
 const MAX_TAG_LEN: usize = 64;
-
 /// Drops any markup and collapses the whitespace of a value from the response.
 ///
 /// Only something that really looks like a tag is removed: a `<`, an optional

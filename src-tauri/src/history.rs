@@ -228,6 +228,10 @@ mod tests {
             meanings: Vec::new(),
             example: None,
             provider: "google".to_string(),
+            synonyms: Vec::new(),
+            forms: Vec::new(),
+            fallback_from: None,
+            pairs: Vec::new(),
             conversions: Vec::new(),
         }
     }
@@ -348,6 +352,9 @@ mod tests {
                 definitions: vec!["lasting a very short time".to_string()],
             }],
             example: Some("an ephemeral joy".to_string()),
+            synonyms: vec!["fleeting".to_string()],
+            forms: Vec::new(),
+            context: None,
         }
     }
 }
