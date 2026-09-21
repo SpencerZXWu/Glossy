@@ -267,12 +267,15 @@ mod tests {
     use super::*;
 
     /// Every fixture is a copy of what a real program put on the clipboard,
-    /// next to what the translator should be asked for.
+    /// next to what the translator should be asked for. The expected file is an
+    /// artifact rather than an input, so the line endings a checkout happened to
+    /// hand it are normalised away before it is compared.
     fn fixture(name: &str) -> (String, String) {
         let raw = std::fs::read_to_string(format!("tests/fixtures/text/{name}.txt"))
             .expect("input fixture");
         let expected = std::fs::read_to_string(format!("tests/fixtures/text/{name}.expected.txt"))
-            .expect("expected fixture");
+            .expect("expected fixture")
+            .replace("\r\n", "\n");
         (raw, expected)
     }
 

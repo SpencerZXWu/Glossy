@@ -1,0 +1,5 @@
+# The expected side of a clipboard fixture is an artifact, not an input: what it
+# holds is compared against a normalised string, so its line endings must be the
+# ones it was authored with rather than whatever the checkout's core.autocrlf
+# would give it.
+src-tauri/tests/fixtures/text/*.expected.txt -text
