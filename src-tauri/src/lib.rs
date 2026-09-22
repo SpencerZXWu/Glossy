@@ -34,7 +34,7 @@ use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
 use notice::{notice_close, notice_open, NOTICE_LABEL};
 use popup::POPUP_LABEL;
-use settings::Settings;
+use settings::{Service, Settings};
 use state::AppState;
 use translate::TranslationResult;
 
@@ -343,6 +343,40 @@ fn speaking() -> bool {
     speech::is_speaking()
 }
 
+/// The translation service the settings currently name.
+///
+/// The stored shape spells the choice across `channel`, `cloudProvider`,
+/// `cloudVendor` and `provider`, so the window asks which of the four entries
+/// that adds up to instead of deriving it a second time.
+#[tauri::command]
+fn current_service(state: State<'_, Arc<AppState>>) -> String {
+    state.settings().service().id().to_string()
+}
+
+/// Switches the translation service, exactly as picking another entry in the
+/// settings window would.
+///
+/// Everything else about the settings is left alone, which is what lets the
+/// card offer the choice without sending the reader to that window.
+#[tauri::command]
+fn set_service(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    id: String,
+) -> Result<Settings, String> {
+    let service = Service::from_id(&id)
+        .ok_or_else(|| format!("`{id}` is not a translation service this build offers."))?;
+    let mut settings = state.settings();
+    if settings.service() == service {
+        return Ok(settings);
+    }
+    settings.set_service(service);
+    settings.save(&app)?;
+    state.set_settings(settings.clone());
+    let _ = app.emit("glossy://settings", settings.clone());
+    Ok(settings)
+}
+
 /// What the clipboard holds, for the paste button of the settings window.
 #[tauri::command]
 fn read_clipboard() -> String {
@@ -557,6 +591,8 @@ pub fn run() {
             say,
             stop_speaking,
             speaking,
+            current_service,
+            set_service,
             read_clipboard,
             history_list,
             history_clear,

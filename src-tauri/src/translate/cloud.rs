@@ -158,12 +158,10 @@ pub async fn translate(
     }
 
     // The server names the engine that answered, so the footer can say which
-    // one it was; an older server sends nothing and Glossy's own name stands.
-    let provider = data
-        .get("vendor")
-        .and_then(|value| value.as_str())
-        .filter(|name| matches!(*name, "baidu" | "youdao"))
-        .unwrap_or("cloud");
+    // one it was; a server too old to name it leaves the vendor the request
+    // asked for, because the card showing the engine that ran is worth more
+    // than it showing that something in the cloud ran.
+    let provider = answered_by(&data, request.vendor);
     let mut result = TranslationResult::new(request.kind, provider, request.text, request.target);
     result.translation = translation;
     result.source_lang = data
@@ -172,6 +170,18 @@ pub async fn translate(
         .unwrap_or("auto")
         .to_string();
     Ok(result)
+}
+
+/// The name the card shows for the engine that answered.
+///
+/// The server's own word for it is trusted when it is one of the two vendors
+/// this build can ask for; anything else falls back to the vendor the request
+/// named, because a card is more useful saying "baidu" than saying nothing.
+fn answered_by<'a>(data: &'a serde_json::Value, vendor: &'a str) -> &'a str {
+    data.get("vendor")
+        .and_then(|value| value.as_str())
+        .filter(|name| matches!(*name, "baidu" | "youdao"))
+        .unwrap_or(vendor)
 }
 
 /// Reads today's allowance for this installation.
@@ -330,6 +340,34 @@ mod tests {
         assert_eq!(body["vendor"], "youdao");
         // The empty string is how the app asks the server to choose.
         assert_eq!(request("").payload("abc")["vendor"], "");
+    }
+
+    #[test]
+    fn the_card_names_the_engine_that_answered() {
+        let answered =
+            |body: serde_json::Value, vendor: &'static str| answered_by(&body, vendor).to_string();
+        // The server's word for it wins, which is the case that matters when
+        // the server walked its own list of backends and picked another one.
+        assert_eq!(
+            answered(serde_json::json!({"vendor": "youdao"}), "baidu"),
+            "youdao"
+        );
+        assert_eq!(
+            answered(serde_json::json!({"vendor": "baidu"}), "youdao"),
+            "baidu"
+        );
+        // A server too old to name it leaves the vendor that was asked for,
+        // because the card never has to fall back to saying "cloud".
+        assert_eq!(answered(serde_json::json!({}), "youdao"), "youdao");
+        assert_eq!(
+            answered(serde_json::json!({"vendor": ""}), "baidu"),
+            "baidu"
+        );
+        // A name this build cannot place is not shown either.
+        assert_eq!(
+            answered(serde_json::json!({"vendor": "deepl"}), "baidu"),
+            "baidu"
+        );
     }
 
     #[test]

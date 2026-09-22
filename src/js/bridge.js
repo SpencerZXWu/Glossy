@@ -48,6 +48,26 @@
 
   let settings = { ...MOCK_SETTINGS };
 
+  /** The service the preview pretends is chosen, and what it answers with. */
+  let previewService = "cloud-baidu";
+
+  /** The engine each service reports as the one that answered. */
+  const SERVICE_ENGINES = {
+    "cloud-baidu": "baidu",
+    "cloud-youdao": "youdao",
+    local: "local",
+    google: "google",
+  };
+
+  /** The stored shape `set_service` writes for each service, as the backend
+      spreads the same choice over four fields. */
+  const SERVICE_STORED = {
+    "cloud-baidu": { channel: "cloud", cloudProvider: "builtin", cloudVendor: "baidu", provider: "baidu" },
+    "cloud-youdao": { channel: "cloud", cloudProvider: "builtin", cloudVendor: "youdao", provider: "youdao" },
+    local: { channel: "cloud", cloudProvider: "local", cloudVendor: "", provider: "local" },
+    google: { channel: "api", cloudProvider: "builtin", cloudVendor: "", provider: "google" },
+  };
+
   /**
    * Whether the preview's imaginary voice is still reading. The real backend
    * reports this itself; here the button would go quiet a frame after it lit up,
@@ -96,7 +116,7 @@
       sourceText: source,
       sourceLang: forced.sourceLang || (/[\u4e00-\u9fff]/.test(source) ? "zh-CN" : "en"),
       targetLang: forced.targetLang || settings.targetLang,
-      provider: "Google · preview",
+      provider: SERVICE_ENGINES[previewService] || "google",
     };
     if (isWord) {
       return {
@@ -143,7 +163,7 @@
         { source: "Then it keeps on running.", translation: "然后它继续跑着。" },
       ];
     }
-    if (previewWantsFallback()) sentence.fallbackFrom = "Baidu Cloud";
+    if (previewWantsFallback()) sentence.fallbackFrom = "baidu";
     return sentence;
   }
 
@@ -219,6 +239,14 @@
         return true;
       case "speaking":
         return previewSpeaking;
+      case "current_service":
+        return previewService;
+      case "set_service":
+        if (!SERVICE_ENGINES[input.id]) throw new Error("unknown service");
+        previewService = input.id;
+        settings = { ...settings, ...SERVICE_STORED[input.id] };
+        previewEmit("glossy://settings", { ...settings });
+        return { ...settings };
       case "capture_status":
         return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
       case "cloud_status":

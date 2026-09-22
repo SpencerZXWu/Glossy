@@ -306,11 +306,11 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 175 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 194 Rust tests
+cargo test --locked                                                  # 196 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -410,7 +410,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 194 tests; see "Checks" above for lint and format runs
+cargo test   # 196 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -644,11 +644,11 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 175 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 194 Rust tests
+cargo test --locked                                                  # 196 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -732,7 +732,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 194 tests; see "Checks" above for lint and format runs
+cargo test   # 196 tests; see "Checks" above for lint and format runs
 ```
 
 ## 目录结构
@@ -1132,11 +1132,11 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 175 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 194 Rust tests
+cargo test --locked                                                  # 196 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1243,7 +1243,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 194 tests; see "Checks" above for lint and format runs
+cargo test   # 196 tests; see "Checks" above for lint and format runs
 ```
 
 ## Estructura

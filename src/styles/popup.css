@@ -577,6 +577,105 @@ body.dragging .card::before {
   border-top: 0;
 }
 
+/* The name of the engine that answered. It is a button because the list of the
+   other ones opens under it; without that it is plain text, which is how the
+   card looked before and how it still looks where there is nothing to choose. */
+.foot .service {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: -3px -7px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
+}
+
+/* Says the name opens something, without a second icon in the row. */
+.foot .service::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.7;
+}
+
+.foot .service:hover,
+.foot .service[aria-expanded="true"] {
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+
+/* The caret turns over while the list is open, so the name says which way it
+   will go when it is clicked again. */
+.foot .service[aria-expanded="true"]::after {
+  border-top-color: transparent;
+  border-bottom: 4px solid currentColor;
+}
+
+.foot .service:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+/* The engines the card can switch to, listed under the name that answered. */
+.service-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg-soft);
+  animation: rise var(--g-dur-fast) var(--g-ease-decelerate);
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: calc(12.5px * var(--popup-font));
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard);
+}
+
+.service-item:hover {
+  background: var(--bg);
+}
+
+.service-item:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: calc(var(--g-focus-offset) * -1);
+}
+
+/* The one in use is marked by the accent and the tick, not by the tick alone:
+   a single glyph is easy to miss and says nothing to a screen reader. */
+.service-item[aria-checked="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.service-chosen {
+  flex: none;
+  font-size: calc(12px * var(--popup-font));
+}
+
 .note {
   color: var(--muted);
   font-size: calc(12px * var(--popup-font));

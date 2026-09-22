@@ -103,26 +103,16 @@
     "field.service": "Translation service",
     "field.localEndpoint": "Local service address",
     "field.localModel": "Model name",
-    "provider.cloudBaidu": "Baidu Translate · nothing to set up",
-    "provider.cloudYoudao": "Youdao Translate · nothing to set up",
-    "provider.local": "Local translation · Ollama (recommended)",
-    "provider.google": "Google · free, no key",
     "providerName.google": "Google",
     "providerName.baidu": "Baidu Translate",
     "providerName.youdao": "Youdao Translate",
-    "providerName.local": "Local translation",
+    "providerName.local": "Ollama",
     "cloud.quota.checking": "Asking the server how much is left today…",
     "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
     "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
     "cloud.quota.retry": "Check again",
     "language.hint": "The source language is detected automatically.",
 
-    "provider.hint.google":
-      "The free public Google endpoint. Phonetics, parts of speech, definitions and an example come from the same call. No key needed.",
-    "provider.hint.cloudBaidu":
-      "Nothing to fill in: the translation runs on the account behind this build, so no key ever reaches the app and each device gets a daily character allowance. Another engine answers when Baidu cannot.",
-    "provider.hint.cloudYoudao":
-      "Nothing to fill in: the translation runs on the account behind this build, so no key ever reaches the app. Another engine answers when Youdao cannot.",
     "cloud.hint.local":
       "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
 
@@ -135,7 +125,7 @@
     "fallback.first": "always first",
     "service.cloud-baidu": "Baidu Translate",
     "service.cloud-youdao": "Youdao Translate",
-    "service.local": "Local model",
+    "service.local": "Ollama",
     "service.google": "Google",
 
     "panel.reading": "Reading",
@@ -211,6 +201,7 @@
     "popup.close": "Close",
     "popup.pin": "Pin the card, so it stays open",
     "popup.unpin": "Unpin the card",
+    "popup.chooseService": "Translation service",
     "popup.sourceLang": "Source language",
     "popup.targetLang": "Target language",
     "popup.swap": "Swap languages and translate back",
@@ -343,26 +334,16 @@
     "field.service": "翻译渠道",
     "field.localEndpoint": "本地服务地址",
     "field.localModel": "模型名称",
-    "provider.cloudBaidu": "百度翻译 · 无需配置",
-    "provider.cloudYoudao": "有道翻译 · 无需配置",
-    "provider.local": "本地翻译 · Ollama（推荐）",
-    "provider.google": "Google · 免费，无需密钥",
     "providerName.google": "Google",
     "providerName.baidu": "百度翻译",
     "providerName.youdao": "有道翻译",
-    "providerName.local": "本地翻译",
+    "providerName.local": "Ollama",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
     "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
     "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
     "cloud.quota.retry": "重新查询",
     "language.hint": "源语言会自动识别。",
 
-    "provider.hint.google":
-      "免费的 Google 公共接口：音标、词性、释义和例句都在同一次请求里返回，无需密钥。",
-    "provider.hint.cloudBaidu":
-      "无需填写任何密钥：翻译由本软件内置的账号完成，密钥不会进入客户端，每台设备每天有字符额度；百度答不上来时服务器会自动改用别的引擎。",
-    "provider.hint.cloudYoudao":
-      "无需填写任何密钥：翻译由本软件内置的账号完成，密钥不会进入客户端；有道答不上来时服务器会自动改用别的引擎。",
     "cloud.hint.local":
       "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
 
@@ -375,7 +356,7 @@
     "fallback.first": "始终最先尝试",
     "service.cloud-baidu": "百度翻译",
     "service.cloud-youdao": "有道翻译",
-    "service.local": "本地模型",
+    "service.local": "Ollama",
     "service.google": "Google",
 
     "panel.reading": "阅读",
@@ -450,6 +431,7 @@
     "popup.close": "关闭",
     "popup.pin": "固定窗口，不随点击关闭",
     "popup.unpin": "取消固定",
+    "popup.chooseService": "翻译渠道",
     "popup.sourceLang": "源语言",
     "popup.targetLang": "目标语言",
     "popup.swap": "交换语言并反向翻译",

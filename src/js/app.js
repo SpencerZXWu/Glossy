@@ -45,7 +45,6 @@
     cloudLocalBlock: $("cloudLocalBlock"),
     localEndpoint: $("localEndpoint"),
     localModel: $("localModel"),
-    serviceHint: $("serviceHint"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
     uiLang: $("uiLang"),
@@ -83,18 +82,6 @@
   };
 
   const LANGUAGES = Glossy.languageCodes;
-
-  /**
-   * Everything the popup can translate through, in the order the dropdown
-   * offers it: the two engines Glossy answers with, then the local model, then
-   * the free Google endpoint.
-   */
-  const SERVICE_HINTS = {
-    "cloud-baidu": "provider.hint.cloudBaidu",
-    "cloud-youdao": "provider.hint.cloudYoudao",
-    local: "cloud.hint.local",
-    google: "provider.hint.google",
-  };
 
   /** The dropdown entries that go through one particular online engine. */
   const CLOUD_VENDORS = { "cloud-baidu": "baidu", "cloud-youdao": "youdao" };
@@ -236,17 +223,17 @@
   }
 
   /**
-   * Shows the fields and the hint that belong to the chosen service.
+   * Shows the fields that belong to the chosen service.
    *
    * The dropdown is one list, so a service either needs nothing (an online
    * engine, the free Google endpoint) or an address of the user's own for the
-   * local model.
+   * local model. The entries are names and nothing else; what a service needs
+   * is shown by the fields under it.
    */
   function syncService() {
     const service = els.service.value;
     els.cloudBlock.hidden = !isCloudService(service);
     els.cloudLocalBlock.hidden = service !== "local";
-    els.serviceHint.innerHTML = Glossy.i18n.t(SERVICE_HINTS[service] || "");
     renderFallbackOrder();
   }
 

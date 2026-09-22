@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [Unreleased]
+
+### Added
+
+- **The card names the engine that translated it, and can change it.** The line under
+  the translation printed the literal word `cloud` for both 百度 and 有道, because it
+  was reading the storage shape instead of the service. It names the service that
+  answered now — Baidu, Youdao, Ollama or Google — and the name is a button: pressing
+  it opens the four services in place inside the card with the current one ticked,
+  and picking one saves the choice and translates the selection again. `cloud::answered_by`
+  keeps the literal `cloud` out of what the card is told, `current_service` and
+  `set_service` carry the choice back and forth, and Escape closes the list before it
+  closes the card.
+
+### Changed
+
+- **The settings window shows the services as plain names.** The line under the
+  dropdown that promised a service needed no setup and cost nothing is gone, and the
+  local engine reads **Ollama** there and on the card instead of 本地翻译. The card's own
+  line carries the same names, so the two places a service is chosen finally agree.
+
 ## [1.1.1] - 2026-09-21
 
 The appearance pass v1.1.0 left open: the popup was measured in a browser, and what

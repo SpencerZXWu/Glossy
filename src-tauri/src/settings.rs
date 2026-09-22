@@ -107,9 +107,8 @@ pub enum Service {
 impl Service {
     /// Every entry, in the order the dropdown shows them.
     ///
-    /// The window builds its dropdown from the markup, so only the tests walk
-    /// the whole list.
-    #[cfg(test)]
+    /// The window builds its dropdown from the markup, so what walks this list
+    /// is [`Service::from_id`] and the tests.
     pub const ALL: [Service; 4] = [
         Service::CloudBaidu,
         Service::CloudYoudao,
@@ -125,6 +124,18 @@ impl Service {
             Service::Local => "local",
             Service::Google => "google",
         }
+    }
+
+    /// The entry an id names; the inverse of [`Service::id`].
+    ///
+    /// `None` means the id is not one of the four, which is what a window or a
+    /// shortcut carrying a stale id has to hear instead of a silent fallback.
+    pub fn from_id(id: &str) -> Option<Service> {
+        let wanted = id.trim();
+        Service::ALL
+            .iter()
+            .copied()
+            .find(|service| service.id() == wanted)
     }
 
     /// The service a stored file names.
@@ -1252,6 +1263,20 @@ mod tests {
 
         assert_eq!(settings.service(), Service::CloudBaidu);
         assert_eq!(settings.service().id(), "cloud-baidu");
+    }
+
+    #[test]
+    fn every_service_answers_to_its_own_id_and_to_nothing_else() {
+        for service in Service::ALL {
+            assert_eq!(Service::from_id(service.id()), Some(service));
+        }
+        // What the window sends for anything it no longer offers, and what a
+        // stray id in a shortcut would look like.
+        assert_eq!(Service::from_id(" deepl"), None);
+        assert_eq!(Service::from_id(""), None);
+        assert_eq!(Service::from_id("Cloud-Baidu"), None);
+        // Enough slack for the window to send an id with a stray space in it.
+        assert_eq!(Service::from_id(" google "), Some(Service::Google));
     }
 
     #[test]

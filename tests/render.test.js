@@ -862,3 +862,35 @@ test("result says nothing about a fallback when none happened", () => {
   Glossy.render.result(node, { kind: "sentence", translation: "你好。", provider: "Baidu" });
   assert.equal(findByClass(node, "foot fallback"), null);
 });
+
+test("the name of the engine is a button when the card can switch services", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", translation: "狐狸", provider: "youdao" },
+    { onChooseService: (button) => asked.push(button) },
+  );
+
+  const button = findByClass(node, "service");
+  assert.ok(button, "the footer name is not a button");
+  assert.equal(button.textContent, "Youdao Translate");
+  assert.equal(button.getAttribute("aria-haspopup"), "true");
+  // Collapsed until the list is really there, which is what a screen reader
+  // reads out before the click.
+  assert.equal(button.getAttribute("aria-expanded"), "false");
+  assert.equal(button.getAttribute("title"), "Translation service");
+  assert.equal(findByClass(node, "foot").textContent, "Youdao Translate");
+
+  button.dispatch("click");
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0], button);
+});
+
+test("the name of the engine stays plain text without a way to switch", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
+
+  assert.equal(findByClass(node, "service"), null);
+  assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
+});

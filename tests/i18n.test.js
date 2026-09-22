@@ -220,7 +220,7 @@ test("t ignores extra arguments and substitutes inside Chinese text", () => {
 test("providerName is case-insensitive and localized", () => {
   i18n.set("en");
   assert.equal(i18n.providerName("GOOGLE"), "Google");
-  assert.equal(i18n.providerName("local"), "Local translation");
+  assert.equal(i18n.providerName("local"), "Ollama");
   i18n.set("zh");
   assert.equal(i18n.providerName("baidu"), "百度翻译");
   assert.equal(i18n.providerName("Youdao"), "有道翻译");

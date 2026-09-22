@@ -239,10 +239,10 @@
             <div class="field">
               <label for="service" data-i18n="field.service">Translation service</label>
               <select id="service">
-                <option value="cloud-baidu" data-i18n="provider.cloudBaidu">Baidu Translate · nothing to set up</option>
-                <option value="cloud-youdao" data-i18n="provider.cloudYoudao">Youdao Translate · nothing to set up</option>
-                <option value="local" data-i18n="provider.local">Local translation · Ollama (recommended)</option>
-                <option value="google" data-i18n="provider.google">Google · free, no key</option>
+                <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
+                <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
+                <option value="local" data-i18n="service.local">Ollama</option>
+                <option value="google" data-i18n="service.google">Google</option>
               </select>
             </div>
           </div>
@@ -264,8 +264,6 @@
               <input type="text" id="localModel" spellcheck="false" autocomplete="off" placeholder="qwen2.5:7b" />
             </div>
           </div>
-
-          <p class="hint" id="serviceHint"></p>
         </section>
 
         <section class="panel">

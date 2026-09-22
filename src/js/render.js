@@ -223,9 +223,27 @@
 
     if (extras) units(target, data.conversions);
 
-    const parts = [];
-    if (data.provider) parts.push(Glossy.i18n.providerName(data.provider));
-    if (parts.length) target.appendChild(node("div", "foot", parts.join(" · ")));
+    // The card names the engine that answered; when the caller can offer the
+    // other ones that name is the way to ask for them.
+    if (data.provider) {
+      const name = Glossy.i18n.providerName(data.provider);
+      const foot = node("div", "foot");
+      if (typeof opts.onChooseService === "function") {
+        const choose = node("button", "service", name);
+        choose.type = "button";
+        choose.setAttribute("aria-haspopup", "true");
+        choose.setAttribute("aria-expanded", "false");
+        choose.setAttribute("title", Glossy.i18n.t("popup.chooseService"));
+        choose.addEventListener("click", (event) => {
+          if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+          opts.onChooseService(choose);
+        });
+        foot.appendChild(choose);
+      } else {
+        foot.textContent = name;
+      }
+      target.appendChild(foot);
+    }
 
     // The card names the service that answered, and says so when that is not the
     // one the settings picked.

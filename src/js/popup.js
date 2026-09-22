@@ -272,6 +272,9 @@
 
     text = value;
     current = null;
+    // Redrawing the card throws the list away with it, so it is forgotten here
+    // rather than removed.
+    serviceMenu = null;
     const mine = ++ticket;
     clearTimeout(closeTimer);
 
@@ -375,7 +378,96 @@
     Glossy.render.result(content, result, {
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
+      onChooseService: toggleServiceMenu,
     });
+  }
+
+  /**
+   * The engines the card can switch between, in the order the settings window
+   * lists them. The stored choice is spread over four fields, so the backend is
+   * asked which entry it adds up to instead of deriving it again here.
+   */
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "local", "google"];
+
+  /** The service list while it is open, and the name it was opened from. */
+  let serviceMenu = null;
+
+  /**
+   * Opens the list of engines under the name of the one that answered, or
+   * closes it again when the name is clicked twice.
+   *
+   * The list is drawn inside the card rather than floating over it: the card is
+   * resized to whatever it holds, so growing it is a layout the window already
+   * knows how to place, and the list can never end up off the screen.
+   */
+  async function toggleServiceMenu(button) {
+    if (serviceMenu) {
+      closeServiceMenu();
+      return;
+    }
+    let chosen = "";
+    try {
+      chosen = String((await Glossy.invoke("current_service")) || "");
+    } catch (error) {
+      chosen = "";
+    }
+    // The answer took a round trip; a click elsewhere may have closed the card.
+    if (document.body.dataset.state === "idle") return;
+
+    const list = document.createElement("div");
+    list.className = "service-menu";
+    list.setAttribute("role", "menu");
+    SERVICES.forEach((id) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "service-item";
+      item.setAttribute("role", "menuitemradio");
+      item.setAttribute("aria-checked", String(id === chosen));
+      const name = document.createElement("span");
+      name.className = "service-name";
+      name.textContent = Glossy.i18n.t(`service.${id}`);
+      item.appendChild(name);
+      if (id === chosen) {
+        const mark = document.createElement("span");
+        mark.className = "service-chosen";
+        mark.textContent = "✓";
+        item.appendChild(mark);
+      }
+      item.addEventListener("click", (event) => {
+        if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+        chooseService(id);
+      });
+      list.appendChild(item);
+    });
+
+    button.setAttribute("aria-expanded", "true");
+    content.appendChild(list);
+    serviceMenu = { list, button };
+    await place(false);
+  }
+
+  /** Puts the card back the way it was before the list was opened. */
+  function closeServiceMenu() {
+    if (!serviceMenu) return;
+    const { list, button } = serviceMenu;
+    serviceMenu = null;
+    button.setAttribute("aria-expanded", "false");
+    if (list.parentNode) list.parentNode.removeChild(list);
+    place(false);
+  }
+
+  /** Switches the engine and translates the same text through it. */
+  async function chooseService(id) {
+    closeServiceMenu();
+    try {
+      await Glossy.invoke("set_service", { id });
+    } catch (error) {
+      // The card keeps the translation it already has; the settings window is
+      // where the choice is explained, and nothing here can improve on that.
+      console.warn("glossy: could not switch the translation service", error);
+      return;
+    }
+    if (text) run(text);
   }
 
   /** Shows a translation the history already has, without asking the provider
@@ -384,6 +476,7 @@
     if (!result || !result.translation) return;
     const mine = ++ticket;
     clearTimeout(closeTimer);
+    serviceMenu = null;
     resetLanguages();
 
     text = String(result.sourceText || "");
@@ -423,6 +516,8 @@
   function dismiss() {
     ticket += 1;
     clearTimeout(closeTimer);
+    // The card is about to be hidden with whatever is on it.
+    serviceMenu = null;
     // Unpinning here keeps the button in step with the card that is about to
     // vanish; the backend forgets the pin with the card.
     pinned = false;
@@ -447,7 +542,23 @@
   });
   langSwap.addEventListener("click", swapLanguages);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") dismiss();
+    if (event.key !== "Escape") return;
+    // Escape belongs to the innermost thing that is open: the list closes
+    // first, and the card goes on the next press.
+    if (serviceMenu) closeServiceMenu();
+    else dismiss();
+  });
+  // A click anywhere else on the card means the list is not wanted; the click
+  // that opens it is stopped from reaching here by the name it started on, and
+  // the list's own items are handled before it too.
+  document.addEventListener("click", (event) => {
+    if (!serviceMenu) return;
+    const target = event.target;
+    if (target === serviceMenu.button) return;
+    if (target && typeof serviceMenu.list.contains === "function") {
+      if (serviceMenu.list.contains(target)) return;
+    }
+    closeServiceMenu();
   });
 
   Glossy.listen("glossy://selection", (event) => {
@@ -488,6 +599,9 @@
       sample === "sentence"
         ? "The quick brown fox jumps over the lazy dog, then it keeps on running."
         : "running";
+    // The sample stands in for a real selection, so the card that switches
+    // services has the text to translate again.
+    text = value;
     headword.textContent = value;
     Glossy.invoke("translate_text", { text: value }).then((result) => {
       current = result;
