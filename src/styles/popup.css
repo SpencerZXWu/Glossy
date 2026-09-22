@@ -461,7 +461,10 @@ body.dragging .card::before {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
-  margin-top: 6px;
+  flex: none;
+  /* It shares one line with the name of the engine, so it asks for no room of
+     its own above it and pushes itself to the far end of the row. */
+  margin-left: auto;
 }
 
 .say {
@@ -562,7 +565,13 @@ body.dragging .card::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* The bottom line of the card: the name of the engine that answered at one end,
+   the pronunciation buttons at the other. It is a single row that never wraps. */
 .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 9px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
@@ -570,8 +579,20 @@ body.dragging .card::before {
   font-size: calc(11.5px * var(--popup-font));
 }
 
+/* The name keeps to one line whatever it says: a long one gives way rather than
+   pushing the buttons down onto a line of their own. */
+.foot .engine,
+.foot .service {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Why the answer did not come from the service that was asked first. */
 .foot.fallback {
+  display: block;
   margin-top: 4px;
   padding-top: 0;
   border-top: 0;

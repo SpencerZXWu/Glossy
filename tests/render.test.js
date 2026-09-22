@@ -196,7 +196,7 @@ test("result skips the phonetic row for a whitespace-only phonetic", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "fox", phonetic: "   " });
   assert.equal(findByClass(node, "phonetic"), null);
-  assert.deepEqual(classesOf(node), ["translation", "says", "say"]);
+  assert.deepEqual(classesOf(node), ["translation", "foot", "says", "say"]);
 });
 
 test("result renders meanings with part of speech and joined definitions", () => {
@@ -472,10 +472,22 @@ test("result localizes the provider footer", () => {
   i18n.set("en");
 });
 
-test("result omits the footer without a provider", () => {
+test("result leaves the footer name off without a provider", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "fox", provider: "" });
-  assert.equal(findByClass(node, "foot"), null);
+  assert.equal(findByClass(node, "foot").textContent, "");
+  assert.equal(findByClass(node, "engine"), null);
+  assert.equal(findByClass(node, "service"), null);
+});
+
+test("result keeps the name of the engine and the buttons on one footer row", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
+  const foot = findByClass(node, "foot");
+  assert.equal(foot.parentNode, node);
+  assert.equal(foot.textContent, "Baidu Translate");
+  assert.deepEqual(classesOf(foot), ["engine", "says", "say"]);
+  assert.equal(findByClass(node, "says").parentNode, foot);
 });
 
 test("result writes translations, definitions and examples as text, not markup", () => {
@@ -499,7 +511,7 @@ test("result clears whatever the target held before", () => {
   const node = target();
   node.appendChild(env.document.createElement("p"));
   Glossy.render.result(node, { kind: "sentence", translation: "Hello" });
-  assert.deepEqual(classesOf(node), ["translation", "says", "say"]);
+  assert.deepEqual(classesOf(node), ["translation", "foot", "says", "say"]);
   assert.equal(node.firstChild.className, "translation");
 });
 

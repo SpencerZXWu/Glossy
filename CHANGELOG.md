@@ -25,6 +25,17 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 - **The settings window shows the services as plain names.** The line under the
   dropdown that promised a service needed no setup and cost nothing is gone. The card's
   own line carries the same names, so the two places a service is chosen finally agree.
+- **The name of the engine shares one line with the two read-aloud buttons.** It sat on
+  the line above them and could wrap away from them on a narrow card. The footer is a
+  single row now, and the name is given the room it needs and kept to one line
+  rather than wrapped, so the buttons keep their place at the end of the line.
+- **The settings window groups each switch with the thing it changes.** The panels now
+  run from the master switch through triggering, languages, the fallback service and the
+  card's options to reading, units, history, the settings file and updates, and the two
+  switches that describe the card — showing the original sentence and the compact layout
+  — sit with the rest of the card's options instead of in the master and reading panels.
+  Starting Glossy with the system is its own group: it sat among the switches the master
+  switch dims while translation is off, which left it unreachable from a paused app.
 
 ### Removed
 

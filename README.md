@@ -304,7 +304,7 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 176 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -640,7 +640,7 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 176 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -1125,7 +1125,7 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 176 frontend tests
+node --test                                                          # 177 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings

@@ -223,11 +223,12 @@
 
     if (extras) units(target, data.conversions);
 
-    // The card names the engine that answered; when the caller can offer the
-    // other ones that name is the way to ask for them.
+    // The bottom line of the card: the name of the engine that answered on the
+    // left, the pronunciation buttons on the right. Both go into the same row,
+    // so neither can push the other onto a line of its own.
+    const foot = node("div", "foot");
     if (data.provider) {
       const name = Glossy.i18n.providerName(data.provider);
-      const foot = node("div", "foot");
       if (typeof opts.onChooseService === "function") {
         const choose = node("button", "service", name);
         choose.type = "button";
@@ -240,10 +241,14 @@
         });
         foot.appendChild(choose);
       } else {
-        foot.textContent = name;
+        foot.appendChild(node("span", "engine", name));
       }
-      target.appendChild(foot);
     }
+
+    // Added last, so the buttons sit in the bottom corner of the card.
+    if (opts.speak !== false) readOut(foot, data);
+
+    if (foot.childNodes.length) target.appendChild(foot);
 
     // The card names the service that answered, and says so when that is not the
     // one the settings picked.
@@ -256,9 +261,6 @@
         ),
       );
     }
-
-    // Last, so the buttons sit in the bottom corner of the card.
-    if (opts.speak !== false) readOut(target, data);
   }
 
   /** The inflections of a word, labelled by the tag the backend wrote. */

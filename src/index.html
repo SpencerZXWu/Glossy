@@ -92,7 +92,9 @@
             <label class="check"><input type="checkbox" id="triggerOnDrag" /><span data-i18n="option.drag">Translate when the mouse drags across text</span></label>
             <label class="check"><input type="checkbox" id="triggerOnDoubleClick" /><span data-i18n="option.doubleClick">Translate a word on double click</span></label>
             <label class="check"><input type="checkbox" id="restoreClipboard" /><span data-i18n="option.restoreClipboard">Put the clipboard back after reading a selection</span></label>
-            <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
+          </div>
+
+          <div class="options" id="startup">
             <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
           </div>
         </section>
@@ -132,6 +134,43 @@
             </div>
           </div>
           <p class="hint" id="sourceLangsHint"></p>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.language">Language</h2>
+          <div class="grid">
+            <div class="field">
+              <label for="targetLang" data-i18n="field.targetLang">Translate into</label>
+              <select id="targetLang"></select>
+            </div>
+            <div class="field">
+              <label for="service" data-i18n="field.service">Translation service</label>
+              <select id="service">
+                <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
+                <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
+                <option value="google" data-i18n="service.google">Google</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="cloudBlock">
+            <div class="demo-actions">
+              <p class="hint" id="cloudQuota"></p>
+              <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 data-i18n="panel.fallback">Fallback</h2>
+          <div class="options">
+            <label class="check"><input type="checkbox" id="fallbackEnabled" /><span data-i18n="option.fallback">Ask another service when the chosen one fails</span></label>
+          </div>
+          <p class="hint" data-i18n="fallback.hint">
+            The service picked above is always tried first. The entries below are asked in this
+            order when it fails, rate-limits or answers with nothing.
+          </p>
+          <ul class="order" id="fallbackList" role="list"></ul>
         </section>
 
         <section class="panel">
@@ -190,20 +229,10 @@
             </div>
           </div>
           <div class="options">
+            <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
+            <label class="check"><input type="checkbox" id="compactPopup" /><span data-i18n="option.compactPopup">Draw a compact card, without the extras</span></label>
             <label class="check"><input type="checkbox" id="closeAfterCopy" /><span data-i18n="option.closeAfterCopy">Close the popup right after the translation is copied</span></label>
           </div>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.units">Units</h2>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="unitsEnabled" /><span data-i18n="option.units">Convert measurements and money the target language does not use</span></label>
-          </div>
-          <p class="hint" data-i18n="units.hint">
-            A measurement or an amount of money that reads the way the source language writes it
-            is shown again the way the target language writes it, with the conversion rate.
-            Currency rates are looked up live.
-          </p>
         </section>
 
         <section class="panel">
@@ -211,7 +240,6 @@
           <div class="options">
             <label class="check"><input type="checkbox" id="wordSentence" /><span data-i18n="option.wordSentence">Show the sentence a word was selected from</span></label>
             <label class="check"><input type="checkbox" id="sentencePairs" /><span data-i18n="option.sentencePairs">Pair the original and the translation sentence by sentence</span></label>
-            <label class="check"><input type="checkbox" id="compactPopup" /><span data-i18n="option.compactPopup">Draw a compact card, without the extras</span></label>
           </div>
           <div class="field">
             <label for="speechRate" data-i18n="field.speechRate">Speaking rate</label>
@@ -230,40 +258,15 @@
         </section>
 
         <section class="panel">
-          <h2 data-i18n="panel.language">Language</h2>
-          <div class="grid">
-            <div class="field">
-              <label for="targetLang" data-i18n="field.targetLang">Translate into</label>
-              <select id="targetLang"></select>
-            </div>
-            <div class="field">
-              <label for="service" data-i18n="field.service">Translation service</label>
-              <select id="service">
-                <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
-                <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
-                <option value="google" data-i18n="service.google">Google</option>
-              </select>
-            </div>
-          </div>
-
-          <div id="cloudBlock">
-            <div class="demo-actions">
-              <p class="hint" id="cloudQuota"></p>
-              <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.fallback">Fallback</h2>
+          <h2 data-i18n="panel.units">Units</h2>
           <div class="options">
-            <label class="check"><input type="checkbox" id="fallbackEnabled" /><span data-i18n="option.fallback">Ask another service when the chosen one fails</span></label>
+            <label class="check"><input type="checkbox" id="unitsEnabled" /><span data-i18n="option.units">Convert measurements and money the target language does not use</span></label>
           </div>
-          <p class="hint" data-i18n="fallback.hint">
-            The service picked above is always tried first. The entries below are asked in this
-            order when it fails, rate-limits or answers with nothing.
+          <p class="hint" data-i18n="units.hint">
+            A measurement or an amount of money that reads the way the source language writes it
+            is shown again the way the target language writes it, with the conversion rate.
+            Currency rates are looked up live.
           </p>
-          <ul class="order" id="fallbackList" role="list"></ul>
         </section>
 
         <section class="panel">

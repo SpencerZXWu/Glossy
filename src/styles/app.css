@@ -873,12 +873,15 @@ input:focus-visible {
   line-height: 1.5;
 }
 
-/* Pronunciation buttons, one per side of the card. */
+/* Pronunciation buttons, one per side of the card. They share the last line with
+   the name of the engine that answered, so they ask for no room above them and
+   take the far end of that line. */
 .says {
   display: flex;
-  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
-  margin-top: 9px;
+  flex: none;
+  margin-left: auto;
 }
 
 .say {
@@ -954,7 +957,13 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+/* The bottom line of the card: the name of the engine that answered at one end,
+   the pronunciation buttons at the other. It is a single row that never wraps. */
 .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 9px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
@@ -962,8 +971,18 @@ input:focus-visible {
   font-size: 10.5px;
 }
 
+/* The name keeps to one line whatever it says. */
+.foot .engine {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Why the answer did not come from the service that was asked first. */
 .foot.fallback {
+  display: block;
   margin-top: 4px;
   padding-top: 0;
   border-top: 0;
