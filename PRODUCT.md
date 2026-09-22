@@ -113,9 +113,9 @@ truthfully copy.
   providers and quotas, troubleshooting, how the selection is captured, layout,
   development and the manual regression checklist.
 - `ROADMAP.md` and `CHANGELOG.md` — delivered work and planned work, per version.
-- `release/v1.0.2/`, `release/v1.1.0/` and `release/v1.1.1/` — the shipped release
-  notes and checksums.
-- The automated suites: 175 frontend tests and 194 Rust tests at v1.1.1.
+- `release/v1.0.2/`, `release/v1.1.0/`, `release/v1.1.1/` and `release/v1.1.2/` — the
+  shipped release notes and checksums.
+- The automated suites: 177 frontend tests and 189 Rust tests at v1.1.2.
 - Absent, and not to be invented: there are no screenshots or recordings of the
   product, no testimonials, no user research and no benchmarks.
 

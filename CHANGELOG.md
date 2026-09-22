@@ -8,6 +8,13 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-22
+
+The bottom line of the card and the order of the settings window: the card says which
+engine translated it and can change engines in place, and the settings finally group each
+switch with the thing it changes. The local model is gone, so nothing has to be installed
+to translate.
+
 ### Added
 
 - **The card names the engine that translated it, and can change it.** The line under
@@ -636,7 +643,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.1...v1.0.2
