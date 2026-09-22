@@ -1,10 +1,8 @@
 //! Translation providers and the orchestration that decides what to show.
 
-mod chat;
 mod cloud;
 mod dictionary;
 mod google;
-mod local;
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -504,18 +502,6 @@ async fn call_service(
 ) -> Result<TranslationResult, String> {
     match service {
         Service::Google => google::translate(client, text, source, target, kind).await,
-        Service::Local => {
-            local::translate(
-                client,
-                &settings.local_endpoint,
-                &settings.local_model,
-                text,
-                source,
-                target,
-                kind,
-            )
-            .await
-        }
         Service::CloudBaidu | Service::CloudYoudao => {
             let vendor = match service {
                 Service::CloudYoudao => "youdao",

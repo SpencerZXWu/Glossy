@@ -387,7 +387,7 @@
    * lists them. The stored choice is spread over four fields, so the backend is
    * asked which entry it adds up to instead of deriving it again here.
    */
-  const SERVICES = ["cloud-baidu", "cloud-youdao", "local", "google"];
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "google"];
 
   /** The service list while it is open, and the name it was opened from. */
   let serviceMenu = null;

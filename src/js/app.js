@@ -42,9 +42,6 @@
     targetLang: $("targetLang"),
     service: $("service"),
     cloudBlock: $("cloudBlock"),
-    cloudLocalBlock: $("cloudLocalBlock"),
-    localEndpoint: $("localEndpoint"),
-    localModel: $("localModel"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
     uiLang: $("uiLang"),
@@ -225,22 +222,19 @@
   /**
    * Shows the fields that belong to the chosen service.
    *
-   * The dropdown is one list, so a service either needs nothing (an online
-   * engine, the free Google endpoint) or an address of the user's own for the
-   * local model. The entries are names and nothing else; what a service needs
-   * is shown by the fields under it.
+   * The dropdown is one list and the entries are names and nothing else: what a
+   * service needs is shown by the fields under it, and only the engines that go
+   * through Glossy's server have anything to show.
    */
   function syncService() {
     const service = els.service.value;
     els.cloudBlock.hidden = !isCloudService(service);
-    els.cloudLocalBlock.hidden = service !== "local";
     renderFallbackOrder();
   }
 
   /** The dropdown value that matches what the settings file holds. */
   function serviceOf(stored) {
     if (stored.channel === "cloud") {
-      if (stored.cloudProvider === "local") return "local";
       const vendor = String(stored.cloudVendor || "").toLowerCase();
       // An unknown vendor means the deployment moved on; Baidu still answers.
       return vendor === "youdao" ? "cloud-youdao" : "cloud-baidu";
@@ -419,8 +413,8 @@
     fillSourceLangPicker();
   }
 
-  /** The four services of the dropdown, in the order it offers them. */
-  const SERVICES = ["cloud-baidu", "cloud-youdao", "local", "google"];
+  /** The three services of the dropdown, in the order it offers them. */
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "google"];
 
   /** Keeps every service once, and drops anything this build does not offer. */
   function normalizeFallbackOrder(list) {
@@ -770,8 +764,6 @@
     els.popupOpacity.value = String(pick(OPACITIES, next.popupOpacity, 100));
     els.autoCloseSecs.value = String(pick(AUTO_CLOSE, next.autoCloseSecs, 0));
     els.closeAfterCopy.checked = !!next.closeAfterCopy;
-    els.localEndpoint.value = next.localEndpoint || "";
-    els.localModel.value = next.localModel || "";
     els.unitsEnabled.checked = next.unitsEnabled !== false;
     els.demoUnits.checked = els.unitsEnabled.checked;
     els.wordSentence.checked = !!next.wordSentence;
@@ -814,13 +806,11 @@
       autoCloseSecs: numberOr(els.autoCloseSecs.value, 0),
       closeAfterCopy: els.closeAfterCopy.checked,
       // The stored shape still separates where the text goes from which engine
-      // translates it: the online engines and the local model both count as the
-      // server channel, while the free Google endpoint dials out from here.
+      // translates it: the two engines that go through Glossy's server are the
+      // cloud channel, while the free Google endpoint dials out from here.
       channel: service === "google" ? "api" : "cloud",
-      cloudProvider: service === "local" ? "local" : "builtin",
+      cloudProvider: "builtin",
       cloudVendor: CLOUD_VENDORS[service] || "",
-      localEndpoint: els.localEndpoint.value.trim(),
-      localModel: els.localModel.value.trim(),
       unitsEnabled: els.unitsEnabled.checked,
       wordSentence: els.wordSentence.checked,
       sentencePairs: els.sentencePairs.checked,
@@ -1241,8 +1231,6 @@
     els.popupOpacity,
     els.autoCloseSecs,
     els.closeAfterCopy,
-    els.localEndpoint,
-    els.localModel,
     els.unitsEnabled,
     els.wordSentence,
     els.sentencePairs,

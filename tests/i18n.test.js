@@ -75,16 +75,6 @@ test("no Chinese value is empty, whitespace or a bare key echo", () => {
   assert.deepEqual(valueReport(EN_KEYS, CHINESE), []);
 });
 
-test("markup carried by a value is present in both languages", () => {
-  const tagsFor = (values) =>
-    EN_KEYS.filter((key) => values[key].includes("<"))
-      .map((key) => `${key}:${(values[key].match(/<\/?[a-z]+>/g) || []).sort().join("")}`)
-      .sort();
-  const english = tagsFor(ENGLISH);
-  assert.ok(english.length > 0);
-  assert.deepEqual(tagsFor(CHINESE), english);
-});
-
 test("both languages agree on which keys take placeholders", () => {
   const mismatched = EN_KEYS.filter(
     (key) =>
@@ -220,7 +210,6 @@ test("t ignores extra arguments and substitutes inside Chinese text", () => {
 test("providerName is case-insensitive and localized", () => {
   i18n.set("en");
   assert.equal(i18n.providerName("GOOGLE"), "Google");
-  assert.equal(i18n.providerName("local"), "Ollama");
   i18n.set("zh");
   assert.equal(i18n.providerName("baidu"), "百度翻译");
   assert.equal(i18n.providerName("Youdao"), "有道翻译");
@@ -278,7 +267,7 @@ test("apply fills text, placeholders and titles from the dictionary", () => {
   i18n.set("en");
   i18n.apply();
 
-  assert.equal(text.innerHTML, "Paused");
+  assert.equal(text.textContent, "Paused");
   assert.equal(placeholder.placeholder, "Text or translation");
   assert.equal(title.title, "Copy translation");
   assert.equal(plain.placeholder, "");
@@ -289,24 +278,26 @@ test("apply follows a language change on a second pass", () => {
   const text = attach({ i18n: "status.paused" });
   i18n.set("en");
   i18n.apply();
-  assert.equal(text.innerHTML, "Paused");
+  assert.equal(text.textContent, "Paused");
   i18n.set("zh");
   i18n.apply();
-  assert.equal(text.innerHTML, "已暂停");
+  assert.equal(text.textContent, "已暂停");
   i18n.set("en");
 });
 
 test("apply leaves the key in place for an unknown key", () => {
   const element = attach({ i18n: "nope.not.here" });
   i18n.apply();
-  assert.equal(element.innerHTML, "nope.not.here");
+  assert.equal(element.textContent, "nope.not.here");
 });
 
-test("apply writes dictionary values as markup, not as escaped text", () => {
-  const element = attach({ i18n: "cloud.hint.local" });
+test("apply writes a value as text, not as markup", () => {
+  // The echo an unknown key leaves behind is the one value that reaches the
+  // page with HTML in it, so it is where the escaping shows.
+  const element = attach({ i18n: "<code>30 000</code> characters" });
   i18n.apply();
-  assert.ok(element.innerHTML.includes("<code>http://127.0.0.1:11434/v1</code>"));
-  assert.ok(!element.innerHTML.includes("&lt;code&gt;"));
+  assert.equal(element.textContent, "<code>30 000</code> characters");
+  assert.ok(element.outerHTML.includes("&lt;code&gt;"));
 });
 
 test("apply only walks the subtree it is given", () => {
@@ -321,6 +312,6 @@ test("apply only walks the subtree it is given", () => {
   i18n.set("en");
   i18n.apply(root);
 
-  assert.equal(inside.innerHTML, "Paused");
+  assert.equal(inside.textContent, "Paused");
   assert.equal(outside.innerHTML, "untouched");
 });

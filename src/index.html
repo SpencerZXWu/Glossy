@@ -241,7 +241,6 @@
               <select id="service">
                 <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
                 <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
-                <option value="local" data-i18n="service.local">Ollama</option>
                 <option value="google" data-i18n="service.google">Google</option>
               </select>
             </div>
@@ -251,17 +250,6 @@
             <div class="demo-actions">
               <p class="hint" id="cloudQuota"></p>
               <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
-            </div>
-          </div>
-
-          <div id="cloudLocalBlock" hidden>
-            <div class="field">
-              <label for="localEndpoint" data-i18n="field.localEndpoint">Local service address</label>
-              <input type="text" id="localEndpoint" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:11434/v1" />
-            </div>
-            <div class="field">
-              <label for="localModel" data-i18n="field.localModel">Model name</label>
-              <input type="text" id="localModel" spellcheck="false" autocomplete="off" placeholder="qwen2.5:7b" />
             </div>
           </div>
         </section>

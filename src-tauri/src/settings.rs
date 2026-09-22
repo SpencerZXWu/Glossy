@@ -58,8 +58,8 @@ impl Provider {
 /// model running on this machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Channel {
-    /// Through Glossy's own server (`server/`) or a model on this machine, so
-    /// nothing has to be filled in and a fresh install works right away.
+    /// Through Glossy's own server (`server/`), so nothing has to be filled in
+    /// and a fresh install works right away.
     #[default]
     #[serde(rename = "cloud")]
     Cloud,
@@ -76,15 +76,17 @@ pub enum CloudProvider {
     #[default]
     #[serde(rename = "builtin")]
     Builtin,
-    /// A model running on this machine, reached over an OpenAI compatible
-    /// endpoint such as the one Ollama serves.
+    /// A model the reader ran on their own machine, reached over an OpenAI
+    /// compatible endpoint. Kept so that a file written while the window still
+    /// offered that entry reads; the list does not offer it any more, and
+    /// [`Service::stored`] resolves it to the built-in engine.
     #[serde(rename = "local")]
     Local,
 }
 
 /// One entry of the translation-service list.
 ///
-/// The window shows a single dropdown and its entries are exactly these four.
+/// The window shows a single dropdown and its entries are exactly these three.
 /// What is stored keeps the shape it has always had - `channel`,
 /// `cloudProvider` and `cloudVendor` - so a settings file written earlier still
 /// reads; this type is what the window, the fallback order and the tests speak,
@@ -98,8 +100,6 @@ pub enum Service {
     /// Glossy's own server, asking Youdao.
     #[serde(rename = "cloud-youdao")]
     CloudYoudao,
-    /// A model running on this machine.
-    Local,
     /// The free public Google endpoint.
     Google,
 }
@@ -109,26 +109,20 @@ impl Service {
     ///
     /// The window builds its dropdown from the markup, so what walks this list
     /// is [`Service::from_id`] and the tests.
-    pub const ALL: [Service; 4] = [
-        Service::CloudBaidu,
-        Service::CloudYoudao,
-        Service::Local,
-        Service::Google,
-    ];
+    pub const ALL: [Service; 3] = [Service::CloudBaidu, Service::CloudYoudao, Service::Google];
 
     /// The id the window and the settings file use.
     pub fn id(self) -> &'static str {
         match self {
             Service::CloudBaidu => "cloud-baidu",
             Service::CloudYoudao => "cloud-youdao",
-            Service::Local => "local",
             Service::Google => "google",
         }
     }
 
     /// The entry an id names; the inverse of [`Service::id`].
     ///
-    /// `None` means the id is not one of the four, which is what a window or a
+    /// `None` means the id is not one of the three, which is what a window or a
     /// shortcut carrying a stale id has to hear instead of a silent fallback.
     pub fn from_id(id: &str) -> Option<Service> {
         let wanted = id.trim();
@@ -156,7 +150,9 @@ impl Service {
             };
         }
         match cloud {
-            CloudProvider::Local => Service::Local,
+            // The local model is not offered any more: a file that still names
+            // it reads as the built-in engine, and the next save replaces it.
+            CloudProvider::Local => Service::CloudBaidu,
             CloudProvider::Builtin if vendor.trim().eq_ignore_ascii_case("youdao") => {
                 Service::CloudYoudao
             }
@@ -164,12 +160,6 @@ impl Service {
         }
     }
 }
-
-/// Address a local service is asked at when the user has not set one.
-pub const DEFAULT_LOCAL_ENDPOINT: &str = "http://127.0.0.1:11434/v1";
-
-/// Model a local service is asked for when the user has not set one.
-pub const DEFAULT_LOCAL_MODEL: &str = "qwen2.5:7b";
 
 /// Credentials of one provider, kept so switching back just works.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -413,12 +403,6 @@ pub struct Settings {
     /// Backend of the api channel. The cloud channel ignores it, so it is kept
     /// rather than cleared and switching back lands on what was picked before.
     pub provider: Provider,
-    /// Address of a local translation service, used when the cloud channel is
-    /// set to the local model. An OpenAI compatible base URL, so `/chat/
-    /// completions` is appended to it.
-    pub local_endpoint: String,
-    /// Model the local service is asked for.
-    pub local_model: String,
     /// Address of Glossy's own translation proxy (the Worker in `server/`).
     /// Kept for the settings files written before the window stopped showing a
     /// field for it: the address the build was made with wins, and this is only
@@ -508,8 +492,6 @@ impl Default for Settings {
             cloud_provider: CloudProvider::default(),
             cloud_vendor: "baidu".to_string(),
             provider: Provider::default(),
-            local_endpoint: DEFAULT_LOCAL_ENDPOINT.to_string(),
-            local_model: DEFAULT_LOCAL_MODEL.to_string(),
             cloud_endpoint: String::new(),
             cloud_id: crate::translate::new_install_id(),
             credentials: BTreeMap::new(),
@@ -562,10 +544,6 @@ impl Settings {
         match service {
             Service::CloudBaidu => self.uses_cloud("baidu"),
             Service::CloudYoudao => self.uses_cloud("youdao"),
-            Service::Local => {
-                self.channel = Channel::Cloud;
-                self.cloud_provider = CloudProvider::Local;
-            }
             Service::Google => {
                 self.channel = Channel::Api;
                 self.provider = Provider::Google;
@@ -581,9 +559,9 @@ impl Settings {
 
     /// The services a translation may be asked of, the chosen one first.
     ///
-    /// A fallback that repeats the choice, names a service twice or picks the
-    /// local model as its own stand-in would only cost a second attempt on the
-    /// same backend, so the list is de-duplicated here.
+    /// A fallback that repeats the choice or names a service twice would only
+    /// cost a second attempt on the same backend, so the list is de-duplicated
+    /// here.
     pub fn service_order(&self) -> Vec<Service> {
         let active = self.service();
         let mut order = vec![active];
@@ -860,16 +838,6 @@ impl Settings {
         if self.cloud_id.is_empty() {
             self.cloud_id = crate::translate::new_install_id();
         }
-        // A cleared address or model would leave the local backend with nothing
-        // to ask, and both defaults are what the field shows anyway.
-        self.local_endpoint = self.local_endpoint.trim().trim_end_matches('/').to_string();
-        if self.local_endpoint.is_empty() {
-            self.local_endpoint = DEFAULT_LOCAL_ENDPOINT.to_string();
-        }
-        self.local_model = self.local_model.trim().to_string();
-        if self.local_model.is_empty() {
-            self.local_model = DEFAULT_LOCAL_MODEL.to_string();
-        }
         self.credentials = self
             .credentials
             .iter()
@@ -892,7 +860,7 @@ impl Settings {
                 true
             }
         });
-        // The window only shows the four services of `Service`, and a file
+        // The window only shows the three services of `Service`, and a file
         // written by an earlier version can name a provider this build no
         // longer offers. Writing the stored fields back in the shape the chosen
         // service has means a save never leaves a stale channel, vendor or
@@ -1294,6 +1262,19 @@ mod tests {
         let settings = Settings::parse("{\"channel\":\"api\",\"provider\":\"deepl\"}");
 
         assert_eq!(settings.service(), Service::CloudBaidu);
+    }
+
+    #[test]
+    fn a_file_that_named_the_local_model_reads_as_the_built_in_engine() {
+        let settings = Settings::parse(
+            "{\"channel\":\"cloud\",\"cloudProvider\":\"local\",\
+             \"localEndpoint\":\"http://127.0.0.1:11434/v1\",\"localModel\":\"qwen2.5:7b\"}",
+        );
+
+        assert_eq!(settings.service(), Service::CloudBaidu);
+        // Sanitizing writes the shape the chosen service has, so the keys of
+        // the dropped entry do not survive into the next file.
+        assert_eq!(settings.sanitized().cloud_provider, CloudProvider::Builtin);
     }
 
     #[test]

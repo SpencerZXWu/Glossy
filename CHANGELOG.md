@@ -13,8 +13,8 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 - **The card names the engine that translated it, and can change it.** The line under
   the translation printed the literal word `cloud` for both 百度 and 有道, because it
   was reading the storage shape instead of the service. It names the service that
-  answered now — Baidu, Youdao, Ollama or Google — and the name is a button: pressing
-  it opens the four services in place inside the card with the current one ticked,
+  answered now — Baidu, Youdao or Google — and the name is a button: pressing
+  it opens the services in place inside the card with the current one ticked,
   and picking one saves the choice and translates the selection again. `cloud::answered_by`
   keeps the literal `cloud` out of what the card is told, `current_service` and
   `set_service` carry the choice back and forth, and Escape closes the list before it
@@ -23,9 +23,18 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 ### Changed
 
 - **The settings window shows the services as plain names.** The line under the
-  dropdown that promised a service needed no setup and cost nothing is gone, and the
-  local engine reads **Ollama** there and on the card instead of 本地翻译. The card's own
-  line carries the same names, so the two places a service is chosen finally agree.
+  dropdown that promised a service needed no setup and cost nothing is gone. The card's
+  own line carries the same names, so the two places a service is chosen finally agree.
+
+### Removed
+
+- **The local model is no longer an option.** The entry that translated through Ollama,
+  or any other OpenAI compatible server on the same machine, is gone from the dropdown,
+  from the fallback list and from the card's own list, along with the address and model
+  fields it needed and the two settings keys behind them. Nothing has to be installed to
+  translate: the two engines that go through Glossy's server and the free Google
+  endpoint are the whole list. A settings file that still names the local model reads as
+  the built-in engine and is rewritten on the next save.
 
 ## [1.1.1] - 2026-09-21
 

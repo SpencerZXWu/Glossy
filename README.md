@@ -108,10 +108,9 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | History | How many finished translations to remember (`Off` to `The last 500`, default 50). The list below the selector keeps the original, the translation, the provider and the time; `Search` filters both texts, clicking an entry shows it in the floating card again (no second provider call), and each entry has a copy and a remove button. `Forget everything` empties the list. The file lives in `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` writes `Documents\glossy-settings.json`; `Import…` reads a file you pick back into the app. The file holds the choices and nothing secret — there is no key field left anywhere, so an export never asks about one. An import validates through `sanitized()`. |
 | Updates | `Check for a new version when Glossy starts` asks GitHub Releases on every start (off by default). `Check now` looks immediately and says which version is waiting, and `Download and restart` installs it. A build without an update signing key — which is every build until the release key pair exists — hides the buttons and says so. |
-| Translation service | Which service translates: `cloud-baidu` (Glossy's own server, translating with Baidu — nothing to fill in), `cloud-youdao` (the same server, translating with Youdao — nothing to fill in either), `local` (a model running on this machine), or `google` (the free public endpoint, no key). A new install starts on `cloud-baidu`. Stored as `channel` + `cloudProvider` + `cloudVendor` / `provider`, see below. |
+| Translation service | Which service translates: `cloud-baidu` (Glossy's own server, translating with Baidu — nothing to fill in), `cloud-youdao` (the same server, translating with Youdao — nothing to fill in either), or `google` (the free public endpoint, no key). A new install starts on `cloud-baidu`. Stored as `channel` + `cloudProvider` + `cloudVendor` / `provider`, see below. |
 | Ask another service when the chosen one fails | The service picked above is always tried first and cannot be moved; the entries below it are asked in order when it fails, rate-limits or answers with nothing, and can be reordered with the arrows. Turning the switch off means a failure is shown as a failure. The card names the service that answered when it was not the one asked for. |
 | Allowance line (`cloud-baidu`, `cloud-youdao`) | Shown only for the two server-backed entries: what is left of today's allowance — or the reason the server could not be reached — with a `Check again` button next to it. The address itself is part of the build rather than a field, so nobody can break the one service that needs nothing set up; see [`server/`](./server/README.md) to run a deployment of your own. |
-| Local service address, model name (`local`) | Shown only for the local model: any OpenAI-compatible endpoint (default `http://127.0.0.1:11434/v1`, the address Ollama serves) and the model name it was pulled under (default `qwen2.5:7b`). The text goes no further than this machine, so nothing leaves the computer and nothing is metered. |
 
 The hotkey accepts `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` plus one key:
 a letter, a digit, `F1`–`F24`, `Space`, `Enter`, `Tab`, `Esc`, `Backspace`,
@@ -126,7 +125,7 @@ current selection, so "select text, press the hotkey" works as well.
 ### Providers
 
 Every entry in the dropdown works without an account of your own: `google` asks
-a public endpoint, `local` a model on this machine, and the two server-backed
+a public endpoint, and the two server-backed
 entries are answered by a Glossy deployment that holds the vendor account, so no
 key ever reaches the app. They only name the engine the server should translate
 with, and it falls back to another one when that engine cannot answer.
@@ -135,7 +134,6 @@ with, and it falls back to another one when that engine cannot answer.
 | --- | --- | --- |
 | `cloud-baidu` | nothing to fill in | **Baidu Translate**: a server deployed from [`server/`](./server/README.md) does the translating with the project's own account, named `vendor: "baidu"` on the wire. The app only sends the text plus an install id, the credentials stay on the server, and it works from mainland China. The daily allowance is counted per device, per address and in total, and the settings window shows what is left of it; running your own deployment is a one-line change of the address inside the build. |
 | `cloud-youdao` | nothing to fill in | **Youdao Translate** — the same server, asked to translate with 有道智云 (`vendor: "youdao"` on the wire). Nothing to fill in either, and the same fallback when Youdao cannot answer. |
-| `local` | nothing to fill in | **Local translation · Ollama**: any service that speaks the OpenAI chat API — Ollama serves one at `http://127.0.0.1:11434/v1` — translates on this machine, so no text and no key ever leaves it, and no allowance is counted. Download a model first (`ollama pull qwen2.5:7b`), then give Glossy the address and the model name. A 7B model is decent for a sentence and weaker than the server on idioms; a larger one closes most of the gap. |
 | `google` | free, no key | Public `translate.googleapis.com` endpoint. Blocked on some networks, including much of mainland China. Always queried with the `dict-chrome-ex` client id; the throttled `gtx` id is only used as a fallback. |
 
 Phonetics and definitions for single words come from `api.dictionaryapi.dev`, which is free,
@@ -155,8 +153,7 @@ relay it that way:
   fall back to Baidu credentials when no such account is configured, so what they
   make are paid calls and the terms above do not apply to them. No user ever sees
   or holds a vendor key: the app sends the text plus an install id, and the server
-  meters a daily allowance per device and address. The local model underneath
-  needs no service at all.
+  meters a daily allowance per device and address.
 - **Zhipu** — 用户协议 §非付费功能 licenses the free models for *非商业的、个人研究学习* use
   only. Fine for personal use; not fine for a published or paid product.
 - **ModelScope API-Inference** — explicitly 非商业化, 非盈利.
@@ -196,8 +193,9 @@ Which service translates is stored in the older two-part shape: `channel`
 endpoint, and `provider` names the service inside it — `baidu` for the
 server-backed entries (a value the channel ignores, kept because the field is
 part of the file format) or `google`. `cloudProvider`
-(`builtin` or `local`) with `localEndpoint`/`localModel` sits behind the local
-model, and `cloudVendor` (`baidu` or `youdao`) is what the server-backed entries
+(`builtin` or `local`, the second of which is read as the built-in engine now that
+the dropdown no longer offers it)
+and `cloudVendor` (`baidu` or `youdao`) are what the server-backed entries
 ask it for. A fresh install starts on `baidu`. The dropdown maps to that shape on
 the way in and out, so a file written
 by an older build keeps working: one without a `channel` is read as the API
@@ -229,11 +227,11 @@ selected) — this exercises the popup without the global hook.
 - **"Google Translate is rate limiting requests right now"** — Google answered `429`, which
   happens to desktop HTTP clients on the public endpoint even though a browser or `curl` still
   works. Glossy first retries with a second client id; if the message stays, wait a minute or
-  switch the service to one of the other three entries in the dropdown.
+  switch the service to one of the other two entries in the dropdown.
 - **"Could not reach Google Translate"** — the free `google` provider calls
   `translate.googleapis.com`, which is blocked on some networks (including much of mainland
   China). The card offers a retry button; if it keeps failing, switch to `cloud-baidu` or
-  `cloud-youdao` (nothing to fill in) or to `local` (a model running on your machine).
+  `cloud-youdao` (nothing to fill in).
 - **"The free cloud translation quota for today is used up"** — the two server-backed
   providers count
   the characters they translate per device, per address and in total, and one of those counters
@@ -254,8 +252,8 @@ pairs. The hook callback only records coordinates; a worker thread decides wheth
 the gesture was a drag or a double click, copies the selection with `Ctrl+C`
 (sending `Ctrl+Insert` when the foreground window runs elevated), restores the
 clipboard if requested, and finally tells the popup window what to show. The
-captured text only ever goes to the translation service you selected — a vendor for
-`google`, nothing but the model on this machine for `local`, and the server the
+captured text only ever goes to the translation service you selected — a vendor
+endpoint for `google`, and the server the
 project runs ([`server/`](./server/README.md)) for the two server-backed entries.
 
 A gesture only opens the card when it really selected something. The release
@@ -306,11 +304,11 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 176 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 196 Rust tests
+cargo test --locked                                                  # 189 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -377,7 +375,7 @@ none of them is covered by the automated tests.
 | 8 | Pin the popup, click elsewhere on the desktop, wait past the auto-close timeout | The card stays open until the pin is released or the × is used |
 | 9 | Click outside an unpinned card | It closes as soon as the click lands outside |
 | 10 | Switch Windows between light and dark, then force each scheme in the settings | Both windows follow the choice, with readable text and borders in both |
-| 11 | Translate through each of the seven translation services — Glossy's server, the local model and the five that take a key, one of them behind a bad key | A result for the good ones; a readable error with a retry button for the bad one |
+| 11 | Translate through each of the three translation services — Glossy's server with 百度, the same server with 有道, and the free public Google endpoint — then once with the network unplugged | A result for the three; a readable error with a retry button when nothing can answer |
 | 12 | Add a running program to the ignore list, translate inside it, then remove it | Nothing pops up while it is listed, and the popup is back once it is removed |
 | 13 | Press the global hotkey with text on the clipboard, then with an empty clipboard and a selection | The translation opens next to the cursor in the first case, the current selection is used in the second |
 | 14 | Export the settings, edit a value in the file, then import it | The export holds no `credentials` block; the import applies the edited value and leaves everything else alone |
@@ -440,7 +438,7 @@ src-tauri/src/
   context.rs             the sentence a selected word stands in, via UI Automation
   speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
-  translate/             google, cloud, local and chat providers, word dictionary
+  translate/             google and cloud providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -542,10 +540,9 @@ process. Each release maps to a GitHub milestone of the same name.
 | 历史记录 | 记住多少条已完成的翻译（`关闭` 到 `最近 500 条`，默认 50）。选择器下方的列表保留原文、译文、翻译渠道和时间；`搜索` 会同时过滤两段文本，点击一条记录会在浮动卡片中再次显示它（不会再次请求翻译渠道），每条记录都有复制和删除按钮。`清空历史记录` 会清空列表。该文件位于 `%APPDATA%\com.glossy.translator\history.json`。 |
 | 设置文件 | `导出…` 会写入 `Documents\glossy-settings.json`；`导入…` 会把你选择的文件读回应用中。文件里只有各项设置，没有任何机密——到处都没有密钥字段了，所以导出时不会再问你要不要带密钥。导入会通过 `sanitized()` 校验。 |
 | 更新 | `启动 Glossy 时检查新版本` 会在每次启动时询问 GitHub Releases（默认关闭）。`立即检查` 会立刻查看并说明是哪个版本在等待，`下载并重启` 则会安装它。没有更新签名密钥的构建——在发布密钥对存在之前的所有构建都是如此——会隐藏这些按钮并说明原因。 |
-| 翻译渠道 | 由哪个服务来翻译：`cloud-baidu`（Glossy 自己的服务器，用百度翻译——无需配置）、`cloud-youdao`（同一台服务器，用有道翻译——同样无需配置）、`local`（跑在这台电脑上的模型）、`google`（免费公开接口，无需密钥）。全新安装默认使用 `cloud-baidu`。底层仍按 `channel` + `cloudProvider` + `cloudVendor` / `provider` 保存，见下文。 |
+| 翻译渠道 | 由哪个服务来翻译：`cloud-baidu`（Glossy 自己的服务器，用百度翻译——无需配置）、`cloud-youdao`（同一台服务器，用有道翻译——同样无需配置）、`google`（免费公开接口，无需密钥）。全新安装默认使用 `cloud-baidu`。底层仍按 `channel` + `cloudProvider` + `cloudVendor` / `provider` 保存，见下文。 |
 | 所选服务失败时改用其他服务 | 上面选中的渠道永远第一个尝试，且不能移动；它下面的条目会在它失败、被限流或什么都没返回时按顺序接管，可以用箭头调整顺序。关闭开关后，失败就只是失败。当回答问题的不是首选渠道时，卡片会写明是谁回答的。 |
 | 额度提示行（`cloud-baidu`、`cloud-youdao`） | 只在走服务器的那两个渠道下显示：今天还剩多少额度——或者服务器联系不上的原因——旁边是 `重新检查` 按钮。服务器地址写死在构建里而不是做成输入框，免得别人把「无需配置」的服务填坏；想用自己的部署见 [`server/`](./server/README.md)。 |
-| 本地服务地址、模型名称（`local`） | 只在本地模型下显示：任何 OpenAI 兼容的接口地址（默认 `http://127.0.0.1:11434/v1`，也就是 Ollama 提供的地址），以及你 pull 下来的模型名（默认 `qwen2.5:7b`）。文本不会离开这台电脑，因此不计费，也不会上传到任何地方。 |
 
 快捷键接受 `Ctrl`/`Control`、`Alt`、`Shift`、`Win`/`Meta` 外加一个按键：
 字母、数字、`F1`–`F24`、`Space`、`Enter`、`Tab`、`Esc`、`Backspace`、
@@ -557,13 +554,12 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 翻译渠道
 
-下拉框里的四个渠道都不需要你自己的账号：`google` 走公开接口，`local` 用本机模型，走服务器的那两个由 Glossy 的部署拿着厂商账号来回答，因此任何密钥都不会进入客户端。它们只是点名让服务器用哪家引擎翻译，答不上来时服务器会自动改用别的上游。
+下拉框里的三个渠道都不需要你自己的账号：`google` 走公开接口，走服务器的那两个由 Glossy 的部署拿着厂商账号来回答，因此任何密钥都不会进入客户端。它们只是点名让服务器用哪家引擎翻译，答不上来时服务器会自动改用别的上游。
 
 | 翻译渠道 | 费用 | 说明 |
 | --- | --- | --- |
 | `cloud-baidu` | 无需填写 | **百度翻译**：由后端服务器（[`server/`](./server/README.md)）用本项目自己的账号完成翻译，在请求里名为 `vendor: "baidu"`。应用只发送文本和一个安装 id，凭据留在服务器上，中国大陆可直接访问。每日额度按设备、按地址以及总量分别统计，设置窗口里会显示当天还剩多少；想换成自己的部署，只要改构建里的那一行地址即可。 |
 | `cloud-youdao` | 无需填写 | **有道翻译**：同一台服务器，只是指定用有道智云来译（`vendor: "youdao"`）。同样无需填写，有道答不上来时同样会自动改用别的上游。 |
-| `local` | 无需填写 | **本地翻译 · Ollama**：任何一个说 OpenAI 对话接口的服务——Ollama 在 `http://127.0.0.1:11434/v1` 提供一个——都在这台电脑上翻译，因此文本和密钥都不会离开本机，也不计任何额度。先下载一个模型（`ollama pull qwen2.5:7b`），再把地址和模型名填给 Glossy。7B 模型翻译句子尚可，遇到习语比服务器弱；更大的模型能补上大部分差距。 |
 | `google` | 免费，无需密钥 | 公开的 `translate.googleapis.com` 接口。在部分网络中被屏蔽，包括中国大陆的大部分地区。始终以 `dict-chrome-ex` 客户端 id 查询；被限流的 `gtx` id 只作为后备。 |
 
 单个单词的音标和释义来自 `api.dictionaryapi.dev`，它免费、无需密钥，且中国大陆可直接访问。只有在所选服务没有返回某些细节时，才会去请求 Google 接口。
@@ -572,7 +568,7 @@ process. Each release maps to a GitHub milestone of the same name.
 
 各免费额度在许可范围上并不相同。它们禁止的是把额度本身转手给他人或转售，也就是把密钥、接口交给别人；把凭据留在我们自己的服务器上、让应用去调用这台服务器，属于账号持有者自己使用额度，因此走服务器的那两个渠道正是以这种方式中转：
 
-- **`cloud-baidu` / `cloud-youdao`** —— 它们走的是本项目付费的 LLM 账号；没有配置该账号时则退回百度凭据，因此发出的是付费调用，上面的条款对它不适用。任何用户都看不到也拿不到厂商密钥：应用只发送文本和一个安装 id，服务器按设备和地址计算每日额度。它下面的本地模型则完全不需要任何服务。
+- **`cloud-baidu` / `cloud-youdao`** —— 它们走的是本项目付费的 LLM 账号；没有配置该账号时则退回百度凭据，因此发出的是付费调用，上面的条款对它不适用。任何用户都看不到也拿不到厂商密钥：应用只发送文本和一个安装 id，服务器按设备和地址计算每日额度。
 - **智谱** —— 用户协议 §非付费功能 只把免费模型授权给*非商业的、个人研究学习*用途。个人使用没问题；用于已发布或收费的产品则不行。
 - **ModelScope API-Inference** —— 明确为非商业化、非盈利。
 - **阿里云机器翻译** —— 每月免费额度明确仅适用客户试用场景。
@@ -589,7 +585,7 @@ process. Each release maps to a GitHub milestone of the same name.
 该映射中的每个值在写入文件之前都会用 Windows DPAPI（`CryptProtectData`，当前用户范围）加密，因此文件里保存的是
 `"apiKey": "dpapi:AQAAANCM…"` 而不是密钥本身，只有录入它的那个 Windows 登录账户才能读回它。由较早版本写出的文件会在该构建首次启动时得到保护；属于其他登录账户或计算机的值无法解锁，会被丢弃，因此必须重新输入密钥。
 被忽略的程序列表以 `ignoredApps` 数组保存；旧版用逗号分隔的字符串也能接受，并在加载时拆分。
-由哪个服务翻译仍按旧的两段式保存：`channel`（`cloud` 或 `api`）区分是走服务器的那两个渠道还是你的账号——`provider` 指出其中的具体服务——走服务器时是 `baidu`（渠道自己忽略这个值，保留它只是因为该字段属于文件格式的一部分），免费 Google 接口则是 `google`；`cloudProvider`（`builtin` 或 `local`）连同 `localEndpoint`/`localModel` 位于本地模型背后，`cloudVendor`（`baidu` 或 `youdao`）是走服务器的那两个渠道点名要用的上游。全新安装从 `baidu` 开始。下拉框在读取和写入时都会做这个映射，因此旧版本写下的文件依然可用：没有 `channel` 的文件会被当作它原本就是的 API 渠道读取，新文件会写成 `cloud`，不是 `youdao` 的 `cloudVendor` 读作百度，而这个构建不再提供的 `provider`——自带密钥的百度、智谱、DeepL、OpenAI——会读作内置的百度渠道，并在下次写文件时被替换掉。
+由哪个服务翻译仍按旧的两段式保存：`channel`（`cloud` 或 `api`）区分是走服务器的那两个渠道还是你的账号——`provider` 指出其中的具体服务——走服务器时是 `baidu`（渠道自己忽略这个值，保留它只是因为该字段属于文件格式的一部分），免费 Google 接口则是 `google`；`cloudProvider`（`builtin` 或 `local`，后者现在读作内置引擎，因为下拉框已不再提供它）以及 `cloudVendor`（`baidu` 或 `youdao`）是走服务器的那两个渠道点名要用的上游。全新安装从 `baidu` 开始。下拉框在读取和写入时都会做这个映射，因此旧版本写下的文件依然可用：没有 `channel` 的文件会被当作它原本就是的 API 渠道读取，新文件会写成 `cloud`，不是 `youdao` 的 `cloudVendor` 读作百度，而这个构建不再提供的 `provider`——自带密钥的百度、智谱、DeepL、OpenAI——会读作内置的百度渠道，并在下次写文件时被替换掉。
 
 ### 在应用内翻译
 
@@ -597,8 +593,8 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ### 常见问题
 
-- **"Google Translate is rate limiting requests right now"**（Google 正在限流）—— Google 返回了 `429`，公开接口对桌面 HTTP 客户端常常如此，即便浏览器或 `curl` 仍然能正常工作。Glossy 会先用第二个客户端 id 重试；如果提示还在，等一分钟，或改用下拉框里另外三个渠道中的任意一个。
-- **"Could not reach Google Translate"**（无法连接 Google Translate）—— 免费的 `google` 渠道会访问 `translate.googleapis.com`，它在部分网络中被屏蔽（包括中国大陆的大部分地区）。卡片会提供重试按钮；如果一直失败，请切换到 `cloud-baidu` 或 `cloud-youdao`（什么都不用填），或者切到 `local`（跑在本机的模型）。
+- **"Google Translate is rate limiting requests right now"**（Google 正在限流）—— Google 返回了 `429`，公开接口对桌面 HTTP 客户端常常如此，即便浏览器或 `curl` 仍然能正常工作。Glossy 会先用第二个客户端 id 重试；如果提示还在，等一分钟，或改用下拉框里另外两个渠道中的任意一个。
+- **"Could not reach Google Translate"**（无法连接 Google Translate）—— 免费的 `google` 渠道会访问 `translate.googleapis.com`，它在部分网络中被屏蔽（包括中国大陆的大部分地区）。卡片会提供重试按钮；如果一直失败，请切换到 `cloud-baidu` 或 `cloud-youdao`（什么都不用填）。
 - **"The free cloud translation quota for today is used up."**（今天的免费云端翻译额度已用完）—— 走服务器的那两个渠道会按设备、按地址和总量分别统计它翻译过的字符数，其中某一个计数器碰到了当天的上限，它会在 UTC 00:00 重新开始。可以换用下拉框里的别的渠道，或者从 [`server/`](./server/README.md) 部署一个自己的服务器并把应用指向它。
 - **"Baidu rejected the APP ID" / "Baidu rejected the signature"**（百度拒绝了 APP ID / 百度拒绝了签名）—— 凭证对的两半被对调或输错了。`baidu` 需要在第一个框中填 APP ID，第二个框填密钥；密钥从不会被发送给百度，它只用来给请求签名。
 - **"Baidu rejected this computer's IP address"**（百度拒绝了本机的 IP 地址）—— 百度控制台中该应用的 IP 白名单被填上了内容。要么清空它，要么把 Glossy 拨号所用的地址加进去。
@@ -606,7 +602,7 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ## 划词是如何捕获的
 
-Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道——`google` 发给厂商接口，`local` 只发给本机的模型，走服务器的那两个渠道则发往本项目自己运行的服务器（[`server/`](./server/README.md)）。
+Glossy 会安装一个 `WH_MOUSE_LL` 钩子，并监听鼠标左键的按下/松开配对。钩子回调只记录坐标；工作线程判断该手势是拖动还是双击，用 `Ctrl+C` 复制选区（当前台窗口以管理员权限运行时改发 `Ctrl+Insert`），按需恢复剪贴板，最后告诉弹窗窗口该显示什么。捕获到的文本只会发送给你所选择的翻译渠道——`google` 发给厂商接口，走服务器的那两个渠道则发往本项目自己运行的服务器（[`server/`](./server/README.md)）。
 
 只有当手势真的选中了东西时，卡片才会打开。首先检查松开鼠标的位置：在 shell 表面（桌面图标、任务栏、开始按钮）上的双击会被忽略，因此 shell 最后放进剪贴板的东西永远不会被拿去翻译。复制到的文本必须含有字母，且不能看起来像文件或文件夹的路径；在资源管理器里复制文件则一律视为没有选中内容。勾选 `读取选区后恢复剪贴板` 时，会在被复制的那个程序停止写入之后再恢复原内容——最多再检查 80 ms——因此迟到的写入不会把复制到的文本留在剪贴板里。Glossy 会记下自己每一次写入的序列号，在等待 `Ctrl+C` 落地时跳过这些写入，因此"恢复剪贴板"这一步不会被它自己当成一次选区读取。
 
@@ -644,11 +640,11 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 176 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 196 Rust tests
+cargo test --locked                                                  # 189 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -703,7 +699,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 8 | 固定弹窗，点击桌面别处，等待超过自动关闭超时 | 卡片保持打开，直到取消固定或使用 × |
 | 9 | 点击未固定卡片的外部 | 点击一落到外面，它就关闭 |
 | 10 | 在 Windows 中切换浅色/深色，然后在设置中强制使用每种方案 | 两个窗口都跟随该选择，两者的文字和边框都清晰可读 |
-| 11 | 对七个翻译渠道各翻译一次——Glossy 自己的服务器、本地模型，以及五个需要密钥的服务，其中一个使用错误的密钥 | 正常的那些能出结果；填错的那个显示可读的错误和重试按钮 |
+| 11 | 对三个翻译渠道各翻译一次——Glossy 自己的服务器配百度、同一台服务器配有道，以及免费的公开 Google 接口——然后断开网络再翻一次 | 前三个能出结果；什么都连不上时显示可读的错误和重试按钮 |
 | 12 | 把正在运行的程序加入忽略列表，在其中翻译，然后移除它 | 它在列表中时不会弹出任何东西，移除后弹窗恢复 |
 | 13 | 剪贴板中有文本时按全局快捷键，然后在剪贴板为空且有选区时再按一次 | 第一种情况下译文在光标旁打开，第二种情况下使用当前选区 |
 | 14 | 导出设置，在文件中改一个值，然后导入它 | 导出文件里没有 `credentials` 块；导入会应用改过的值，其余设置保持不变 |
@@ -762,7 +758,7 @@ src-tauri/src/
   context.rs             the sentence a selected word stands in, via UI Automation
   speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
-  translate/             google, cloud, local and chat providers, word dictionary
+  translate/             google and cloud providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
@@ -909,10 +905,9 @@ encima de él cuando no hay espacio debajo.
 | History | Cuántas traducciones terminadas recordar (`Off` hasta `The last 500`, por defecto 50). La lista que hay bajo el selector conserva el original, la traducción, el proveedor y la hora; `Search` filtra ambos textos, al hacer clic en una entrada se muestra de nuevo en la tarjeta flotante (sin una segunda llamada al proveedor), y cada entrada tiene un botón de copiar y otro de eliminar. `Forget everything` vacía la lista. El archivo está en `%APPDATA%\com.glossy.translator\history.json`. |
 | Settings file | `Export…` escribe `Documents\glossy-settings.json`; `Import…` vuelve a leer en la aplicación un archivo que elijas. El archivo contiene las opciones y nada secreto —ya no queda ningún campo de claves, así que una exportación nunca pregunta por una—. Una importación se valida mediante `sanitized()`. |
 | Updates | `Check for a new version when Glossy starts` consulta GitHub Releases en cada arranque (desactivado por defecto). `Check now` busca de inmediato y dice qué versión está esperando, y `Download and restart` la instala. Una compilación sin clave de firma de actualizaciones —que es toda compilación hasta que exista el par de claves de publicación— oculta los botones y lo indica. |
-| Servicio de traducción | Qué servicio traduce: `cloud-baidu` (el servidor del propio Glossy, traduciendo con Baidu —no hay nada que configurar), `cloud-youdao` (ese mismo servidor, traduciendo con Youdao —tampoco hay nada que rellenar), `local` (un modelo que se ejecuta en esta máquina) o `google` (el punto de conexión público gratuito, sin clave). Una instalación nueva empieza en `cloud-baidu`. Se guarda como `channel` + `cloudProvider` + `cloudVendor` / `provider`, ver más abajo. |
+| Servicio de traducción | Qué servicio traduce: `cloud-baidu` (el servidor del propio Glossy, traduciendo con Baidu —no hay nada que configurar), `cloud-youdao` (ese mismo servidor, traduciendo con Youdao —tampoco hay nada que rellenar) o `google` (el punto de conexión público gratuito, sin clave). Una instalación nueva empieza en `cloud-baidu`. Se guarda como `channel` + `cloudProvider` + `cloudVendor` / `provider`, ver más abajo. |
 | Ask another service when the chosen one fails | El servicio elegido arriba se intenta siempre primero y no se puede mover; las entradas que hay debajo se consultan en orden cuando falla, se limita o no devuelve nada, y pueden reordenarse con las flechas. Apagar el interruptor significa que un fallo se muestra como un fallo. La tarjeta indica qué servicio respondió cuando no fue el solicitado. |
 | Línea de cuota (`cloud-baidu`, `cloud-youdao`) | Se muestra solo para las dos entradas que responden desde el servidor: cuánto queda de la cuota de hoy —o el motivo por el que no se pudo contactar con el servidor— junto a un botón `Check again`. La dirección forma parte de la compilación en lugar de ser un campo, para que nadie pueda romper el servicio que no necesita configurar nada; consulta [`server/`](./server/README.md) para mantener un despliegue propio. |
-| Dirección del servicio local, nombre del modelo (`local`) | Se muestra solo para el modelo local: cualquier punto de conexión compatible con OpenAI (por defecto `http://127.0.0.1:11434/v1`, la dirección que sirve Ollama) y el nombre del modelo tal como lo descargaste (por defecto `qwen2.5:7b`). El texto no sale de esta máquina, así que no se contabiliza nada ni se envía nada fuera. |
 
 El atajo de teclado acepta `Ctrl`/`Control`, `Alt`, `Shift`, `Win`/`Meta` más una
 tecla: una letra, un dígito, `F1`–`F24`, `Space`, `Enter`, `Tab`, `Esc`,
@@ -927,8 +922,8 @@ funciona.
 
 ### Proveedores
 
-Ninguna de las cuatro entradas del desplegable necesita tu propia cuenta: `google`
-usa el punto de conexión público, `local` un modelo de esta máquina, y las dos
+Ninguna de las tres entradas del desplegable necesita tu propia cuenta: `google`
+usa el punto de conexión público, y las dos
 entradas que responden desde el servidor lo hacen con las cuentas que tiene el
 proyecto, así que ninguna clave llega al cliente. Esas dos solo indican con qué
 proveedor debe traducir el servidor, y si ese no responde se usa otro motor.
@@ -937,7 +932,6 @@ proveedor debe traducir el servidor, y si ese no responde se usa otro motor.
 | --- | --- | --- |
 | `cloud-baidu` | nada que rellenar | **Baidu Translate**: un servidor desplegado desde [`server/`](./server/README.md) traduce con la cuenta del propio proyecto, y en la red se llama `vendor: "baidu"`. La aplicación solo envía el texto más un id de instalación, las credenciales se quedan en el servidor y funciona desde China continental. La cuota diaria se cuenta por dispositivo, por dirección y en total, y la ventana de ajustes muestra lo que queda; usar tu propio despliegue es cambiar una línea de la dirección dentro de la compilación. |
 | `cloud-youdao` | nada que rellenar | **Youdao Translate**: otra vez el servidor de Glossy, esta vez con 有道智云 (`vendor: "youdao"`). Igual: sin clave, nada que rellenar, y con motor de reserva cuando Youdao no responde. |
-| `local` | sin nada que rellenar | **Modelo local · Ollama**: cualquier servicio que hable la API de chat de OpenAI —Ollama sirve uno en `http://127.0.0.1:11434/v1`— traduce en esta máquina, así que ni el texto ni la clave salen de ella y no se cuenta ninguna cuota. Descarga antes un modelo (`ollama pull qwen2.5:7b`) y luego dale a Glossy la dirección y el nombre del modelo. Un modelo de 7B se defiende con una frase y es más flojo que el servidor con las expresiones idiomáticas; uno mayor cierra casi toda la diferencia. |
 | `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
 
 Los símbolos fonéticos y las definiciones de palabras sueltas provienen de
@@ -958,8 +952,7 @@ eso las dos entradas que responden desde el servidor las intermedian así:
   cuenta configurada, recurren a las credenciales de Baidu, así que sus llamadas son
   de pago y las condiciones de arriba no les afectan. Ningún usuario ve ni tiene
   nunca una clave de proveedor: la aplicación envía el texto más un id de
-  instalación, y el servidor mide una cuota diaria por dispositivo y dirección. El
-  modelo local que llevan debajo no necesita ningún servicio.
+  instalación, y el servidor mide una cuota diaria por dispositivo y dirección.
 - **Zhipu** — 用户协议 §非付费功能 licencia los modelos gratuitos solo para uso
   *非商业的、个人研究学习*. Está bien para uso personal; no lo está para un producto
   publicado o de pago.
@@ -1008,8 +1001,8 @@ El servicio que traduce se guarda en la antigua forma de dos partes: `channel`
 el punto de conexión gratuito de Google,
 y `provider` nombra el servicio dentro de ella — `baidu` para las entradas servidas
 por el servidor (un valor que el canal ignora, conservado porque el campo forma
-parte del formato del archivo) o `google`. `cloudProvider` (`builtin` o `local`) con
-`localEndpoint`/`localModel` están detrás del modelo local, y `cloudVendor`
+parte del formato del archivo) o `google`. `cloudProvider` (`builtin` o `local`, y el
+segundo se lee ahora como el motor integrado, ya que el desplegable no lo ofrece) y `cloudVendor`
 (`baidu` o `youdao`) es el proveedor que piden
 las entradas servidas por el servidor. Una instalación nueva empieza en `baidu`. El
 desplegable hace ese mapeo al leer y al
@@ -1044,12 +1037,12 @@ seleccionado): así se prueba el emergente sin el enganche global.
 - **"Google Translate is rate limiting requests right now"** — Google respondió `429`, algo
   que les ocurre a los clientes HTTP de escritorio en el punto de conexión público aunque un
   navegador o `curl` sigan funcionando. Glossy reintenta primero con un segundo id de cliente;
-  si el mensaje persiste, espera un minuto o cambia a cualquiera de las otras tres entradas
+  si el mensaje persiste, espera un minuto o cambia a cualquiera de las otras dos entradas
   del desplegable.
 - **"Could not reach Google Translate"** — el proveedor gratuito `google` llama a
   `translate.googleapis.com`, que está bloqueado en algunas redes (incluida buena parte de
   China continental). La tarjeta ofrece un botón de reintento; si sigue fallando, cambia a
-  `cloud-baidu` o `cloud-youdao` (nada que rellenar) o a `local` (un modelo en tu máquina).
+  `cloud-baidu` o `cloud-youdao` (nada que rellenar).
 - **"The free cloud translation quota for today is used up."** — las dos entradas que
   responden desde el servidor cuentan
   los caracteres que traducen por dispositivo, por dirección y en total, y alguno de esos
@@ -1076,7 +1069,7 @@ copia la selección con `Ctrl+C` (enviando `Ctrl+Insert` cuando la ventana en pr
 plano se ejecuta con privilegios elevados), restaura el portapapeles si se ha
 pedido y, por último, indica a la ventana emergente qué debe mostrar. El texto
 capturado solo se envía al servicio de traducción que hayas elegido — para `google`
-es un tercero, para `local` solo el modelo de esta máquina, y para las dos entradas
+es un tercero, y para las dos entradas
 que responden desde el servidor es el servidor que mantiene
 el proyecto ([`server/`](./server/README.md)).
 
@@ -1132,11 +1125,11 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 176 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 196 Rust tests
+cargo test --locked                                                  # 189 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1206,7 +1199,7 @@ real en algún momento y ninguno está cubierto por las pruebas automatizadas.
 | 8 | Fijar el emergente, hacer clic en otro punto del escritorio y esperar más allá del tiempo de cierre automático | La tarjeta permanece abierta hasta que se suelte la fijación o se use la × |
 | 9 | Hacer clic fuera de una tarjeta sin fijar | Se cierra en cuanto el clic cae fuera |
 | 10 | Cambiar Windows entre modo claro y oscuro y luego forzar cada esquema en los ajustes | Ambas ventanas siguen la elección, con texto y bordes legibles en las dos |
-| 11 | Traducir con cada uno de los siete servicios —el servidor de Glossy, el modelo local y los cinco que piden clave, uno de ellos con una clave incorrecta | Un resultado para los correctos; un error legible con un botón de reintento para el incorrecto |
+| 11 | Traducir con cada uno de los tres servicios —el servidor de Glossy con Baidu, ese mismo servidor con Youdao y el punto de conexión público de Google— y luego una vez sin red | Un resultado para los tres; un error legible con un botón de reintento cuando no se puede contactar con ninguno |
 | 12 | Añadir un programa en ejecución a la lista de ignorados, traducir dentro de él y luego quitarlo | No aparece nada mientras está en la lista, y el emergente vuelve en cuanto se quita |
 | 13 | Pulsar el atajo de teclado global con texto en el portapapeles y luego con el portapapeles vacío y una selección | La traducción se abre junto al cursor en el primer caso y se usa la selección actual en el segundo |
 | 14 | Exportar los ajustes, cambiar un valor en el archivo y luego importarlo | La exportación no tiene bloque `credentials`; la importación aplica el valor editado y deja lo demás intacto |
@@ -1273,7 +1266,7 @@ src-tauri/src/
   context.rs             the sentence a selected word stands in, via UI Automation
   speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
-  translate/             google, cloud, local and chat providers, word dictionary
+  translate/             google and cloud providers, word dictionary
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel

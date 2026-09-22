@@ -21,8 +21,6 @@
     channel: "cloud",
     cloudProvider: "builtin",
     cloudVendor: "baidu",
-    localEndpoint: "http://127.0.0.1:11434/v1",
-    localModel: "qwen2.5:7b",
     provider: "baidu",
     credentials: {},
     restoreClipboard: true,
@@ -41,7 +39,7 @@
     compactPopup: false,
     speechRate: 0,
     fallbackEnabled: true,
-    fallbackOrder: ["google", "local"],
+    fallbackOrder: ["google", "cloud-youdao"],
     hotkey: "Ctrl+Alt+C",
     uiLang: "system",
   };
@@ -55,7 +53,6 @@
   const SERVICE_ENGINES = {
     "cloud-baidu": "baidu",
     "cloud-youdao": "youdao",
-    local: "local",
     google: "google",
   };
 
@@ -64,7 +61,6 @@
   const SERVICE_STORED = {
     "cloud-baidu": { channel: "cloud", cloudProvider: "builtin", cloudVendor: "baidu", provider: "baidu" },
     "cloud-youdao": { channel: "cloud", cloudProvider: "builtin", cloudVendor: "youdao", provider: "youdao" },
-    local: { channel: "cloud", cloudProvider: "local", cloudVendor: "", provider: "local" },
     google: { channel: "api", cloudProvider: "builtin", cloudVendor: "", provider: "google" },
   };
 

@@ -70,11 +70,11 @@ truthfully copy.
 
 ## Capabilities and Constraints
 
-- Four translation channels, every one of them usable without an account of the
-  user's own: `google` (a public endpoint), `local` (any OpenAI-compatible service
-  on this machine, e.g. Ollama), and two server-backed entries named after the
-  engine they translate with — **Baidu Translate** and **Youdao Translate**.
-- The two server-backed entries are presented beside Google and Local as ordinary
+- Three translation channels, every one of them usable without an account of the
+  user's own: `google` (a public endpoint) and two server-backed entries named
+  after the engine they translate with — **Baidu Translate** and **Youdao
+  Translate**.
+- The two server-backed entries are presented beside Google as ordinary
   translation channels. The deployment that answers them is never named or shown
   in the interface, and no deployment address appears anywhere in the product. A
   user never holds a vendor key: the app sends the text plus an install id, the

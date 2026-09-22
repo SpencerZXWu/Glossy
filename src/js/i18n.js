@@ -3,8 +3,8 @@
  * markup.
  *
  * Every element that carries text uses a `data-i18n` attribute naming its key;
- * `data-i18n-placeholder` / `data-i18n-title` cover the attributes. Values may
- * contain markup, so they are applied with `innerHTML`.
+ * `data-i18n-placeholder` / `data-i18n-title` cover the attributes. Values are
+ * plain text, so they are written with `textContent`.
  */
 (function (Glossy) {
   const ENGLISH = {
@@ -101,20 +101,14 @@
     "panel.language": "Language",
     "field.targetLang": "Translate into",
     "field.service": "Translation service",
-    "field.localEndpoint": "Local service address",
-    "field.localModel": "Model name",
     "providerName.google": "Google",
     "providerName.baidu": "Baidu Translate",
     "providerName.youdao": "Youdao Translate",
-    "providerName.local": "Ollama",
     "cloud.quota.checking": "Asking the server how much is left today…",
     "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
     "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
     "cloud.quota.retry": "Check again",
     "language.hint": "The source language is detected automatically.",
-
-    "cloud.hint.local":
-      "The text goes to a model running on this machine, so nothing leaves the computer and nothing is metered. Any OpenAI compatible service works — Ollama serves <code>http://127.0.0.1:11434/v1</code> — and the model name is the one you pulled. Bigger models translate better; a small one still keeps the whole thing offline.",
 
     "panel.fallback": "Fallback",
     "option.fallback": "Ask another service when the chosen one fails",
@@ -125,7 +119,6 @@
     "fallback.first": "always first",
     "service.cloud-baidu": "Baidu Translate",
     "service.cloud-youdao": "Youdao Translate",
-    "service.local": "Ollama",
     "service.google": "Google",
 
     "panel.reading": "Reading",
@@ -332,20 +325,14 @@
     "panel.language": "语言",
     "field.targetLang": "翻译为",
     "field.service": "翻译渠道",
-    "field.localEndpoint": "本地服务地址",
-    "field.localModel": "模型名称",
     "providerName.google": "Google",
     "providerName.baidu": "百度翻译",
     "providerName.youdao": "有道翻译",
-    "providerName.local": "Ollama",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
     "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
     "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
     "cloud.quota.retry": "重新查询",
     "language.hint": "源语言会自动识别。",
-
-    "cloud.hint.local":
-      "文本会发给你自己电脑上运行的模型，不经过任何服务器，也不计费。任何 OpenAI 兼容服务都行——Ollama 默认是 <code>http://127.0.0.1:11434/v1</code>——模型名就填你 pull 下来的那个。模型越大译得越好，小模型则胜在完全离线。",
 
     "panel.fallback": "备用服务",
     "option.fallback": "所选服务失败时改用其他服务",
@@ -356,7 +343,6 @@
     "fallback.first": "始终最先尝试",
     "service.cloud-baidu": "百度翻译",
     "service.cloud-youdao": "有道翻译",
-    "service.local": "Ollama",
     "service.google": "Google",
 
     "panel.reading": "阅读",
@@ -544,7 +530,7 @@
       found.forEach(setter);
     };
     fill("[data-i18n]", (element) => {
-      element.innerHTML = t(element.dataset.i18n);
+      element.textContent = t(element.dataset.i18n);
     });
     fill("[data-i18n-placeholder]", (element) => {
       element.placeholder = t(element.dataset.i18nPlaceholder);
