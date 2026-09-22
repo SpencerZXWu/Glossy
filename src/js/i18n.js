@@ -3,8 +3,11 @@
  * markup.
  *
  * Every element that carries text uses a `data-i18n` attribute naming its key;
- * `data-i18n-placeholder` / `data-i18n-title` cover the attributes. Values are
- * plain text, so they are written with `textContent`.
+ * `data-i18n-placeholder` / `data-i18n-title` / `data-i18n-aria-label` cover the
+ * attributes. Values are plain text, so they are written with `textContent`.
+ *
+ * A key that counts something is stored twice, as `key.one` and `key.other`, and
+ * read through `plural`.
  */
 (function (Glossy) {
   const ENGLISH = {
@@ -42,7 +45,8 @@
     "hotkey.active": "Active: {0}. Press it to translate the clipboard content.",
     "field.ignored": "Never translate in these programs",
     "ignored.empty": "Nothing ignored yet — every program triggers a translation.",
-    "ignored.count": "{0} program(s) ignored.",
+    "ignored.count.one": "1 program ignored.",
+    "ignored.count.other": "{0} programs ignored.",
     "ignored.add": "Add",
     "ignored.manual": "Type a program name",
     "ignored.running": "Pick from running programs…",
@@ -55,7 +59,8 @@
     "ignored.none": "No program with a visible window was found.",
     "field.sourceLangs": "Only translate these source languages",
     "source.empty": "Every language triggers a translation.",
-    "source.count": "{0} source language(s) allowed. Anything written in another language is skipped.",
+    "source.count.one": "1 source language allowed. Anything written in another language is skipped.",
+    "source.count.other": "{0} source languages allowed. Anything written in another language is skipped.",
     "source.add": "Add a language…",
     "source.clear": "Any language",
     "source.remove": "Stop translating this language",
@@ -266,7 +271,8 @@
     "hotkey.active": "已生效：{0}。按下即可翻译剪贴板内容。",
     "field.ignored": "以下程序中不翻译",
     "ignored.empty": "暂未忽略任何程序，所有程序都会触发翻译。",
-    "ignored.count": "已忽略 {0} 个程序。",
+    "ignored.count.one": "已忽略 1 个程序。",
+    "ignored.count.other": "已忽略 {0} 个程序。",
     "ignored.add": "添加",
     "ignored.manual": "输入程序名",
     "ignored.running": "从运行中的程序选择…",
@@ -279,7 +285,8 @@
     "ignored.none": "没有找到带可见窗口的程序。",
     "field.sourceLangs": "仅翻译以下原文语言",
     "source.empty": "所有语言都会触发翻译。",
-    "source.count": "只翻译 {0} 种原文语言，其它语言会被跳过。",
+    "source.count.one": "只翻译 1 种原文语言，其它语言会被跳过。",
+    "source.count.other": "只翻译 {0} 种原文语言，其它语言会被跳过。",
     "source.add": "添加语言…",
     "source.clear": "不限语言",
     "source.remove": "不再翻译该语言",
@@ -520,6 +527,16 @@
     });
   }
 
+  /**
+   * Counted text: `key.one` for a single item and `key.other` for everything
+   * else, with the count filled into `{0}`. English needs the two forms; Chinese
+   * reads the same either way, so its pair differs only in what a single item
+   * says.
+   */
+  function plural(key, count) {
+    return t(`${key}.${count === 1 ? "one" : "other"}`, count);
+  }
+
   /** Fills every `data-i18n*` element at or below `root`. */
   function apply(root) {
     const scope = root || document;
@@ -537,6 +554,9 @@
     });
     fill("[data-i18n-title]", (element) => {
       element.title = t(element.dataset.i18nTitle);
+    });
+    fill("[data-i18n-aria-label]", (element) => {
+      element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel));
     });
   }
 
@@ -561,5 +581,14 @@
     return name === key ? String(id || "") : name;
   }
 
-  Glossy.i18n = { set, resolve, t, apply, languageName, providerName, language: () => language };
+  Glossy.i18n = {
+    set,
+    resolve,
+    t,
+    plural,
+    apply,
+    languageName,
+    providerName,
+    language: () => language,
+  };
 })(window.Glossy);

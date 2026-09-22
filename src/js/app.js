@@ -342,7 +342,7 @@
       els.ignoredList.appendChild(chip);
     });
     els.ignoredHint.textContent = ignored.length
-      ? Glossy.i18n.t("ignored.count", ignored.length)
+      ? Glossy.i18n.plural("ignored.count", ignored.length)
       : Glossy.i18n.t("ignored.empty");
   }
 
@@ -408,7 +408,7 @@
     });
     els.sourceLangsClear.disabled = !sourceLangs.length;
     els.sourceLangsHint.textContent = sourceLangs.length
-      ? Glossy.i18n.t("source.count", sourceLangs.length)
+      ? Glossy.i18n.plural("source.count", sourceLangs.length)
       : Glossy.i18n.t("source.empty");
     fillSourceLangPicker();
   }

@@ -6,7 +6,9 @@
 //! corner that holds that icon for a few seconds, opens the settings window when
 //! clicked, and goes away by itself.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewWindow};
 
@@ -20,6 +22,19 @@ const EDGE_MARGIN: f64 = 16.0;
 
 /// Fallback size in CSS pixels, used until the window reports its own.
 const FALLBACK_SIZE: (f64, f64) = (340.0, 104.0);
+
+/// How long the hint stays on screen before it takes itself away.
+const LINGER: Duration = Duration::from_millis(6500);
+
+/// Number of the show the hint is meant to be on screen for.
+///
+/// The window is created once and reused, so the countdown cannot live in the
+/// page: its document loads once and a timer armed there would only ever run
+/// for the first hint. It is kept here instead, and this counter lets a
+/// countdown recognise that a later show has taken over — a start of Glossy
+/// while the previous hint is still up must not be cut short by the countdown
+/// of the one before it.
+static SHOW_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 /// Where the hint sits while it is on screen.
 ///
@@ -41,8 +56,26 @@ fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(NOTICE_LABEL)
 }
 
+/// Claims the next show number, retiring the one before it.
+fn start_show() -> u64 {
+    SHOW_EPOCH.fetch_add(1, Ordering::SeqCst) + 1
+}
+
+/// Whether `epoch` is still the show that owns the hint.
+fn is_current(epoch: u64) -> bool {
+    SHOW_EPOCH.load(Ordering::SeqCst) == epoch
+}
+
+/// Ends the current show without hiding the window.
+fn retire_show() {
+    SHOW_EPOCH.fetch_add(1, Ordering::SeqCst);
+}
+
 /// Places the hint in the bottom right corner of the screen the cursor is on —
 /// the corner that holds the notification area — and shows it.
+///
+/// The countdown that takes it away again is started here, so every show gets a
+/// full one however often the window has been on screen before.
 pub fn show(app: &AppHandle) {
     let Some(window) = window(app) else {
         return;
@@ -77,9 +110,18 @@ pub fn show(app: &AppHandle) {
         *guard = bounds;
     }
     let _ = window.show();
+    let epoch = start_show();
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(LINGER).await;
+        if is_current(epoch) {
+            hide(&handle);
+        }
+    });
 }
 
 pub fn hide(app: &AppHandle) {
+    retire_show();
     if let Ok(mut guard) = BOUNDS.lock() {
         *guard = None;
     }
@@ -113,5 +155,21 @@ mod tests {
     fn a_hint_that_is_not_shown_covers_nothing() {
         assert!(!contains(0, 0));
         assert!(!contains(1356, 904));
+    }
+
+    /// A hint that comes back a second time gets its own countdown, and the one
+    /// left over from the show before it must not cut that short.
+    #[test]
+    fn a_new_show_retires_the_countdown_of_the_previous_one() {
+        let first = start_show();
+        assert!(is_current(first));
+
+        let second = start_show();
+        assert!(is_current(second));
+        assert!(!is_current(first));
+
+        // Closing the hint by hand ends the show it belonged to as well.
+        retire_show();
+        assert!(!is_current(second));
     }
 }

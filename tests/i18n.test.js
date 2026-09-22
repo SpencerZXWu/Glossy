@@ -187,23 +187,44 @@ test("t returns the key itself when the key is unknown", () => {
 
 test("t substitutes positional placeholders", () => {
   assert.equal(i18n.t("ignored.picked", "notepad.exe"), "Added notepad.exe.");
-  assert.equal(i18n.t("ignored.count", 3), "3 program(s) ignored.");
+  assert.equal(i18n.t("ignored.count.other", 3), "3 programs ignored.");
   assert.equal(
     i18n.t("hotkey.active", "Ctrl+Alt+C"),
     "Active: Ctrl+Alt+C. Press it to translate the clipboard content.",
   );
-  assert.equal(i18n.t("ignored.count", 0), "0 program(s) ignored.");
+  assert.equal(i18n.t("ignored.count.other", 0), "0 programs ignored.");
+});
+
+test("plural picks the singular form for exactly one item", () => {
+  i18n.set("en");
+  assert.equal(i18n.plural("ignored.count", 1), "1 program ignored.");
+  assert.equal(i18n.plural("ignored.count", 2), "2 programs ignored.");
+  assert.equal(i18n.plural("ignored.count", 0), "0 programs ignored.");
+  assert.equal(
+    i18n.plural("source.count", 1),
+    "1 source language allowed. Anything written in another language is skipped.",
+  );
+  assert.equal(
+    i18n.plural("source.count", 4),
+    "4 source languages allowed. Anything written in another language is skipped.",
+  );
+
+  i18n.set("zh");
+  assert.equal(i18n.plural("ignored.count", 1), "已忽略 1 个程序。");
+  assert.equal(i18n.plural("ignored.count", 3), "已忽略 3 个程序。");
+  assert.equal(i18n.plural("source.count", 1), "只翻译 1 种原文语言，其它语言会被跳过。");
+  i18n.set("en");
 });
 
 test("t leaves placeholders without a matching argument alone", () => {
-  assert.equal(i18n.t("ignored.count"), "{0} program(s) ignored.");
+  assert.equal(i18n.t("ignored.count.other"), "{0} programs ignored.");
   assert.equal(i18n.t("ignored.picked", "a", "b"), "Added a.");
 });
 
 test("t ignores extra arguments and substitutes inside Chinese text", () => {
   i18n.set("zh");
   assert.equal(i18n.t("ignored.picked", "notepad.exe"), "已添加 notepad.exe。");
-  assert.equal(i18n.t("ignored.count", 2, 3, 4), "已忽略 2 个程序。");
+  assert.equal(i18n.t("ignored.count.other", 2, 3, 4), "已忽略 2 个程序。");
   i18n.set("en");
 });
 
@@ -262,6 +283,7 @@ test("apply fills text, placeholders and titles from the dictionary", () => {
   const text = attach({ i18n: "status.paused" });
   const placeholder = attach({ i18nPlaceholder: "history.search" });
   const title = attach({ i18nTitle: "popup.copy" });
+  const label = attach({ i18nAriaLabel: "notice.close" });
   const plain = attach({ i18n: "render.retry" });
 
   i18n.set("en");
@@ -270,8 +292,21 @@ test("apply fills text, placeholders and titles from the dictionary", () => {
   assert.equal(text.textContent, "Paused");
   assert.equal(placeholder.placeholder, "Text or translation");
   assert.equal(title.title, "Copy translation");
+  assert.equal(label.getAttribute("aria-label"), "Dismiss");
   assert.equal(plain.placeholder, "");
   assert.equal(plain.title, "");
+  assert.equal(plain.getAttribute("aria-label"), null);
+});
+
+test("apply follows the language on the accessible name too", () => {
+  const label = attach({ i18nAriaLabel: "notice.close" });
+  i18n.set("en");
+  i18n.apply();
+  assert.equal(label.getAttribute("aria-label"), "Dismiss");
+  i18n.set("zh");
+  i18n.apply();
+  assert.equal(label.getAttribute("aria-label"), "关闭");
+  i18n.set("en");
 });
 
 test("apply follows a language change on a second pass", () => {

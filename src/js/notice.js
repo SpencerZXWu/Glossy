@@ -1,11 +1,12 @@
 /**
  * The card that announces a background start. It closes on its own, or when the
  * user clicks it (which opens the settings window) or its close button.
+ *
+ * The countdown that hides it is kept by the backend, which is the only side
+ * that knows when the card is shown again: this document is loaded once and the
+ * window is then reused for every later hint.
  */
 (function (Glossy) {
-  /** How long the card stays on screen before it hides itself. */
-  const LINGER_MS = 6500;
-
   const card = document.getElementById("toast");
   const close = document.getElementById("close");
 
@@ -39,8 +40,5 @@
       console.warn("glossy: cannot read settings", error);
       applyLanguage("system");
     }
-    // The card is shown again on the next start, so the timer restarts with the
-    // freshly loaded document rather than being reset from the backend.
-    setTimeout(() => hide("notice_close"), LINGER_MS);
   })();
 })(window.Glossy);

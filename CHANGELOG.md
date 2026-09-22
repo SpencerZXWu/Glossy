@@ -8,6 +8,30 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
 ## [Unreleased]
 
+The hint that announces a background start belongs to the backend now, so a second start of
+Glossy no longer leaves it stranded over whatever is on screen, and the labels that only ever
+reached a screen reader in English follow the interface language like everything else.
+
+### Fixed
+
+- **The start hint goes away every time it appears.** A 6.5 second timer in the page took it
+  off screen, and the page loads once: the timer ran for the first hint and never again, so
+  the card a later start of Glossy put back stayed there for as long as the process lived.
+  Starting Glossy a second time — double clicking the shortcut again, which is how most
+  people reopen the settings window — is exactly the path that showed it. The countdown runs
+  in `notice.rs` now, started by `notice::show` itself and guarded by a show counter, so
+  every show gets a full one and a countdown left over from an earlier hint cannot take down
+  the one that replaced it. `notice.js` no longer arms a timer.
+- **The names that live only in an attribute are translated.** `i18n.apply` fills
+  `data-i18n-aria-label` beside `data-i18n-title`, which is what the close button of the hint
+  and the interface language selector were missing: both had an English tooltip and an
+  English accessible name in every language, and the selector's `ui.lang` key — written for
+  exactly this control — had no reader left. It has one again.
+- **A counted sentence reads correctly for one item.** `"{0} program(s) ignored."` printed
+  its own brackets at one program. `ignored.count` and `source.count` are stored as
+  `key.one` and `key.other` and read through the new `i18n.plural`, so a single item says
+  `1 program ignored.` The Chinese text is unchanged.
+
 ## [1.1.2] - 2026-09-22
 
 The bottom line of the card and the order of the settings window: the card says which
