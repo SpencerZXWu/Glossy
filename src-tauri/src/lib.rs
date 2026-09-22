@@ -336,6 +336,13 @@ fn stop_speaking() {
     speech::stop();
 }
 
+/// Whether the voice is reading something out loud right now, which the card
+/// polls to know when its pronunciation buttons should go back to rest.
+#[tauri::command]
+fn speaking() -> bool {
+    speech::is_speaking()
+}
+
 /// What the clipboard holds, for the paste button of the settings window.
 #[tauri::command]
 fn read_clipboard() -> String {
@@ -549,6 +556,7 @@ pub fn run() {
             copy_text,
             say,
             stop_speaking,
+            speaking,
             read_clipboard,
             history_list,
             history_clear,

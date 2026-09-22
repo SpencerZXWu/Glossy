@@ -306,13 +306,13 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 130 frontend tests
+node --test                                                          # 175 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 152 Rust tests
+cargo test --locked                                                  # 194 Rust tests
 cd ..\server
-npm test                                                             # 49 server tests
+npm test                                                             # 74 server tests
 ```
 
 `npm test` runs the same `node --test` command. The frontend tests load
@@ -384,6 +384,7 @@ none of them is covered by the automated tests.
 | 15 | Set the history to `The last 50`, translate 60 texts, then set it to `Off` | The list keeps 50, search filters them, clicking one reopens it in the card, and `Off` empties the file |
 | 16 | Change the opacities, font size and width, restart | The popup keeps the chosen values |
 | 17 | Open the Updates section | This build, without a signing key, hides the check buttons and says the build cannot update itself; after a key pair exists, `Check now` reports either the running version or the one that is waiting |
+| 18 | Press a read-aloud button, press it again while it is lit, then start another reading and close the card | The button turns into a stop square while its text is read, and back into a speaker once the voice stops; the second press stops the reading, closing the card stops it too, and no reading talks over the next card |
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -409,7 +410,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 152 tests; see "Checks" above for lint and format runs
+cargo test   # 194 tests; see "Checks" above for lint and format runs
 ```
 
 ## Layout
@@ -643,13 +644,13 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 130 frontend tests
+node --test                                                          # 175 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 152 Rust tests
+cargo test --locked                                                  # 194 Rust tests
 cd ..\server
-npm test                                                             # 49 server tests
+npm test                                                             # 74 server tests
 ```
 
 `npm test` 运行的是同一条 `node --test` 命令。前端测试把
@@ -709,6 +710,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 15 | 把历史记录设为 `最近 50 条`，翻译 60 段文本，然后把它设为 `关闭` | 列表保留 50 条，搜索能过滤它们，点击一条会在卡片中重新打开它，`关闭` 会清空文件 |
 | 16 | 修改不透明度、字号和宽度，然后重启 | 弹窗保持所选择的值 |
 | 17 | 打开更新部分 | 没有签名密钥的这个构建会隐藏检查按钮并说明该构建无法自我更新；密钥对存在之后，`立即检查` 要么报告当前运行的版本，要么报告正在等待的那个版本 |
+| 18 | 按一次朗读按钮，再按一次那个正在朗读的按钮，然后开始一次朗读并关闭卡片 | 朗读时按钮变成停止方块，语音停下后变回喇叭；第二次按下会停止朗读，关闭卡片也会停止朗读，下一次卡片不会被上一次的朗读盖过 |
 
 ### 工具链说明（Windows，GNU 工具链）
 
@@ -730,7 +732,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 152 tests; see "Checks" above for lint and format runs
+cargo test   # 194 tests; see "Checks" above for lint and format runs
 ```
 
 ## 目录结构
@@ -1130,13 +1132,13 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 130 frontend tests
+node --test                                                          # 175 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 152 Rust tests
+cargo test --locked                                                  # 194 Rust tests
 cd ..\server
-npm test                                                             # 49 server tests
+npm test                                                             # 74 server tests
 ```
 
 `npm test` ejecuta el mismo comando `node --test`. Las pruebas del frontend cargan
@@ -1211,6 +1213,7 @@ real en algún momento y ninguno está cubierto por las pruebas automatizadas.
 | 15 | Poner el historial en `The last 50`, traducir 60 textos y luego ponerlo en `Off` | La lista guarda 50, la búsqueda los filtra, al hacer clic en uno se reabre en la tarjeta y `Off` vacía el archivo |
 | 16 | Cambiar las transparencias, el tamaño de fuente y el ancho, y reiniciar | El emergente conserva los valores elegidos |
 | 17 | Abrir la sección de actualizaciones | Esta compilación, sin clave de firma, oculta los botones de comprobación y dice que la compilación no puede actualizarse; una vez que existe un par de claves, `Check now` informa de la versión en ejecución o de la que está esperando |
+| 18 | Pulsar un botón de lectura, volver a pulsarlo mientras está encendido y luego empezar otra lectura y cerrar la tarjeta | El botón se convierte en un cuadrado de detener mientras se lee su texto y vuelve a ser un altavoz cuando la voz se detiene; la segunda pulsación detiene la lectura, cerrar la tarjeta también la detiene y ninguna lectura se solapa con la tarjeta siguiente |
 
 ### Notas sobre la cadena de herramientas (Windows, cadena GNU)
 
@@ -1240,7 +1243,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 152 tests; see "Checks" above for lint and format runs
+cargo test   # 194 tests; see "Checks" above for lint and format runs
 ```
 
 ## Estructura

@@ -48,6 +48,16 @@
 
   let settings = { ...MOCK_SETTINGS };
 
+  /**
+   * Whether the preview's imaginary voice is still reading. The real backend
+   * reports this itself; here the button would go quiet a frame after it lit up,
+   * so a reading is held for as long as a short sentence would take.
+   */
+  let previewSpeaking = false;
+
+  /** The timer that ends the preview's imaginary reading. */
+  let previewSpeechTimer = 0;
+
   function previewEmit(event, payload) {
     const set = previewListeners.get(event);
     if (!set) return;
@@ -195,11 +205,20 @@
               },
         };
       case "say":
-        // The browser preview has no voice; answering keeps the buttons alive.
-        await new Promise((resolve) => setTimeout(resolve, 120));
+        // The browser preview has no voice; the button is kept lit long enough
+        // to be looked at, then the reading ends by itself.
+        previewSpeaking = true;
+        clearTimeout(previewSpeechTimer);
+        previewSpeechTimer = setTimeout(() => {
+          previewSpeaking = false;
+        }, 2400);
         return true;
       case "stop_speaking":
+        previewSpeaking = false;
+        clearTimeout(previewSpeechTimer);
         return true;
+      case "speaking":
+        return previewSpeaking;
       case "capture_status":
         return { hooked: true, error: null, hotkey: "Ctrl+Alt+C", hotkeyError: null };
       case "cloud_status":

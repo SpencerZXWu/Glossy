@@ -114,7 +114,10 @@
 
   --g-text-primary: rgba(0, 0, 0, 0.8956);
   --g-text-secondary: rgba(0, 0, 0, 0.6063);
-  --g-text-tertiary: rgba(0, 0, 0, 0.4458);
+  /* Deliberately darker than the WinUI value (0.4458): that one measures 3.3:1
+     on a white surface, and this tier carries captions, phonetics and the
+     source line the reader has to be able to read. Holds 4.5:1 on white. */
+  --g-text-tertiary: rgba(0, 0, 0, 0.558);
   --g-text-disabled: rgba(0, 0, 0, 0.3614);
 
   --g-stroke-subtle: rgba(0, 0, 0, 0.0578);
@@ -173,7 +176,9 @@
 
   --g-text-primary: #ffffff;
   --g-text-secondary: rgba(255, 255, 255, 0.786);
-  --g-text-tertiary: rgba(255, 255, 255, 0.5442);
+  /* Lifted from 0.5442 so the tier still clears 4.5:1 when a bright desktop
+     shows through the translucent flyout surface. */
+  --g-text-tertiary: rgba(255, 255, 255, 0.5646);
   --g-text-disabled: rgba(255, 255, 255, 0.3628);
 
   --g-stroke-subtle: rgba(255, 255, 255, 0.0693);

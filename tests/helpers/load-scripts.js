@@ -14,6 +14,41 @@ function readScript(name) {
   return { name, file, code: fs.readFileSync(file, "utf8") };
 }
 
+/**
+ * The timers the scripts under test reach for. Intervals are recorded so a test
+ * can fire them by hand; timeouts are recorded and left alone, which keeps a
+ * state that is meant to expire on a timer observable.
+ */
+function makeTimers() {
+  let next = 1;
+  const intervals = new Map();
+  const timeouts = new Map();
+  return {
+    api: {
+      setInterval(fn) {
+        const id = next++;
+        intervals.set(id, fn);
+        return id;
+      },
+      clearInterval(id) {
+        intervals.delete(id);
+      },
+      setTimeout(fn) {
+        const id = next++;
+        timeouts.set(id, fn);
+        return id;
+      },
+      clearTimeout(id) {
+        timeouts.delete(id);
+      },
+    },
+    intervals: () => intervals.size,
+    async fire() {
+      for (const fn of Array.from(intervals.values())) await fn();
+    },
+  };
+}
+
 function loadFrontend(options) {
   const settings = options || {};
   const scripts = (settings.files || DEFAULT_FILES).map(readScript);
@@ -23,7 +58,8 @@ function loadFrontend(options) {
   const navigator = { language: settings.language || "en-US" };
   if (settings.languages) navigator.languages = settings.languages.slice();
 
-  const context = vm.createContext({ window, document, navigator, console });
+  const timers = makeTimers();
+  const context = vm.createContext({ window, document, navigator, console, ...timers.api });
 
   function run() {
     for (const script of scripts) {
@@ -38,6 +74,7 @@ function loadFrontend(options) {
     window,
     document,
     navigator,
+    timers,
     setLocale(language, languages) {
       navigator.language = language;
       navigator.languages = languages ? languages.slice() : undefined;

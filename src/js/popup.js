@@ -322,13 +322,16 @@
    * The translation comes from the provider and is on screen already; phonetic
    * symbols, meanings and an example need the dictionary and the free endpoint,
    * which are slow and sometimes have nothing. The card therefore says that the
-   * lookups are running, and updates in place when they answer — staying a bare
-   * translation when they have nothing to add. */
+   * lookups are running and updates in place when they answer — staying a bare
+   * translation when they have nothing to add.
+   *
+   * Whatever the provider already returned stays on screen while that happens:
+   * emptying the card and filling it again made the whole entry slide up and
+   * down twice for a single selection. */
   async function refine(result, mine) {
     if (!result || result.kind !== "word" || !needsDetails(result)) return;
 
-    const waiting = { ...result, phonetic: null, meanings: [], example: null };
-    Glossy.render.result(content, waiting, {
+    Glossy.render.result(content, result, {
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
       pending: true,
@@ -424,6 +427,8 @@
     // vanish; the backend forgets the pin with the card.
     pinned = false;
     showPin();
+    // A card that is gone must not keep talking.
+    Glossy.render.stopSpeaking();
     document.body.dataset.state = "idle";
     Glossy.invoke("popup_close").catch(() => {});
   }

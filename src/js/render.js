@@ -109,6 +109,8 @@
   }
 
   function clear(target) {
+    // A card that is being replaced must not keep talking behind the new one.
+    if (reading) stopSpeaking();
     while (target.firstChild) target.removeChild(target.firstChild);
   }
 
@@ -131,9 +133,15 @@
   function error(target, message, onRetry) {
     clear(target);
     const wrap = node("div", "error");
-    wrap.appendChild(
-      node("div", "message", message || Glossy.i18n.t("render.failed")),
-    );
+    const detail = String(message || "").trim();
+    wrap.appendChild(node("div", "message", Glossy.i18n.t("render.failed")));
+    // The failure text from the backend is written in English and names things
+    // like sockets; the reader gets their own language as the headline with the
+    // original underneath, where it is useful for a bug report and harmless
+    // otherwise.
+    if (detail && detail !== Glossy.i18n.t("render.failed")) {
+      wrap.appendChild(node("div", "note", detail));
+    }
     if (typeof onRetry === "function") {
       const retry = node("button", "ghost-button", Glossy.i18n.t("render.retry"));
       retry.type = "button";
@@ -153,16 +161,23 @@
 
     const translation = String(data.translation || "").trim();
     const isSentence = data.kind === "sentence";
-    const empty = () => Glossy.i18n.t("render.empty");
+    // An empty answer is a message about the result, not the result: it gets its
+    // own styling so it does not sit in the card with the weight of a translation.
+    const answer = () =>
+      node(
+        "div",
+        translation ? "translation" : "translation empty",
+        translation || Glossy.i18n.t("render.empty"),
+      );
 
     if (isSentence) {
       if (opts.showOriginal !== false && data.sourceText) {
         target.appendChild(node("div", "original", data.sourceText));
       }
-      target.appendChild(node("div", "translation", translation || empty()));
+      target.appendChild(answer());
       if (extras) pairs(target, data.pairs);
     } else {
-      target.appendChild(node("div", "translation", translation || empty()));
+      target.appendChild(answer());
 
       const phonetic = phoneticText(data.phonetic || "");
       if (phonetic) {
@@ -207,7 +222,6 @@
     }
 
     if (extras) units(target, data.conversions);
-    if (opts.speak !== false) readOut(target, data);
 
     const parts = [];
     if (data.provider) parts.push(Glossy.i18n.providerName(data.provider));
@@ -224,6 +238,9 @@
         ),
       );
     }
+
+    // Last, so the buttons sit in the bottom corner of the card.
+    if (opts.speak !== false) readOut(target, data);
   }
 
   /** The inflections of a word, labelled by the tag the backend wrote. */
@@ -292,8 +309,26 @@
     target.appendChild(block);
   }
 
+  /**
+   * The two faces of a pronunciation button: a speaker at rest, and the stop
+   * square it wears while its text is being read.
+   */
+  const SPEAK_GLYPH =
+    '<svg class="glyph glyph-speak" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 4.5 6 8.5H3v7h3l5 4v-15Z" /><path d="M15.5 9.5a4 4 0 0 1 0 5" /><path d="M18.5 7a8 8 0 0 1 0 10" /></svg>';
+  const STOP_GLYPH =
+    '<svg class="glyph glyph-stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" /></svg>';
+
+  /** How often the card asks whether the voice is still reading. */
+  const SPEECH_POLL_MS = 250;
+
+  /** How long a reading that failed shows on its button before going back. */
+  const FAILED_HOLD_MS = 2600;
+
   /** The button that is currently reading something out loud, if any. */
   let reading = null;
+
+  /** The timer that waits for the voice to fall silent, while one is reading. */
+  let watching = null;
 
   /** The pronunciation buttons: the original, the translation, or both. */
   function readOut(target, data) {
@@ -314,48 +349,98 @@
 
     const block = node("div", "says");
     rows.forEach((row) => {
-      const button = node("button", "say", Glossy.i18n.t(row.key));
+      const button = node("button", "say");
       button.type = "button";
       button.setAttribute("data-say", row.key);
-      button.setAttribute("title", Glossy.i18n.t(row.key));
+      button.setAttribute("aria-pressed", "false");
+      button.innerHTML = `${SPEAK_GLYPH}${STOP_GLYPH}`;
+      name(button, row.key);
       button.addEventListener("click", () => toggleReading(button, row));
       block.appendChild(button);
     });
     target.appendChild(block);
   }
 
-  /** Reads one text out loud, or stops the one already playing. */
-  async function toggleReading(button, row) {
-    if (typeof Glossy.invoke !== "function") return;
-    const stop = reading === button;
-    stopReading();
-    if (stop) {
-      Glossy.invoke("stop_speaking").catch(() => {});
-      return;
-    }
-
-    reading = button;
-    button.dataset.state = "on";
-    button.textContent = Glossy.i18n.t("render.stop");
-    try {
-      await Glossy.invoke("say", {
-        text: row.text,
-        language: row.language || null,
-      });
-    } catch (error) {
-      // A machine without a voice for that language answers with an error, and
-      // there is nothing to show for it beyond the button going back.
-      console.warn("glossy: unable to read the text out loud", error);
-    }
-    if (reading === button) stopReading();
+  /** Names a button after an i18n key, for its tooltip and its screen reader. */
+  function name(button, key) {
+    const text = Glossy.i18n.t(key);
+    button.setAttribute("title", text);
+    button.setAttribute("aria-label", text);
   }
 
-  /** Puts the button that is reading back to its resting look. */
+  /** Reads one text out loud, or stops the one that is already being read. */
+  function toggleReading(button, row) {
+    if (typeof Glossy.invoke !== "function") return;
+    if (reading === button) {
+      stopSpeaking();
+      return;
+    }
+    stopSpeaking();
+    reading = button;
+    button.dataset.state = "on";
+    button.setAttribute("aria-pressed", "true");
+    name(button, "render.stop");
+    watch();
+    // The voice says the words on a thread of its own, so this promise answers
+    // long before the reading is over; whether it is still going is asked
+    // separately, in `watch`.
+    Glossy.invoke("say", { text: row.text, language: row.language || null }).catch((error) => {
+      console.warn("glossy: unable to read the text out loud", error);
+      if (reading === button) failReading(button);
+    });
+  }
+
+  /** Follows a reading until the voice reports that it has fallen silent. */
+  function watch() {
+    if (watching !== null) return;
+    watching = setInterval(async () => {
+      let busy;
+      try {
+        busy = await Glossy.invoke("speaking");
+      } catch (error) {
+        // A backend that will not answer is not one to keep asking.
+        console.warn("glossy: unable to ask whether the voice is busy", error);
+        stopWatching();
+        return;
+      }
+      if (!busy) stopReading();
+    }, SPEECH_POLL_MS);
+  }
+
+  function stopWatching() {
+    if (watching === null) return;
+    clearInterval(watching);
+    watching = null;
+  }
+
+  /** Puts the button that was reading back to its resting look. */
   function stopReading() {
-    if (!reading) return;
-    reading.dataset.state = "off";
-    reading.textContent = Glossy.i18n.t(reading.getAttribute("data-say"));
+    if (reading) {
+      reading.dataset.state = "off";
+      reading.setAttribute("aria-pressed", "false");
+      name(reading, reading.getAttribute("data-say"));
+    }
     reading = null;
+    stopWatching();
+  }
+
+  /** Says on the button that its text could not be read, then goes back. */
+  function failReading(button) {
+    stopReading();
+    button.dataset.state = "failed";
+    name(button, "render.speakFailed");
+    setTimeout(() => {
+      if (button.dataset.state !== "failed") return;
+      button.dataset.state = "off";
+      name(button, button.getAttribute("data-say"));
+    }, FAILED_HOLD_MS);
+  }
+
+  /** Stops whatever is being read out loud and puts the buttons back. */
+  function stopSpeaking() {
+    stopReading();
+    if (typeof Glossy.invoke !== "function") return;
+    Glossy.invoke("stop_speaking").catch(() => {});
   }
 
   /** The source of a live currency rate, spelled the way the interface does. */
@@ -413,5 +498,5 @@
     if (error && typeof error.message === "string") return error.message;
     return Glossy.i18n.t("render.failed");
   };
-  Glossy.render = { loading, error, result, clear };
+  Glossy.render = { loading, error, result, clear, stopSpeaking };
 })(window.Glossy);

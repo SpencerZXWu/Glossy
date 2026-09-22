@@ -6,6 +6,85 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.1.1] - 2026-09-21
+
+The appearance pass v1.1.0 left open: the popup was measured in a browser, and what
+came back was contrast, type size, motion and two states that said the same thing
+twice. Almost nothing here changes what Glossy does; the read-aloud buttons are the
+one exception, and that is because their logic was wrong as well as their look.
+
+### Changed
+
+- **The muted text is readable now.** The phonetic symbols, the example, the
+  footnotes, the block titles and the line that stands in while a word card is still
+  being completed all drew from `--g-text-tertiary`, which measured about 3.3:1
+  against the card. The token is `rgba(0, 0, 0, 0.558)` in light and
+  `rgba(255, 255, 255, 0.5646)` in dark, which puts every one of them at 4.86:1 or
+  better in either theme.
+
+- **The opacity setting dims the plate, not the words.** The card used to fade as a
+  whole, so a setting below about 70 % took the text down with it. The surface moved
+  into `.card::before` — border, background and shadow, with `isolation: isolate` on
+  the card to keep the layer under the text — and that layer is the only thing
+  `--popup-opacity` touches. The text stays fully opaque at the 50 % minimum.
+
+- **The smallest text and the buttons both grew.** The close, copy and pin buttons go
+  from 24px to `calc(26px * var(--popup-font))` with a 15px icon, the language swap
+  button is 24px, the footnotes from 10.5px to 11.5px and the block titles from 10px
+  to 10.5px.
+
+- **The read-aloud buttons are a pair of icons in the corner.** They were two wide
+  pills under the translation; they are now 26px buttons built like the pin, copy and
+  close buttons, side by side and right-aligned at the bottom corner of the card,
+  each one labelled for its own side. A speaker at rest becomes a stop square while
+  that side is being read, so which of the two is playing is never something the
+  reader has to remember.
+
+- **Nothing flashes while a word card is completed.** `refine()` used to draw a card
+  with the extras stripped out and fill them in afterwards; it draws the one card with
+  a pending marker instead, so the provider's content is never wiped and redrawn.
+
+- **Motion and colour come from the tokens.** Every literal `120ms ease` became
+  `var(--g-dur-fast) var(--g-ease-standard)`, the entrance animation translates the
+  card without animating its opacity, `.card::before` fades in on its own keyframes,
+  the focus ring is one `:focus-visible` rule on `--accent`, and the scrollbar thumb is
+  `--g-stroke-strong`, lifting to `--muted` under the pointer.
+
+### Fixed
+
+- **Pressing a pronunciation button a second time did nothing.** `say` answers as
+  soon as the voice has accepted the text — the reading itself runs on a SAPI thread
+  of its own — so a second press on a button that was still lit was treated as a
+  first press: the highlight lasted one frame and a reading could only be stopped by
+  closing the card. `speech.rs` now keeps a speaking flag under a generation counter,
+  the `speaking` command reports it, and the card follows it on a 250ms timer so the
+  button goes back to rest when the voice falls silent.
+
+- **A reading outlived the card that started it.** Closing the card, replacing it
+  with a new selection, or switching to the other side all used to leave the old
+  reading talking over the new one. Each of them stops the voice first: `popup::hide`
+  on the way out, `dismiss()` before the window goes, and the card itself before
+  arming the next button.
+
+- **A reading that could not start said nothing.** A missing voice, a busy one or an
+  outright refusal now says so on the button that asked — tinted, relabelled, and
+  back to rest a couple of seconds later.
+
+- **Reduced motion was not honoured.** The `prefers-reduced-motion` block sat above
+  the rules it was meant to switch off, and at equal specificity the later declaration
+  wins, so the loading shimmer and the plate fade kept playing. The block is last in
+  `popup.css` now and covers `.card::before`, not just `.card`.
+
+- **An error message repeated itself.** The card printed the localized headline and
+  then the raw message, and the two were often the same sentence. The headline is
+  always the localized one, and the provider's own text follows as a muted note only
+  when it is different and not empty.
+
+- **An empty translation looked like an answer.** The fallback message draws as
+  `translation empty` — muted and italic — so it reads as a notice. The line that
+  stands in while a lookup is running stays a plain muted line: a pulsing dot would
+  claim more liveness than a single lookup deserves.
+
 ## [1.1.0] - 2026-09-21
 
 ### Added
@@ -516,7 +595,10 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.2...v1.1.0
+[1.0.2]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.3...v1.0.0
 [0.3.3]: https://github.com/SpencerZXWu/Glossy/compare/v0.3.2...v0.3.3

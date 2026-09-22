@@ -6,9 +6,14 @@
 //! for. Speaking asynchronously keeps the interface responsive, and every new
 //! request first purges the queue, so pressing play twice does not queue two
 //! readings behind each other but replaces the one that is running.
+//!
+//! Because the reading itself is asynchronous, the worker keeps watching the
+//! voice afterwards and reports when it falls silent, which is what the buttons
+//! in the card follow to know when the reading is over.
 
 use std::collections::HashMap;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
@@ -16,7 +21,7 @@ use std::time::Duration;
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::Media::Speech::{
     ISpObjectToken, ISpObjectTokenCategory, ISpVoice, SpObjectTokenCategory, SpVoice, SPCAT_VOICES,
-    SPF_ASYNC, SPF_PURGEBEFORESPEAK,
+    SPF_ASYNC, SPF_PURGEBEFORESPEAK, SPRS_IS_SPEAKING, SPVOICESTATUS,
 };
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_ALL,
@@ -26,19 +31,29 @@ use windows::Win32::System::Com::{
 /// How long the interface waits for the worker to report that it has a voice.
 const READY_TIMEOUT: Duration = Duration::from_millis(1500);
 
+/// How often the worker asks the voice whether it is still speaking.
+const POLL_INTERVAL: Duration = Duration::from_millis(120);
+
+/// How many quiet polls in a row mean the reading has finished. One is not
+/// enough: the voice only reports itself as speaking once the first samples
+/// reach the device.
+const QUIET_POLLS: u32 = 2;
+
 /// What the interface asks the voice to do.
 enum Command {
     Speak {
         text: String,
         rate: i32,
         language: Option<String>,
+        /// The reading this command starts, so a report about it cannot be
+        /// mistaken for a report about a later one.
+        reading: u64,
     },
     Stop,
 }
 
 /// The command queue, created with the worker thread it feeds.
 fn commands() -> &'static Mutex<Sender<Command>> {
-    static COMMANDS: OnceLock<Mutex<Sender<Command>>> = OnceLock::new();
     COMMANDS.get_or_init(|| {
         let (sender, receiver) = channel();
         if let Err(error) = thread::Builder::new()
@@ -51,6 +66,14 @@ fn commands() -> &'static Mutex<Sender<Command>> {
     })
 }
 
+static COMMANDS: OnceLock<Mutex<Sender<Command>>> = OnceLock::new();
+
+/// Whether the worker was ever asked to do anything, which is not the same as
+/// asking for it: starting the thread is how the queue comes into being.
+fn started() -> bool {
+    COMMANDS.get().is_some()
+}
+
 /// Set by the worker once COM and the voice are ready, so `speak` can report a
 /// machine that has no voice at all instead of failing silently.
 type Readiness = (Mutex<Option<Result<(), String>>>, Condvar);
@@ -58,6 +81,33 @@ type Readiness = (Mutex<Option<Result<(), String>>>, Condvar);
 fn readiness() -> &'static Readiness {
     static READY: OnceLock<Readiness> = OnceLock::new();
     READY.get_or_init(|| (Mutex::new(None), Condvar::new()))
+}
+
+/// Whether a reading is in progress, which the card polls to know when its
+/// buttons should go back to their resting look.
+fn speaking() -> &'static AtomicBool {
+    static SPEAKING: OnceLock<AtomicBool> = OnceLock::new();
+    SPEAKING.get_or_init(|| AtomicBool::new(false))
+}
+
+/// The number of the reading in progress, bumped by everything that starts or
+/// ends one so that a late report from a reading that is already over cannot
+/// speak for the one that replaced it.
+fn generation() -> &'static AtomicU64 {
+    static GENERATION: OnceLock<AtomicU64> = OnceLock::new();
+    GENERATION.get_or_init(|| AtomicU64::new(0))
+}
+
+/// Whether the voice is reading something out loud right now.
+pub fn is_speaking() -> bool {
+    speaking().load(Ordering::SeqCst)
+}
+
+/// Reports `reading` as finished, unless a newer one has taken its place.
+fn settle(reading: u64) {
+    if generation().load(Ordering::SeqCst) == reading {
+        speaking().store(false, Ordering::SeqCst);
+    }
 }
 
 fn send(command: Command) {
@@ -76,17 +126,35 @@ pub fn speak(text: &str, rate: i32, language: Option<&str>) -> Result<(), String
     if text.is_empty() {
         return Err("there is nothing to read".to_string());
     }
+    let reading = generation().fetch_add(1, Ordering::SeqCst) + 1;
+    // Reported before the worker picks the command up, so the card never sees a
+    // quiet voice in the gap between asking and hearing anything.
+    speaking().store(true, Ordering::SeqCst);
     send(Command::Speak {
         text: text.to_string(),
         rate,
         language: language.map(str::to_string),
+        reading,
     });
-    wait_until_ready()
+    let ready = wait_until_ready();
+    if ready.is_err() {
+        settle(reading);
+    }
+    ready
 }
 
 /// Stops the reading that is in progress.
 pub fn stop() {
     // Stopping does not need a voice, so a machine without one is not an error.
+    // The generation moves on here as well, so a reading that was already under
+    // way cannot report itself finished after the next one has started.
+    generation().fetch_add(1, Ordering::SeqCst);
+    // Nothing was ever read out loud, and starting the worker now only to drop
+    // one message would put a speech thread behind a card that never spoke.
+    if !started() {
+        return;
+    }
+    speaking().store(false, Ordering::SeqCst);
     send(Command::Stop);
 }
 
@@ -124,17 +192,33 @@ fn worker(receiver: Receiver<Command>) {
         return;
     };
     let mut voices: HashMap<String, ISpObjectToken> = HashMap::new();
-    while let Ok(command) = receiver.recv() {
+    // A command that arrived while a reading was being watched, handled by the
+    // next turn of this loop.
+    let mut queued: Option<Command> = None;
+    loop {
+        let command = match queued.take() {
+            Some(command) => command,
+            None => match receiver.recv() {
+                Ok(command) => command,
+                Err(_) => break,
+            },
+        };
         match command {
             Command::Speak {
                 text,
                 rate,
                 language,
+                reading,
             } => {
-                if let Err(error) =
-                    unsafe { speak_with(&voice, &mut voices, &text, rate, language.as_deref()) }
-                {
-                    eprintln!("Glossy could not read the translation out loud: {error}");
+                match unsafe { speak_with(&voice, &mut voices, &text, rate, language.as_deref()) } {
+                    Err(error) => {
+                        eprintln!("Glossy could not read the translation out loud: {error}");
+                        settle(reading);
+                    }
+                    // The voice says the words on its own thread, so this one
+                    // stays free to keep the queue moving and to watch for the
+                    // moment the reading ends.
+                    Ok(()) => queued = watch(&voice, &receiver, reading),
                 }
             }
             // A null pointer with `SPF_PURGEBEFORESPEAK` drops everything that
@@ -147,6 +231,42 @@ fn worker(receiver: Receiver<Command>) {
         }
     }
     unsafe { CoUninitialize() };
+}
+
+/// Watches a reading until the voice falls silent, reporting whether it has. A
+/// command that arrives first cuts the reading short and is handed back to the
+/// loop that owns the voice.
+fn watch(voice: &ISpVoice, receiver: &Receiver<Command>, reading: u64) -> Option<Command> {
+    let mut quiet = 0;
+    loop {
+        match receiver.recv_timeout(POLL_INTERVAL) {
+            Ok(command) => return Some(command),
+            Err(RecvTimeoutError::Disconnected) => {
+                settle(reading);
+                return None;
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+        }
+        if silent(voice) {
+            quiet += 1;
+            if quiet >= QUIET_POLLS {
+                settle(reading);
+                return None;
+            }
+        } else {
+            quiet = 0;
+        }
+    }
+}
+
+/// Whether the voice has nothing left to say. A status that cannot be read
+/// counts as busy, so a reading is never cut short by a failed call.
+fn silent(voice: &ISpVoice) -> bool {
+    let mut status: SPVOICESTATUS = unsafe { std::mem::zeroed() };
+    if unsafe { voice.GetStatus(&mut status, std::ptr::null_mut()) }.is_err() {
+        return false;
+    }
+    status.dwRunningState & (SPRS_IS_SPEAKING.0 as u32) == 0
 }
 
 /// The `dwflags` value `ISpVoice::Speak` expects, which the crate hands over as

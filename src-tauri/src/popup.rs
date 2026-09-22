@@ -6,6 +6,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow};
 
 use crate::platform::ScreenRect;
+use crate::speech;
 use crate::state::AppState;
 use crate::translate::TranslationResult;
 
@@ -319,6 +320,8 @@ pub fn hide(app: &AppHandle) {
     if let Some(window) = popup_window(app) {
         let _ = window.hide();
     }
+    // A card that is out of sight must not keep talking.
+    speech::stop();
     BOUNDS.visible.store(false, Ordering::Relaxed);
     // The pin belongs to the card that is on screen, not to the popup window,
     // which lives on between translations.

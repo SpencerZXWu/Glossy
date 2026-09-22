@@ -227,6 +227,7 @@
     "render.speakOriginal": "Read the original out loud",
     "render.speakTranslation": "Read the translation out loud",
     "render.stop": "Stop reading",
+    "render.speakFailed": "Could not read this out loud",
     "render.fallback": "Answered by {0} after the chosen service failed",
 
     "form.plural": "plural",
@@ -465,6 +466,7 @@
     "render.speakOriginal": "朗读原文",
     "render.speakTranslation": "朗读译文",
     "render.stop": "停止朗读",
+    "render.speakFailed": "无法朗读这段文字",
     "render.fallback": "所选服务失败，由 {0} 回答",
 
     "form.plural": "复数",

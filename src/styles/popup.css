@@ -9,6 +9,8 @@
   --bg-soft: var(--g-surface-sunken);
   --fg: var(--g-text-primary);
   --fg-soft: var(--g-text-secondary);
+  /* Captions, phonetics and the source line all read from this tier, so it is
+     the one that has to stay legible; its value lives in tokens.css. */
   --muted: var(--g-text-tertiary);
   --line: var(--g-stroke-subtle);
   --accent: var(--g-accent);
@@ -44,6 +46,8 @@ body.dragging {
 
 .card {
   position: relative;
+  /* Keeps the surface layer below the content instead of behind the window. */
+  isolation: isolate;
   width: var(--card-width);
   /* The window is resized to the card, so the card must not be capped by its
      own viewport (`vh`) or it would shrink itself on every re-measure. The
@@ -52,25 +56,43 @@ body.dragging {
   max-height: var(--max-card-height, 92vh);
   display: flex;
   flex-direction: column;
-  background: var(--bg);
-  border: 1px solid var(--line);
   border-radius: var(--g-radius-xl);
-  box-shadow: var(--shadow);
-  opacity: var(--popup-opacity, 1);
-  overflow: hidden;
-  animation: rise 120ms ease-out;
+  animation: rise var(--g-dur-fast) var(--g-ease-decelerate);
 }
 
-body.dragging .card {
+/* Paint and shadow sit on their own layer so that the opacity setting dims the
+   card without dimming the text on it: at 50% the copy used to turn into a
+   ghost of itself, worst of all in the dark theme. */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  opacity: var(--popup-opacity, 1);
+  /* The fade belongs to the surface: fading the card itself would flash its
+     text from half to full opacity at the end of the animation. */
+  animation: plate-in var(--g-dur-fast) var(--g-ease-decelerate);
+  pointer-events: none;
+}
+
+body.dragging .card,
+body.dragging .card::before {
   animation: none;
 }
 
-/* Only the opening state is animated: the card fades in from invisible to
-   whatever `--popup-opacity` says, so a translucent card never flashes solid. */
 @keyframes rise {
   from {
-    opacity: 0;
     transform: translateY(-3px);
+  }
+}
+
+@keyframes plate-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -82,7 +104,6 @@ body.dragging .card {
   gap: 8px;
   padding: 9px 10px 9px 12px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
   user-select: none;
   cursor: default;
 }
@@ -112,7 +133,6 @@ body.dragging .card {
   gap: 4px;
   padding: 3px 8px 4px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
   user-select: none;
   cursor: default;
 }
@@ -131,7 +151,8 @@ body.dragging .card {
   font: inherit;
   font-size: calc(11.5px * var(--popup-font));
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease;
+  transition: border-color var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .lang-select option {
@@ -149,7 +170,6 @@ body.dragging .card {
 }
 
 .lang-select:focus-visible {
-  outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
 }
 
@@ -165,7 +185,9 @@ body.dragging .card {
   background: var(--g-surface-solid);
   color: var(--fg-soft);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    border-color var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .lang-swap:hover {
@@ -185,8 +207,8 @@ body.dragging .card {
 
 .icon-button {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: calc(26px * var(--popup-font));
+  height: calc(26px * var(--popup-font));
   display: grid;
   place-items: center;
   border: 0;
@@ -195,7 +217,8 @@ body.dragging .card {
   color: var(--muted);
   cursor: pointer;
   padding: 0;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .icon-button:hover {
@@ -208,8 +231,8 @@ body.dragging .card {
 }
 
 .icon-button svg {
-  width: calc(14px * var(--popup-font));
-  height: calc(14px * var(--popup-font));
+  width: calc(15px * var(--popup-font));
+  height: calc(15px * var(--popup-font));
   display: block;
 }
 
@@ -220,6 +243,17 @@ body.dragging .card {
 .icon-button[data-state="on"] {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* Keyboard rings have to be visible on their own: the accent outlines read
+   against both the light and the dark card, soft tints do not. */
+.lang-select:focus-visible,
+.lang-swap:focus-visible,
+.icon-button:focus-visible,
+.say:focus-visible,
+.ghost-button:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
 }
 
 /* ------------------------------------------------------------------ body */
@@ -236,8 +270,12 @@ body.dragging .card {
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--g-stroke-strong);
   border-radius: 4px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 .phonetic {
@@ -247,24 +285,13 @@ body.dragging .card {
   margin-bottom: 8px;
 }
 
-/* Stand-in for the extras a word card is still looking up. */
+/* Stand-in for the extras a word card is still looking up. It stays a plain
+   line: pulsing the text faded near-threshold grey below readable contrast, and
+   a pulsing dot would claim more liveness than a single lookup deserves. */
 .pending {
   color: var(--muted);
   font-size: calc(11.5px * var(--popup-font));
   margin-bottom: 8px;
-  animation: pending-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes pending-pulse {
-  50% {
-    opacity: 0.45;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pending {
-    animation: none;
-  }
 }
 
 .meanings {
@@ -309,10 +336,10 @@ body.dragging .card {
   color: var(--muted);
   font-size: calc(12px * var(--popup-font));
   line-height: 1.5;
-  /* Four lines at most; a longer selection scrolls inside the block. */
+  /* Four lines at most; a longer selection scrolls inside the block. The wheel
+     is left alone so a flick at the end of the source keeps scrolling the card. */
   max-height: 6em;
   overflow-y: auto;
-  overscroll-behavior: contain;
   padding-right: 2px;
 }
 
@@ -321,8 +348,12 @@ body.dragging .card {
 }
 
 .original::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--g-stroke-strong);
   border-radius: 3px;
+}
+
+.original::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 .translation {
@@ -330,6 +361,14 @@ body.dragging .card {
   font-size: calc(15px * var(--popup-font));
   line-height: 1.6;
   word-break: break-word;
+}
+
+/* A provider that answered with nothing is a message about the result, not a
+   result: it should not wear the weight of the translation. */
+.translation.empty {
+  color: var(--muted);
+  font-size: calc(13px * var(--popup-font));
+  font-style: italic;
 }
 
 /* Inflections of a word and the words that mean roughly the same. */
@@ -351,7 +390,7 @@ body.dragging .card {
 .block-title {
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: calc(10px * var(--popup-font));
+  font-size: calc(10.5px * var(--popup-font));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -417,38 +456,63 @@ body.dragging .card {
   line-height: 1.5;
 }
 
-/* Pronunciation buttons, one per side of the card. */
+/* Pronunciation buttons, one per side of the card, in its bottom corner. */
 .says {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 9px;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .say {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: var(--g-radius-pill);
+  flex: none;
+  width: calc(26px * var(--popup-font));
+  height: calc(26px * var(--popup-font));
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
-  color: var(--fg-soft);
-  font: inherit;
-  font-size: calc(11.5px * var(--popup-font));
+  color: var(--muted);
   cursor: pointer;
+  padding: 0;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .say:hover {
-  background: var(--g-surface-hover);
+  background: var(--bg-soft);
   color: var(--fg);
 }
 
 .say:active {
-  background: var(--g-surface-pressed);
+  transform: translateY(1px);
+}
+
+.say svg {
+  width: calc(15px * var(--popup-font));
+  height: calc(15px * var(--popup-font));
+  display: block;
+}
+
+/* The stop square takes the speaker's place while its text is being read, so
+   which side is playing is never something the reader has to remember. */
+.say .glyph-stop,
+.say[data-state="on"] .glyph-speak {
+  display: none;
 }
 
 .say[data-state="on"] {
-  border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.say[data-state="on"] .glyph-stop {
+  display: block;
+}
+
+.say[data-state="failed"] {
+  color: var(--g-bad);
 }
 
 /* Conversion of a unit or an amount of money the reader would not use. */
@@ -463,7 +527,7 @@ body.dragging .card {
 
 .units-title {
   color: var(--muted);
-  font-size: calc(10px * var(--popup-font));
+  font-size: calc(10.5px * var(--popup-font));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -503,7 +567,7 @@ body.dragging .card {
   padding-top: 8px;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: calc(10.5px * var(--popup-font));
+  font-size: calc(11.5px * var(--popup-font));
 }
 
 /* Why the answer did not come from the service that was asked first. */
@@ -560,6 +624,7 @@ body.dragging .card {
 
 .error .message {
   color: var(--g-bad);
+  font-weight: 600;
 }
 
 .ghost-button {
@@ -572,12 +637,25 @@ body.dragging .card {
   font: inherit;
   font-size: calc(12px * var(--popup-font));
   cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .ghost-button:hover {
   background: var(--bg-soft);
+  color: var(--fg);
 }
 
 body[data-state="loading"] .content {
   padding-top: 13px;
+}
+
+/* Last in the file on purpose: these rules disable animations declared above,
+   and an override of equal specificity only wins by coming later. */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card::before,
+  .skeleton span {
+    animation: none;
+  }
 }

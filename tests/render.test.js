@@ -24,7 +24,7 @@ test("the module exports the render helpers the windows rely on", () => {
   assert.equal(typeof Glossy.languageName, "function");
   assert.equal(typeof Glossy.errorMessage, "function");
   assert.ok(Array.isArray(Array.from(Glossy.languageCodes)));
-  for (const name of ["loading", "error", "result", "clear"]) {
+  for (const name of ["loading", "error", "result", "clear", "stopSpeaking"]) {
     assert.equal(typeof Glossy.render[name], "function", `${name} is missing`);
   }
 });
@@ -162,7 +162,8 @@ test("result never renders the original for a word", () => {
 test("result shows the empty-translation text when nothing came back", () => {
   const node = target();
   Glossy.render.result(node, { kind: "sentence", translation: "   " });
-  assert.equal(findByClass(node, "translation").textContent, "No translation returned.");
+  const line = findByClass(node, "translation empty");
+  assert.equal(line.textContent, "No translation returned.");
   assert.equal(findByClass(node, "phonetic"), null);
   assert.equal(findByClass(node, "foot"), null);
 });
@@ -170,8 +171,11 @@ test("result shows the empty-translation text when nothing came back", () => {
 test("result survives a missing or null payload", () => {
   const node = target();
   Glossy.render.result(node, null);
-  assert.equal(findByClass(node, "translation").textContent, "No translation returned.");
-  assert.deepEqual(classesOf(node), ["translation"]);
+  assert.equal(
+    findByClass(node, "translation empty").textContent,
+    "No translation returned.",
+  );
+  assert.deepEqual(classesOf(node), ["translation empty"]);
 });
 
 test("result wraps a bare phonetic in slashes and keeps an existing wrapper", () => {
@@ -510,13 +514,14 @@ test("loading replaces the target with a busy skeleton of three bars", () => {
   assert.ok(skeleton.childNodes.every((child) => child.tagName === "SPAN"));
 });
 
-test("error shows the message and a retry button that calls back", () => {
+test("error shows the localized headline over the raw detail and a retry button that calls back", () => {
   const node = target();
   let clicks = 0;
   Glossy.render.error(node, "Network is down", () => {
     clicks += 1;
   });
-  assert.equal(findByClass(node, "message").textContent, "Network is down");
+  assert.equal(findByClass(node, "message").textContent, "Translation failed.");
+  assert.equal(findByClass(node, "note").textContent, "Network is down");
   const retry = findByClass(node, "ghost-button");
   assert.equal(retry.textContent, "Try again");
   assert.equal(retry.type, "button");
@@ -531,6 +536,13 @@ test("error falls back to the failure text and hides retry without a callback", 
   assert.equal(findByClass(node, "ghost-button"), null);
   Glossy.render.error(node, "boom", "not a function");
   assert.equal(findByClass(node, "ghost-button"), null);
+});
+
+test("error never repeats the headline as its own detail", () => {
+  const node = target();
+  Glossy.render.error(node, "Translation failed.", () => {});
+  assert.equal(findByClass(node, "message").textContent, "Translation failed.");
+  assert.equal(findByClass(node, "note"), null);
 });
 
 test("error localizes its retry label", () => {
@@ -673,16 +685,162 @@ test("result draws a pronunciation button for each side of the card", () => {
   const says = findByClass(node, "says");
   const buttons = says.childNodes;
   assert.equal(buttons.length, 2);
-  assert.equal(buttons[0].textContent, "Read the original out loud");
+  // The buttons are icons, so the label lives on the accessible name instead of
+  // on the face of the button.
+  assert.equal(buttons[0].textContent, "");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Read the original out loud");
+  assert.equal(buttons[0].getAttribute("title"), "Read the original out loud");
+  assert.equal(buttons[0].getAttribute("aria-pressed"), "false");
+  assert.ok(buttons[0].innerHTML.includes("glyph-speak"));
+  assert.ok(buttons[0].innerHTML.includes("glyph-stop"));
   assert.equal(buttons[0].getAttribute("data-say"), "render.speakOriginal");
   assert.equal(buttons[1].getAttribute("data-say"), "render.speakTranslation");
+  assert.equal(buttons[1].getAttribute("aria-label"), "Read the translation out loud");
   assert.equal(buttons[0].type, "button");
+});
+
+test("the pronunciation buttons come after the rest of the card", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    sourceText: "Hello.",
+    provider: "Baidu",
+  });
+  const classes = classesOf(node);
+  assert.ok(classes.indexOf("foot") < classes.indexOf("says"));
+  assert.equal(classes[classes.length - 1], "say");
 });
 
 test("a card with nothing to read out has no pronunciation buttons", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "", sourceText: "" });
   assert.equal(findByClass(node, "says"), null);
+});
+
+/** An environment whose backend answers the way the test tells it to. */
+function backend(invoke) {
+  const fresh = newEnv();
+  fresh.Glossy.invoke = invoke;
+  return fresh;
+}
+
+/** A sentence card in its own environment, answered with its own buttons. */
+function cardButtons(fresh) {
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(node, {
+    kind: "sentence",
+    sourceText: "Hello there.",
+    translation: "你好。",
+    sourceLang: "en",
+    targetLang: "zh-CN",
+  });
+  return findByClass(node, "says").childNodes;
+}
+
+test("pressing a pronunciation button reads that side out loud", () => {
+  const calls = [];
+  const fresh = backend((command, payload) => {
+    calls.push({ command, payload });
+    return Promise.resolve(command === "speaking");
+  });
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+
+  const said = calls.filter((call) => call.command === "say");
+  assert.equal(said.length, 1);
+  assert.equal(said[0].payload.text, "Hello there.");
+  assert.equal(said[0].payload.language, "en");
+  assert.equal(buttons[0].dataset.state, "on");
+  assert.equal(buttons[0].getAttribute("aria-pressed"), "true");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Stop reading");
+  // The buttons read in the same order they sit in, so the second one is the
+  // translation's.
+  assert.notEqual(buttons[1].dataset.state, "on");
+});
+
+test("pressing the button that is reading stops it instead of starting over", () => {
+  const calls = [];
+  const fresh = backend((command) => {
+    calls.push(command);
+    return Promise.resolve(command === "speaking");
+  });
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+  buttons[0].dispatch("click");
+
+  assert.deepEqual(calls, ["stop_speaking", "say", "stop_speaking"]);
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[0].getAttribute("aria-pressed"), "false");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Read the original out loud");
+});
+
+test("reading the other side of the card takes the highlight with it", () => {
+  const fresh = backend((command) => Promise.resolve(command === "speaking"));
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+  buttons[1].dispatch("click");
+
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[1].dataset.state, "on");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Read the original out loud");
+  assert.equal(buttons[1].getAttribute("aria-label"), "Stop reading");
+});
+
+test("the button goes back to rest once the voice falls silent", async () => {
+  let busy = true;
+  const fresh = backend((command) => Promise.resolve(command === "speaking" ? busy : undefined));
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+  assert.equal(fresh.timers.intervals(), 1);
+
+  await fresh.timers.fire();
+  assert.equal(buttons[0].dataset.state, "on");
+
+  busy = false;
+  await fresh.timers.fire();
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Read the original out loud");
+  assert.equal(fresh.timers.intervals(), 0);
+});
+
+test("a reading that cannot start says so on its button", async () => {
+  const fresh = backend((command) =>
+    command === "say" ? Promise.reject(new Error("no voice")) : Promise.resolve(true),
+  );
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+  await Promise.resolve();
+  await Promise.resolve();
+
+  assert.equal(buttons[0].dataset.state, "failed");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Could not read this out loud");
+  assert.equal(buttons[0].getAttribute("data-say"), "render.speakOriginal");
+  assert.equal(fresh.timers.intervals(), 0);
+});
+
+test("a card that is replaced stops the reading behind it", () => {
+  const calls = [];
+  const fresh = backend((command) => {
+    calls.push(command);
+    return Promise.resolve(command === "speaking");
+  });
+  const buttons = cardButtons(fresh);
+
+  buttons[0].dispatch("click");
+  fresh.Glossy.render.result(fresh.document.createElement("div"), {
+    kind: "sentence",
+    translation: "Hello.",
+  });
+
+  assert.equal(calls[calls.length - 1], "stop_speaking");
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(fresh.timers.intervals(), 0);
 });
 
 test("result names the service that answered after a fallback", () => {
