@@ -323,7 +323,7 @@ node --test                                                          # 181 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 191 Rust tests
+cargo test --locked                                                  # 192 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -423,7 +423,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 191 tests; see "Checks" above for lint and format runs
+cargo test   # 192 tests; see "Checks" above for lint and format runs
 ```
 
 ### Content Security Policy
@@ -691,7 +691,7 @@ node --test                                                          # 181 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 191 Rust tests
+cargo test --locked                                                  # 192 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -775,7 +775,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 191 tests; see "Checks" above for lint and format runs
+cargo test   # 192 tests; see "Checks" above for lint and format runs
 ```
 
 ### 内容安全策略
@@ -1207,7 +1207,7 @@ node --test                                                          # 181 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 191 Rust tests
+cargo test --locked                                                  # 192 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1314,7 +1314,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 191 tests; see "Checks" above for lint and format runs
+cargo test   # 192 tests; see "Checks" above for lint and format runs
 ```
 
 ### Política de seguridad de contenido

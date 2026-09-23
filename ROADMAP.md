@@ -14,7 +14,7 @@ the milestone is closed and the tag is pushed.
 | --- | --- |
 | Version | `1.2.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~20,300 lines: ~10,800 Rust, ~5,750 frontend (plain HTML/CSS/JS), ~1,400 frontend test lines and ~2,400 in `server/`, comments included |
-| Tests | 191 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Tests | 192 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
 | Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. No code signing yet, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
@@ -251,7 +251,7 @@ rather than investing in it early.
 | --- | --- |
 | 版本 | `1.2.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
 | 规模 | 约 20,300 行：Rust 约 10,800 行，前端约 5,750 行（纯 HTML/CSS/JS），前端测试约 1,400 行，`server/` 约 2,400 行，含注释 |
-| 测试 | Rust 191 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
+| 测试 | Rust 192 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
 | 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。尚无代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
