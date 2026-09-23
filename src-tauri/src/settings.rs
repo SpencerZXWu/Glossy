@@ -236,7 +236,7 @@ pub fn stored_ui_language() -> UiLanguage {
 pub fn resolve_ui_language(preference: UiLanguage) -> UiLanguage {
     match preference {
         UiLanguage::System => {
-            if crate::platform::user_locale()
+            if crate::platform::desktop::user_locale()
                 .to_lowercase()
                 .starts_with("zh")
             {
@@ -362,7 +362,7 @@ where
 }
 
 fn default_target_lang() -> String {
-    let locale = crate::platform::user_locale();
+    let locale = crate::platform::desktop::user_locale();
     let lower = locale.to_ascii_lowercase();
     if lower.starts_with("zh") {
         if lower.contains("tw") || lower.contains("hk") || lower.contains("hant") {
@@ -730,11 +730,11 @@ impl Settings {
                 if value.is_empty() {
                     continue;
                 }
-                if !crate::secrets::is_protected(value) {
+                if !crate::platform::secrets::is_protected(value) {
                     rewrite = true;
                     continue;
                 }
-                match crate::secrets::reveal(value) {
+                match crate::platform::secrets::reveal(value) {
                     Some(plain) => *value = plain,
                     None => {
                         eprintln!(
@@ -755,10 +755,10 @@ impl Settings {
         let mut stored = self.clone();
         for (provider, credentials) in stored.credentials.iter_mut() {
             for (field, value) in credential_fields(credentials) {
-                if value.is_empty() || crate::secrets::is_protected(value) {
+                if value.is_empty() || crate::platform::secrets::is_protected(value) {
                     continue;
                 }
-                match crate::secrets::protect(value) {
+                match crate::platform::secrets::protect(value) {
                     Ok(protected) => *value = protected,
                     // Storing the key unprotected beats losing it; DPAPI is part
                     // of Windows, so this only happens in a broken environment.
@@ -1158,7 +1158,7 @@ mod tests {
         let stored = settings.protected_for_storage();
 
         let written = &stored.credentials.get("deepl").unwrap().api_key;
-        assert!(crate::secrets::is_protected(written));
+        assert!(crate::platform::secrets::is_protected(written));
         assert!(!serde_json::to_string(&stored)
             .unwrap()
             .contains("sk-secret"));
@@ -1181,7 +1181,7 @@ mod tests {
         // Which is what makes `load` rewrite the file.
         assert!(settings.reveal_credentials());
         assert_eq!(settings.active_credentials().api_key, "sk-old");
-        assert!(crate::secrets::is_protected(
+        assert!(crate::platform::secrets::is_protected(
             &settings
                 .protected_for_storage()
                 .credentials
@@ -1197,7 +1197,7 @@ mod tests {
         let raw = "{\"provider\":\"deepl\",\"credentials\":{\"deepl\":\
                    {\"apiKey\":\"dpapi:bm90IGEgYmxvYg==\"}}}";
         let mut settings = Settings::parse(raw);
-        assert!(crate::secrets::is_protected(
+        assert!(crate::platform::secrets::is_protected(
             &settings.active_credentials().api_key
         ));
 

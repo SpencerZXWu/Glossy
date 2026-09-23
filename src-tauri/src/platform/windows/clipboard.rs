@@ -314,7 +314,7 @@ pub fn capture_selection(restore: bool) -> Capture {
     // not be mistaken for the answer to this copy.
     let own = OWN_SEQUENCE.load(Ordering::Relaxed);
 
-    crate::input::send_copy();
+    super::input::send_copy();
 
     let deadline = Instant::now() + Duration::from_millis(700);
     let mut changed = false;

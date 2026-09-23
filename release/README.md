@@ -10,16 +10,19 @@ Staging area for the files that get uploaded to
 ```
 release/
   v0.1.0/
-    Glossy_0.1.0_x64-setup.exe   the NSIS installer — the release asset
-    RELEASE_NOTES.md             paste into the release description (EN · 中文 · ES)
-    SHA256SUMS.txt               checksum of the installer
+    Glossy_0.1.0_x64-setup.exe        the NSIS installer
+    Glossy_0.1.0_x64_en-US.msi        the same application as an MSI package
+    Glossy_0.1.0_x64_portable.zip     unpack and run; nothing to install
+    RELEASE_NOTES.md                  paste into the release description (EN · 中文 · ES)
+    SHA256SUMS.txt                    checksum of all three artefacts
 ```
 
-Installers are **git-ignored** (`release/**/*.exe` and friends), so one 1.8 MB binary
-per version never accumulates in the repository history — the uploaded asset is the
-published one. The notes and checksums stay tracked so the description of every
-release is versioned alongside the code; the two translations in `RELEASE_NOTES.md`
-are the one thing here that is written by hand rather than produced by the script.
+Installers and packages are **git-ignored** (`release/**/*.exe`, `*.msi`, `*.zip` and
+friends), so one 1.8 MB binary per version never accumulates in the repository history —
+the uploaded asset is the published one. The notes and checksums stay tracked so the
+description of every release is versioned alongside the code; the two translations in
+`RELEASE_NOTES.md` are the one thing here that is written by hand rather than produced
+by the script.
 
 ## Producing a release
 
@@ -32,8 +35,11 @@ powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild   # re-s
 default execution policy on this machine — the same reason the README uses `npm.cmd`.
 
 The script takes the version from `scripts/version.ps1 -Get` and stops a running Glossy
-(the linker cannot replace `glossy.exe` while it is loaded), builds the NSIS bundle and
-stages it under `release/v<version>/`. `RELEASE_NOTES.md` is written in three languages
+(the linker cannot replace `glossy.exe` while it is loaded), builds the NSIS and MSI
+bundles, packs the portable zip from the release binary and the `WebView2Loader.dll`
+next to it, and stages all three under `release/v<version>/`. A bundle target that
+produced no file stops the script rather than staging an incomplete set: the NSIS
+installer and the MSI are both mandatory. `RELEASE_NOTES.md` is written in three languages
 unless the file is already there, so notes written by hand survive; `-ForceNotes`
 regenerates them and resets the translations.
 
@@ -93,15 +99,17 @@ without one.
 3. Create the release on GitHub for that tag. The tag keeps the `v`, the release title
    does not: it is `Glossy X.Y.Z`, never `Glossy vX.Y.Z`. Paste `RELEASE_NOTES.md`
    into the description, all three languages and the anchor links included.
-4. Attach the installer and `SHA256SUMS.txt`. The installer has to be the one **this
-   version staged**, whose file name carries the version, and `SHA256SUMS.txt` is
-   generated from that same file — a mismatched pair means the wrong build is going
+4. Attach the installer, the MSI, the portable zip and `SHA256SUMS.txt`, and say in the
+   description which download suits whom. Every artefact has to be the one **this
+   version staged**, its file name has to carry the version, and `SHA256SUMS.txt` is
+   generated from those same files — a mismatched pair means the wrong build is going
    out. v0.3.1 was published with v0.3.0's installer attached, which is how a release
    shipped without the fixes it described.
 
-The GNU build links `WebView2Loader.dll` dynamically, so an installer that does not
-carry it produces an app that dies on launch with "WebView2Loader.dll was not found".
-`scripts/release.ps1` stops before staging when the DLL is not in `src-tauri/resources/`
-or the generated `installer.nsi` does not install it.
+The GNU build links `WebView2Loader.dll` dynamically, so a release that does not carry it
+produces an app that dies on launch with "WebView2Loader.dll was not found".
+`scripts/release.ps1` stops before staging when the DLL is not in `src-tauri/resources/`,
+when the generated `installer.nsi` does not install it, or when the portable archive would
+be packed without it.
 
 Versions and their acceptance criteria are in [../ROADMAP.md](../ROADMAP.md).

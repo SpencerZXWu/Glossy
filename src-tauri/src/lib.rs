@@ -3,22 +3,15 @@
 
 mod autostart;
 mod classify;
-mod clipboard;
-pub mod console;
 mod context;
 mod history;
-mod hotkey;
-mod input;
-mod instance;
 mod lang;
 mod morphology;
 mod notice;
-mod platform;
+pub mod platform;
 mod popup;
-mod secrets;
 mod selection;
 mod settings;
-mod speech;
 mod state;
 mod surface;
 mod text;
@@ -91,7 +84,7 @@ fn save_settings(
         popup::hide(&app);
     }
     // The accelerator lives on the hook thread, which re-reads it on demand.
-    hotkey::request_reload();
+    platform::hotkey::request_reload();
     let _ = app.emit("glossy://settings", settings.clone());
     let _ = app.emit("glossy://history", ());
     Ok(settings)
@@ -254,7 +247,7 @@ async fn history_reopen(
         let settings = state.settings();
         attach_conversions(&app, &settings, &mut result).await;
     }
-    let (x, y) = platform::cursor_pos();
+    let (x, y) = platform::desktop::cursor_pos();
     popup::reveal_result(&app, &state, result, (x as f64, y as f64));
     Ok(())
 }
@@ -263,7 +256,7 @@ async fn history_reopen(
 /// pane uses this to exercise the popup without a global text selection.
 #[tauri::command]
 fn show_popup(app: AppHandle, state: State<'_, Arc<AppState>>, text: String) {
-    let (x, y) = platform::cursor_pos();
+    let (x, y) = platform::desktop::cursor_pos();
     // The demo pane stands in for a selection, so there is no program in front
     // to read a sentence out of.
     popup::reveal(&app, &state, text, None, (x as f64, y as f64));
@@ -313,7 +306,7 @@ fn popup_set_pinned(pinned: bool) {
 
 #[tauri::command]
 fn copy_text(text: String) -> bool {
-    clipboard::copy_to_clipboard(&text)
+    platform::clipboard::copy_to_clipboard(&text)
 }
 
 /// Reads text out loud, using the voices Windows already has.
@@ -327,20 +320,20 @@ fn say(
     language: Option<String>,
 ) -> Result<(), String> {
     let rate = state.settings().speech_rate;
-    speech::speak(&text, rate, language.as_deref())
+    platform::speech::speak(&text, rate, language.as_deref())
 }
 
 /// Stops the reading that is in progress, if any.
 #[tauri::command]
 fn stop_speaking() {
-    speech::stop();
+    platform::speech::stop();
 }
 
 /// Whether the voice is reading something out loud right now, which the card
 /// polls to know when its pronunciation buttons should go back to rest.
 #[tauri::command]
 fn speaking() -> bool {
-    speech::is_speaking()
+    platform::speech::is_speaking()
 }
 
 /// The translation service the settings currently name.
@@ -380,12 +373,12 @@ fn set_service(
 /// What the clipboard holds, for the paste button of the settings window.
 #[tauri::command]
 fn read_clipboard() -> String {
-    clipboard::read_text().unwrap_or_default()
+    platform::clipboard::read_text().unwrap_or_default()
 }
 
 #[tauri::command]
 fn capture_status(state: State<'_, Arc<AppState>>) -> CaptureStatus {
-    let (hotkey, hotkey_error) = hotkey::status();
+    let (hotkey, hotkey_error) = platform::hotkey::status();
     CaptureStatus {
         hooked: state.hooked.load(std::sync::atomic::Ordering::Relaxed),
         error: state.hook_error.lock().ok().and_then(|guard| guard.clone()),
@@ -407,7 +400,7 @@ struct RunningApp {
 /// Programs the user can pick from for the "never translate here" list.
 #[tauri::command]
 fn running_apps() -> Vec<RunningApp> {
-    platform::visible_apps()
+    platform::desktop::visible_apps()
         .into_iter()
         .map(|(name, title)| RunningApp { name, title })
         .collect()
@@ -437,17 +430,17 @@ fn show_launch_surface(handle: &AppHandle) {
 
 pub fn run() {
     // Two instances would install two mouse hooks and race over one popup.
-    let _guard = match instance::claim() {
-        instance::Claim::First(guard) => Some(Arc::new(guard)),
-        instance::Claim::Taken => {
+    let _guard = match platform::instance::claim() {
+        platform::instance::Claim::First(guard) => Some(Arc::new(guard)),
+        platform::instance::Claim::Taken => {
             // The running instance answers by showing what a start of its own
             // shows; only a launch nobody answers has to speak for itself.
-            if !instance::announce_launch() {
-                instance::report_already_running();
+            if !platform::instance::announce_launch() {
+                platform::instance::report_already_running();
             }
             return;
         }
-        instance::Claim::Unavailable => None,
+        platform::instance::Claim::Unavailable => None,
     };
     // A later launch reaches this process through the guard, so the watcher
     // needs a handle on it that outlives `run`.
@@ -504,7 +497,9 @@ pub fn run() {
                 // Without WS_EX_NOACTIVATE the popup would steal the focus of
                 // the application the user is reading in.
                 if let Ok(hwnd) = popup.hwnd() {
-                    platform::make_non_activating(platform::Handle(hwnd.0 as isize));
+                    platform::desktop::make_non_activating(platform::desktop::Handle(
+                        hwnd.0 as isize,
+                    ));
                 }
             }
 
@@ -514,7 +509,9 @@ pub fn run() {
                 // Clicking the hint must not pull the focus out of whatever the
                 // user is doing while it is on screen.
                 if let Ok(hwnd) = hint.hwnd() {
-                    platform::make_non_activating(platform::Handle(hwnd.0 as isize));
+                    platform::desktop::make_non_activating(platform::desktop::Handle(
+                        hwnd.0 as isize,
+                    ));
                 }
             }
 

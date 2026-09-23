@@ -2,19 +2,13 @@
 //!
 //! A dictionary entry answers what a word means, but not what it means *here*.
 //! The sentence the user selected the word from is read out of the program in
-//! front with UI Automation, which browsers, Word and most readers support; a
-//! program that does not offer it (a terminal, a canvas application) simply
-//! gets no context line. The paragraph UI Automation returns is then narrowed
-//! to one sentence locally, which is the part that is worth testing.
+//! front with UI Automation — [`crate::platform::uia`] does the reading, this
+//! module decides what to do with it: a program that offers no text (a
+//! terminal, a canvas application) simply gets no context line, and the
+//! paragraph that comes back is narrowed to one sentence locally, which is the
+//! part worth testing.
 
-use windows::core::BSTR;
-use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
-};
-use windows::Win32::UI::Accessibility::{
-    CUIAutomation8, IUIAutomation, IUIAutomationTextPattern, IUIAutomationTextRange,
-    IUIAutomationTextRangeArray, TextUnit_Line, TextUnit_Paragraph, UIA_TextPatternId,
-};
+use crate::platform::uia::{self, Unit};
 
 /// The longest context the card shows; an enclosing unit that turns out to be
 /// the whole document is replaced by its line instead.
@@ -22,48 +16,14 @@ const MAX_CONTEXT: usize = 400;
 
 /// The sentence around `selected`, when the program in front can be read.
 pub fn sentence(selected: &str) -> Option<String> {
-    let paragraph = focused_text(TextUnit_Paragraph)?;
+    let paragraph = uia::text_of(Unit::Paragraph)?;
     // A provider that does not know paragraph units answers with everything it
     // has, which the line around the selection narrows down again.
     if paragraph.chars().count() > MAX_CONTEXT {
-        let line = focused_text(TextUnit_Line).unwrap_or(paragraph);
+        let line = uia::text_of(Unit::Line).unwrap_or(paragraph);
         return sentence_in(&line, selected);
     }
     sentence_in(&paragraph, selected)
-}
-
-/// Reads the enclosing unit of the current selection.
-fn focused_text(unit: windows::Win32::UI::Accessibility::TextUnit) -> Option<String> {
-    // UI Automation needs COM, and the caller is a worker thread that has not
-    // initialised it yet.
-    let started = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
-    let text = unsafe { read_enclosing(unit) };
-    if started {
-        unsafe { CoUninitialize() };
-    }
-    text
-}
-
-unsafe fn read_enclosing(unit: windows::Win32::UI::Accessibility::TextUnit) -> Option<String> {
-    let automation: IUIAutomation = CoCreateInstance(&CUIAutomation8, None, CLSCTX_ALL).ok()?;
-    let element = automation.GetFocusedElement().ok()?;
-    let pattern: IUIAutomationTextPattern = element.GetCurrentPatternAs(UIA_TextPatternId).ok()?;
-    let ranges: IUIAutomationTextRangeArray = pattern.GetSelection().ok()?;
-    let range = ranges.GetElement(0).ok()?;
-    let text = expand(&range, unit)?;
-    (!text.trim().is_empty()).then_some(text)
-}
-
-/// Expands a copy of `range` to the unit around it and returns its text.
-unsafe fn expand(
-    range: &IUIAutomationTextRange,
-    unit: windows::Win32::UI::Accessibility::TextUnit,
-) -> Option<String> {
-    // The range is expanded in place, so the caller keeps the original.
-    let range = range.clone();
-    range.ExpandToEnclosingUnit(unit).ok()?;
-    let text: BSTR = range.GetText(-1).ok()?;
-    Some(text.to_string())
 }
 
 /// True for the characters that end a sentence.

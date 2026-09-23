@@ -1,7 +1,10 @@
-//! Thin wrappers around the Win32 APIs Glossy needs (locale, cursor, monitor and
-//! window geometry, non activating window styles).
+//! What the desktop looks like: the cursor, the monitors, the window under a
+//! point, the program in front and the user's locale, plus the window styles
+//! that keep the popup out of the way.
 
 use std::ffi::c_void;
+
+use crate::platform::ScreenRect;
 
 use windows::core::{BOOL, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT};
@@ -14,10 +17,10 @@ use windows::Win32::System::Threading::{
     PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
-    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-    SetWindowLongPtrW, WindowFromPoint, GA_PARENT, GA_ROOT, GWL_EXSTYLE, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW,
+    EnumChildWindows, EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow,
+    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+    IsWindowVisible, SetWindowLongPtrW, WindowFromPoint, GA_PARENT, GA_ROOT, GA_ROOTOWNER,
+    GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 
 /// Native handle of a window, kept as a plain integer so callers never have to
@@ -32,22 +35,6 @@ impl Handle {
 
     pub fn is_null(self) -> bool {
         self.0 == 0
-    }
-}
-
-/// Region of the desktop: `(left, top, right, bottom)` in physical pixels.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ScreenRect {
-    pub left: i32,
-    pub top: i32,
-    pub right: i32,
-    pub bottom: i32,
-}
-
-impl ScreenRect {
-    /// True when the point falls inside the rectangle, grown by `pad` pixels.
-    pub fn contains_padded(self, x: i32, y: i32, pad: i32) -> bool {
-        x >= self.left - pad && x < self.right + pad && y >= self.top - pad && y < self.bottom + pad
     }
 }
 
@@ -107,6 +94,101 @@ pub fn process_under_point(x: i32, y: i32) -> Option<String> {
         // Child windows belong to the top level window the user sees.
         let root = GetAncestor(window, GA_ROOT);
         process_name_of_window(if root.0.is_null() { window } else { root })
+    }
+}
+
+/// Process id of the window under `(x, y)`, `None` when there is no window.
+///
+/// The list of a `<select>` is drawn by the browser process of the webview, a
+/// program of ours that owns no window of ours, so the process is what tells it
+/// apart from the program behind us.
+pub fn process_id_under_point(x: i32, y: i32) -> Option<u32> {
+    unsafe {
+        let window = WindowFromPoint(POINT { x, y });
+        if window.0.is_null() {
+            return None;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(window, Some(&mut pid));
+        if pid == 0 {
+            None
+        } else {
+            Some(pid)
+        }
+    }
+}
+
+/// Process id of the first child of `parent` that is not our own process.
+///
+/// A webview window is drawn by a separate browser process, which is a child of
+/// ours and the process that opens the list of a `<select>`.
+pub fn child_process_id(parent: Handle) -> Option<u32> {
+    if parent.is_null() {
+        return None;
+    }
+    let mut found = 0u32;
+    unsafe {
+        let _ = EnumChildWindows(
+            Some(parent.to_hwnd()),
+            Some(collect_child_process),
+            LPARAM(&mut found as *mut u32 as isize),
+        );
+    }
+    if found == 0 {
+        None
+    } else {
+        Some(found)
+    }
+}
+
+unsafe extern "system" fn collect_child_process(child: HWND, lparam: LPARAM) -> BOOL {
+    unsafe {
+        let slot = &mut *(lparam.0 as *mut u32);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(child, Some(&mut pid));
+        if pid != 0 && pid != GetCurrentProcessId() {
+            *slot = pid;
+            return BOOL(0);
+        }
+        BOOL(1)
+    }
+}
+
+/// True when the window under `(x, y)` belongs to `root`.
+///
+/// The desktop draws parts of a window somewhere else: the list of a `<select>`
+/// is a popup window of its own, owned by a window of the webview that opened
+/// it, and a long list reaches past the edges of the window it belongs to.
+/// Walking the owner chain is what tells a click there apart from a click on
+/// the program behind us.
+pub fn owns_point(root: Handle, x: i32, y: i32) -> bool {
+    if root.is_null() {
+        return false;
+    }
+    unsafe {
+        let window = WindowFromPoint(POINT { x, y });
+        if window.0.is_null() {
+            return false;
+        }
+        root_owner_of(window).0 == root.to_hwnd().0
+    }
+}
+
+/// Top level window that answers for `window`.
+///
+/// The owner of a popup hangs off the top level window, the one carrying the
+/// owner is only reached by walking up the parent chain first: the point asks
+/// for the deepest window under it, a render widget several levels down.
+unsafe fn root_owner_of(window: HWND) -> HWND {
+    unsafe {
+        let top = GetAncestor(window, GA_ROOT);
+        let top = if top.0.is_null() { window } else { top };
+        let owner = GetAncestor(top, GA_ROOTOWNER);
+        if owner.0.is_null() {
+            top
+        } else {
+            owner
+        }
     }
 }
 
@@ -391,5 +473,11 @@ mod tests {
             &chain(&["Edit", "Notepad", "#32769"])
         ));
         assert!(!chain_reaches_shell(HWND::default(), &chain(&["Edit"])));
+    }
+
+    #[test]
+    fn a_window_without_a_handle_owns_nothing() {
+        assert!(!owns_point(Handle::default(), 0, 0));
+        assert!(child_process_id(Handle::default()).is_none());
     }
 }

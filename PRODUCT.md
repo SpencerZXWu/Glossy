@@ -47,11 +47,16 @@ truthfully copy.
 
 ## Operating Context
 
-- Windows 11 x64. The installer is `Glossy_<version>_x64-setup.exe`; it is not
+- Windows 11 x64. Three downloads: `Glossy_<version>_x64-setup.exe` (the installer),
+  `Glossy_<version>_x64_en-US.msi` (the same application as an MSI package) and
+  `Glossy_<version>_x64_portable.zip` (unpack and run, nothing to install). None is
   code-signed yet, so SmartScreen warns about an unknown publisher. WebView2 is
   required and ships with current Windows builds.
 - Tauri v2 shell, WebView2, HTML/CSS/JS renderer in `src/`, Rust in `src-tauri/`,
-  and a Cloudflare Worker deployment in `server/`.
+  and a Cloudflare Worker deployment in `server/`. The backend is Windows-only:
+  everything that talks to Win32 sits in `src-tauri/src/platform/windows/` behind
+  the neutral surface in `src-tauri/src/platform/mod.rs`, and a build for another
+  operating system stops with a message pointing at that layer.
 - Glossy lives in the notification area. The first launch opens the settings
   window; later launches start quietly and are announced by a card in the bottom
   right that fades away. Closing the window does not quit Glossy — **Quit** in
@@ -94,8 +99,11 @@ truthfully copy.
   translation, start with Windows, the drag and double-click gestures, clipboard
   restore, showing the original, unit conversion, the reading options (source
   sentence, sentence pairing, compact card), the fallback order, and the hotkey.
-- Open decision: macOS and Linux support is an intention, not a commitment.
-  Nothing has been designed or built for either.
+- Open decision: macOS and Linux support is an intention, not a commitment. The
+  abstraction layer a port would be written against exists, and the packaging
+  matrix covers x64; no macOS or Linux code has been written, ARM64 needs a
+  toolchain the project does not currently build with, and the code signing that
+  would silence SmartScreen is still outstanding.
 
 ## Brand Commitments
 
@@ -105,7 +113,7 @@ truthfully copy.
 - Documentation is trilingual (English, 简体中文, Español) and that coverage is
   expected to continue.
 - There is no account and no login, and no key for the user to fill in.
-- The Windows installer is published unsigned, together with a checksum.
+- The Windows downloads are published unsigned, together with a checksum.
 
 ## Evidence on Hand
 
@@ -113,9 +121,9 @@ truthfully copy.
   providers and quotas, troubleshooting, how the selection is captured, layout,
   development and the manual regression checklist.
 - `ROADMAP.md` and `CHANGELOG.md` — delivered work and planned work, per version.
-- `release/v1.0.2/`, `release/v1.1.0/`, `release/v1.1.1/` and `release/v1.1.2/` — the
-  shipped release notes and checksums.
-- The automated suites: 177 frontend tests and 189 Rust tests at v1.1.2.
+- `release/v1.0.2/`, `release/v1.1.0/`, `release/v1.1.1/`, `release/v1.1.2/` and
+  `release/v1.2.0/` — the shipped release notes and checksums.
+- The automated suites: 181 frontend tests and 191 Rust tests at v1.2.0.
 - Absent, and not to be invented: there are no screenshots or recordings of the
   product, no testimonials, no user research and no benchmarks.
 

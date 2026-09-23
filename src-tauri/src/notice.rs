@@ -80,9 +80,9 @@ pub fn show(app: &AppHandle) {
     let Some(window) = window(app) else {
         return;
     };
-    let (cursor_x, cursor_y) = platform::cursor_pos();
-    let area = platform::work_area_for_point(cursor_x, cursor_y)
-        .or_else(|| platform::work_area_for_point(0, 0));
+    let (cursor_x, cursor_y) = platform::desktop::cursor_pos();
+    let area = platform::desktop::work_area_for_point(cursor_x, cursor_y)
+        .or_else(|| platform::desktop::work_area_for_point(0, 0));
     // The work area and the window position are physical pixels while the
     // margin and the fallback size are CSS pixels: on a display that is not at
     // 100% they only agree after this conversion.

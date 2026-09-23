@@ -6,11 +6,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
-## [Unreleased]
+## [1.2.0] - 2026-09-22
 
-The hint that announces a background start belongs to the backend now, so a second start of
-Glossy no longer leaves it stranded over whatever is on screen, and the labels that only ever
-reached a screen reader in English follow the interface language like everything else.
+Windows is no longer the operating system of the whole backend: every call into Win32 now
+lives behind one dispatch layer, so a port has a single place to stand. The window content
+is governed by an explicit Content Security Policy instead of none, and a release ships
+three ways — the installer, an MSI package and a portable zip. macOS and Linux are still
+ahead (`src/platform/mod.rs` refuses to compile anywhere but Windows), and this release
+deliberately stops at the interface those ports will be built against.
+
+### Added
+
+- **The platform layer.** `src/platform/mod.rs` publishes what the rest of the backend is
+  allowed to assume about an operating system — without a screen, `ScreenRect` and its
+  padded hit test — and dispatches to `src/platform/windows/`, which holds the ten modules
+  that talk to Win32: `clipboard`, `console`, `desktop`, `hotkey`, `input`, `input_hook`,
+  `instance`, `secrets`, `speech` and `uia`. A target that is not Windows fails to compile
+  with a message pointing at the layer instead of failing to link. No module in it leaks a
+  `windows` type through its public surface: the low-level mouse hook reports a
+  `Click { pressed, x, y }`, the window handle travels as an `isize`, and the accessibility
+  text read for a word's sentence is asked for as a `Unit::Line` or `Unit::Paragraph`.
+- **An MSI package and a portable zip, next to the installer.** `bundle.targets` builds
+  NSIS and MSI, and `scripts/release.ps1` stages both, then packs
+  `Glossy_<version>_x64_portable.zip` — the release binary and the `WebView2Loader.dll` the
+  GNU toolchain links against, with nothing to install — and checksums all three. A build
+  that names MSI in its targets but produces no MSI fails the release instead of staging
+  two files out of three.
+
+### Security
+
+- **The content is behind a policy now.** `app.security.csp` was `null`, which let the
+  window load anything a script asked for. It is an explicit whitelist: `default-src`,
+  `script-src`, `style-src` and `font-src` are `'self'`, images may add `data:`, and
+  `object-src`, `frame-src` and `form-action` are closed. The frontend loads no remote
+  script, style, font or image, so nothing had to be widened for it — verified in the
+  running app by reading each window's console, where a deliberate remote `fetch` is
+  refused and nothing this app loads is.
+
+### Changed
+
+- **The backend's OS-bound modules moved under `src/platform/windows/`.** `clipboard.rs`,
+  `console.rs`, `hotkey.rs`, `input.rs`, `instance.rs`, `secrets.rs`, `speech.rs` and
+  `platform.rs` (now `desktop.rs`) were moved, not rewritten, so the behaviour of a
+  selection is the same one as before. What they exported is reached through the layer
+  now: `platform::clipboard`, `platform::hotkey`, `platform::speech`, `platform::instance`
+  and `platform::desktop` from the window setup, the popup, the hint, the settings and the
+  console borrow. The mouse hook itself was split: the thread, the message loop and the
+  callback plumbing live in `platform::windows::input_hook`, and the click chain that
+  decides what a gesture meant stays in `selection.rs`, where it can be tested without a
+  screen.
+- **`windows` and `window-vibrancy` are Windows-only dependencies.** `Cargo.toml` declares
+  them under `[target.'cfg(windows)'.dependencies]`, so the tree a port starts from does
+  not contain them at all.
+- **The screenshot-shaped parts still inside the Windows modules are named as debt.** The
+  hotkey's key parsing, the speech queue, `secrets::is_protected`, `context::sentence_in`
+  and the click chain in `selection.rs` are portable but still sit in OS-bound files; the
+  capability table in `src/platform/mod.rs` says so, and the roadmap records it.
 
 ### Fixed
 
@@ -31,6 +82,15 @@ reached a screen reader in English follow the interface language like everything
   its own brackets at one program. `ignored.count` and `source.count` are stored as
   `key.one` and `key.other` and read through the new `i18n.plural`, so a single item says
   `1 program ignored.` The Chinese text is unchanged.
+- **Choosing a language no longer takes the card away.** The list of a language selector is
+  a window of its own, drawn by the browser process of the webview and taller than the card,
+  so pressing an entry fell outside the card's edges: the mouse hook read it as a click on
+  the program behind Glossy and dismissed the card mid-choice. A click now also belongs to
+  the card when the window under it hangs off one of the card's windows or is drawn by the
+  process that draws the card, so the entries are pressed normally and only a click that
+  really lands elsewhere closes the card. `platform::desktop::owns_point` walks the owner
+  chain from the top level window down, `child_process_id` finds the browser process behind
+  the card, and `popup::owns_point` remembers both when the card is placed.
 
 ## [1.1.2] - 2026-09-22
 
@@ -667,7 +727,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/SpencerZXWu/Glossy/compare/v1.0.2...v1.1.0

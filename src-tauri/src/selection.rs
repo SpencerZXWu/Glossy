@@ -1,8 +1,11 @@
-//! Global low level mouse hook driving the "select text -> translate" flow.
+//! What a click means, driving the "select text -> translate" flow.
 //!
-//! The hook callback itself must stay extremely cheap: Windows silently
-//! removes hooks that block for too long. It therefore only records click
-//! coordinates and forwards a decision to a worker thread over a channel.
+//! [`crate::platform::input_hook`] reports raw left button events and this
+//! module decides what they meant: whether the click landed on one of Glossy's
+//! own cards, whether it was the second click of a double click, whether it
+//! dragged. The work that follows — capture the selection, translate it, show
+//! the card — is handed to a worker thread over a channel, because the hook
+//! that delivered the click must stay cheap.
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -12,18 +15,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExW, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL,
-    WM_LBUTTONDOWN, WM_LBUTTONUP,
-};
 
 use crate::classify;
-use crate::clipboard::{self, Capture};
 use crate::context;
-use crate::hotkey;
 use crate::notice;
 use crate::platform;
+use crate::platform::clipboard::{self, Capture};
+use crate::platform::hotkey;
+use crate::platform::input_hook::Click;
 use crate::popup;
 use crate::settings::{self, Settings};
 use crate::state::AppState;
@@ -122,9 +121,11 @@ struct Down {
 /// True when the point lands on one of Glossy's own floating cards.
 ///
 /// Clicks and drags there belong to the card, not to the program the user is
-/// reading in, so they must never start a translation.
+/// reading in, so they must never start a translation. The card's own windows
+/// count as well, which is what keeps the list of a `<select>` from turning a
+/// press on one of its entries into a translation of whatever lies behind it.
 fn on_overlay(x: i32, y: i32) -> bool {
-    popup::contains(x, y) || notice::contains(x, y)
+    popup::contains(x, y) || popup::owns_point(x, y) || notice::contains(x, y)
 }
 
 fn now_ms() -> u128 {
@@ -140,77 +141,70 @@ fn send(event: HookEvent) {
     }
 }
 
-unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if code >= 0 {
-        let message = wparam.0 as u32;
-        if message == WM_LBUTTONDOWN || message == WM_LBUTTONUP {
-            let info = unsafe { &*(lparam.0 as *const MSLLHOOKSTRUCT) };
-            let (x, y) = (info.pt.x, info.pt.y);
-            TRACKER.with(|tracker| {
-                let mut tracker = match tracker.try_borrow_mut() {
-                    Ok(guard) => guard,
-                    Err(_) => return,
-                };
-                match message {
-                    WM_LBUTTONDOWN => {
-                        let now = now_ms();
-                        let repeated = tracker.last_click.is_some_and(|(lx, ly, lt)| {
-                            now.saturating_sub(lt) <= DOUBLE_CLICK_MS
-                                && (x - lx).abs() <= DOUBLE_CLICK_SLOP
-                                && (y - ly).abs() <= DOUBLE_CLICK_SLOP
-                        });
-                        tracker.last_click = Some((x, y, now));
-                        tracker.down = Some(Down {
-                            x,
-                            y,
-                            inside_overlay: on_overlay(x, y),
-                            repeated,
-                        });
-                        send(HookEvent::ButtonDown { x, y });
-                    }
-                    _ => {
-                        // A pick request swallows the click it was armed for.
-                        if take_pick() {
-                            tracker.down = None;
-                            tracker.last_click = None;
-                            send(HookEvent::Pick { x, y });
-                            return;
-                        }
-                        let Some(down) = tracker.down.take() else {
-                            return;
-                        };
-                        // A drag that started on one of our own cards (the popup
-                        // header, the start hint) or that ends on one must never
-                        // trigger a translation.
-                        if down.inside_overlay || on_overlay(x, y) {
-                            return;
-                        }
-                        let moved = (x - down.x).abs().max((y - down.y).abs());
-                        let trigger = if down.repeated {
-                            Some(Trigger::DoubleClick)
-                        } else if moved >= DRAG_MIN_PX {
-                            Some(Trigger::Drag)
-                        } else {
-                            None
-                        };
-                        if moved >= DRAG_MIN_PX {
-                            tracker.last_click = None;
-                        } else {
-                            tracker.last_click = Some((x, y, now_ms()));
-                        }
-                        if let Some(trigger) = trigger {
-                            send(HookEvent::ButtonUp { x, y, trigger });
-                        }
-                    }
-                }
+/// Decides what one left button event means and forwards the outcome.
+///
+/// Called on the hook thread, so it stays short: the click chain is tracked in
+/// a thread local and the decision is sent to the worker thread.
+fn handle_click(click: Click) {
+    let (x, y) = (click.x, click.y);
+    TRACKER.with(|tracker| {
+        let mut tracker = match tracker.try_borrow_mut() {
+            Ok(guard) => guard,
+            Err(_) => return,
+        };
+        if click.pressed {
+            let now = now_ms();
+            let repeated = tracker.last_click.is_some_and(|(lx, ly, lt)| {
+                now.saturating_sub(lt) <= DOUBLE_CLICK_MS
+                    && (x - lx).abs() <= DOUBLE_CLICK_SLOP
+                    && (y - ly).abs() <= DOUBLE_CLICK_SLOP
             });
+            tracker.last_click = Some((x, y, now));
+            tracker.down = Some(Down {
+                x,
+                y,
+                inside_overlay: on_overlay(x, y),
+                repeated,
+            });
+            send(HookEvent::ButtonDown { x, y });
+        } else {
+            // A pick request swallows the click it was armed for.
+            if take_pick() {
+                tracker.down = None;
+                tracker.last_click = None;
+                send(HookEvent::Pick { x, y });
+                return;
+            }
+            let Some(down) = tracker.down.take() else {
+                return;
+            };
+            // A drag that started on one of our own cards (the popup header,
+            // the start hint) or that ends on one must never trigger a
+            // translation.
+            if down.inside_overlay || on_overlay(x, y) {
+                return;
+            }
+            let moved = (x - down.x).abs().max((y - down.y).abs());
+            let trigger = if down.repeated {
+                Some(Trigger::DoubleClick)
+            } else if moved >= DRAG_MIN_PX {
+                Some(Trigger::Drag)
+            } else {
+                None
+            };
+            if moved >= DRAG_MIN_PX {
+                tracker.last_click = None;
+            } else {
+                tracker.last_click = Some((x, y, now_ms()));
+            }
+            if let Some(trigger) = trigger {
+                send(HookEvent::ButtonUp { x, y, trigger });
+            }
         }
-    }
-
-    unsafe { CallNextHookEx(None, code, wparam, lparam) }
+    });
 }
 
-/// Installs the hook and starts the worker thread that performs the capture.
+/// Starts the hook thread and the worker thread that performs the capture.
 ///
 /// Returns immediately; hook failures are recorded in `AppState::hook_error`.
 pub fn install(app: AppHandle, state: Arc<AppState>) {
@@ -223,36 +217,29 @@ pub fn install(app: AppHandle, state: Arc<AppState>) {
     let worker_state = Arc::clone(&state);
     std::thread::spawn(move || worker(worker_app, worker_state, rx));
 
-    std::thread::spawn(move || unsafe {
-        // The handle is kept alive for the lifetime of the message loop.
-        let _hook = match SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), None, 0) {
-            Ok(hook) => hook,
-            Err(error) => {
-                state.set_hook_error(format!("could not install the mouse hook: {error}"));
-                return;
-            }
+    std::thread::spawn(move || {
+        let reload_app = app.clone();
+        let reload_state = Arc::clone(&state);
+        let on_reload = move || {
+            // The first call means the hook is live; it is also what registers
+            // the accelerator, and every later call re-registers it after a
+            // settings change.
+            reload_state.hooked.store(true, Ordering::Relaxed);
+            hotkey::reload(&reload_state);
+            let _ = reload_app.emit("glossy://status", ());
         };
 
-        state.hooked.store(true, Ordering::Relaxed);
+        let fire_app = app.clone();
+        let fire_state = Arc::clone(&state);
+        let on_fire = move || {
+            // Never block: the hook has to stay responsive.
+            let app = fire_app.clone();
+            let state = Arc::clone(&fire_state);
+            std::thread::spawn(move || on_hotkey(&app, &state));
+        };
 
-        // Hotkeys are delivered to the thread that registered them, so the
-        // accelerator shares this message loop with the hook.
-        hotkey::register_loop_thread();
-        hotkey::reload(&state);
-        let _ = app.emit("glossy://status", ());
-
-        let mut message = MSG::default();
-        // A message loop is required for low level hooks to be delivered.
-        while GetMessageW(&mut message, None, 0, 0).as_bool() {
-            if message.message == hotkey::WM_RELOAD {
-                hotkey::reload(&state);
-                let _ = app.emit("glossy://status", ());
-            } else if hotkey::is_hotkey_message(message.message, message.wParam.0) {
-                // Never block: the hook has to stay responsive.
-                let hotkey_app = app.clone();
-                let hotkey_state = Arc::clone(&state);
-                std::thread::spawn(move || on_hotkey(&hotkey_app, &hotkey_state));
-            }
+        if let Err(error) = platform::input_hook::run(handle_click, on_reload, on_fire) {
+            state.set_hook_error(error);
         }
     });
 }
@@ -269,7 +256,10 @@ fn worker(app: AppHandle, state: Arc<AppState>, rx: Receiver<HookEvent>) {
         };
         match event {
             HookEvent::ButtonDown { x, y } => {
-                if popup::dismisses_click(x, y) {
+                // A click on the list of a language dropdown counts as a click
+                // on the card: the list reaches past the card's edges, so the
+                // position alone would call it a click on the program behind.
+                if popup::dismisses_click(x, y) && !popup::owns_point(x, y) {
                     popup::hide(&app);
                 }
             }
@@ -339,7 +329,7 @@ fn settle_click_chain(
 /// Reports the program the user clicked on while the pick mode was armed.
 fn on_pick(app: &AppHandle, x: i32, y: i32) {
     let picked = PickedApp {
-        name: platform::process_under_point(x, y),
+        name: platform::desktop::process_under_point(x, y),
     };
     let _ = app.emit("glossy://picked-app", picked);
 }
@@ -350,7 +340,7 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
         return;
     }
     // Selections made inside our own windows are handled by the webview.
-    if platform::foreground_is_self() {
+    if platform::desktop::foreground_is_self() {
         return;
     }
     if is_ignored(&settings) {
@@ -359,12 +349,12 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     // A double click on the desktop, the taskbar or the start menu selects no
     // text at all, and the Ctrl+C sent right after only copies whatever the
     // clipboard happened to hold.
-    if platform::shell_surface_at(x, y) {
+    if platform::desktop::shell_surface_at(x, y) {
         return;
     }
     // The click can also hand the foreground to the desktop while the icon stays
     // selected, so check where the copy would land as well.
-    if platform::copy_target_is_shell() {
+    if platform::desktop::copy_target_is_shell() {
         return;
     }
 
@@ -413,7 +403,7 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
     }
     // The hotkey is pressed inside another program, so there is nothing to do
     // when one of our own windows is in front or the program is ignored.
-    if platform::foreground_is_self() {
+    if platform::desktop::foreground_is_self() {
         return;
     }
     if is_ignored(&settings) {
@@ -433,7 +423,7 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
         return;
     }
 
-    let (x, y) = platform::cursor_pos();
+    let (x, y) = platform::desktop::cursor_pos();
     let context = enclosing_sentence(&settings, &text);
     popup::reveal(app, state, text, context, (x as f64, y as f64));
 }
@@ -464,7 +454,7 @@ fn is_ignored(settings: &Settings) -> bool {
     if settings.ignored_apps.is_empty() {
         return false;
     }
-    platform::foreground_process_name()
+    platform::desktop::foreground_process_name()
         .is_some_and(|process| settings::ignores_process(&settings.ignored_apps, &process))
 }
 
@@ -655,5 +645,52 @@ mod tests {
             preferred_text(Capture::NoResponse, Some("  \n ".to_string())),
             None
         );
+    }
+
+    /// The click tracker is a thread local and [`handle_click`] reports through
+    /// the channel the app installs at startup, so this one test owns that
+    /// channel and walks the whole chain: a click that selects nothing, a drag,
+    /// and the second click of a double click.
+    #[test]
+    fn the_hook_reports_a_click_a_drag_and_a_double_click() {
+        let (tx, rx) = channel::<HookEvent>();
+        let _ = EVENT_TX.set(tx);
+
+        let click = |pressed: bool, x: i32, y: i32| handle_click(Click { pressed, x, y });
+        let next = || rx.try_recv().expect("an event was reported");
+
+        // A click that never moved selects nothing.
+        click(true, 10, 10);
+        assert!(matches!(next(), HookEvent::ButtonDown { x: 10, y: 10 }));
+        click(false, 10, 10);
+        assert!(rx.try_recv().is_err());
+
+        // Press, move, release is a drag.
+        click(true, 500, 500);
+        assert!(matches!(next(), HookEvent::ButtonDown { x: 500, y: 500 }));
+        click(false, 540, 500);
+        assert!(matches!(
+            next(),
+            HookEvent::ButtonUp {
+                trigger: Trigger::Drag,
+                ..
+            }
+        ));
+
+        // The second click of a double click reports the word under the cursor.
+        click(true, 500, 500);
+        assert!(matches!(next(), HookEvent::ButtonDown { x: 500, y: 500 }));
+        click(false, 500, 500);
+        assert!(rx.try_recv().is_err());
+        click(true, 500, 500);
+        assert!(matches!(next(), HookEvent::ButtonDown { x: 500, y: 500 }));
+        click(false, 500, 500);
+        assert!(matches!(
+            next(),
+            HookEvent::ButtonUp {
+                trigger: Trigger::DoubleClick,
+                ..
+            }
+        ));
     }
 }

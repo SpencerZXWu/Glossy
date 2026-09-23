@@ -12,13 +12,13 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.0.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~15,700 lines: ~8,300 Rust, ~4,600 frontend (plain HTML/CSS/JS), ~1,000 frontend test lines and ~1,900 in `server/`, comments included |
-| Tests | 160 Rust tests, 155 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
-| Platform | Windows only — no `cfg(target_os)` gating, the `windows` crate is used unconditionally |
-| Distribution | NSIS installer only; no code signing, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
+| Version | `1.2.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~20,300 lines: ~10,800 Rust, ~5,750 frontend (plain HTML/CSS/JS), ~1,400 frontend test lines and ~2,400 in `server/`, comments included |
+| Tests | 191 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
+| Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. No code signing yet, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
-| Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.0.1` tagged and published with its NSIS installer, and the staged installer kept in `release/vX.Y.Z/` |
+| Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.2.0` tagged and published with its NSIS installer, and the staged installers kept in `release/vX.Y.Z/` |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
@@ -146,16 +146,24 @@ Estimated effort: 6–10 days.
 
 Goal: leave Windows behind and stop being flagged by SmartScreen.
 
-| Work item | Details |
-| --- | --- |
-| Platform abstraction | Move the direct Win32 calls in `input.rs`, `platform.rs`, `clipboard.rs` and `hotkey.rs` behind `platform/windows.rs` with `cfg(target_os)` dispatch. This is a prerequisite — there is no gating today |
-| macOS | Selection capture through the Accessibility API with a permission onboarding flow; the popup becomes an `NSPanel` that does not take focus; signing and notarisation |
-| Linux | X11 first, where the `PRIMARY` selection maps naturally onto select-to-translate. On Wayland the global hook is not available, so it is documented as an unsupported combination rather than silently failing |
-| Code signing | Azure Trusted Signing or an EV certificate, so a fresh install no longer shows a SmartScreen warning |
-| Packaging matrix | NSIS, MSI and a portable zip; x64 and ARM64 |
-| Content Security Policy | `tauri.conf.json` sets `"csp": null` today; replace it with an explicit whitelist (the frontend loads no remote scripts, so this is cheap) |
+| Work item | Details | Status |
+| --- | --- | --- |
+| Platform abstraction | Move the direct Win32 calls behind one dispatch layer, so a port has a single place to stand | done — `src/platform/mod.rs` publishes what the rest of the backend may assume about an operating system, `src/platform/windows/` holds the ten modules that talk to Win32, and any other target fails to compile with a message pointing at the layer |
+| Packaging matrix | NSIS, MSI and a portable zip; x64 and ARM64 | partly done — the installer, the MSI and `Glossy_<version>_x64_portable.zip` are built, staged and checksummed by `scripts/release.ps1`; ARM64 needs an MSVC toolchain and this machine has only the GNU one, so it moves to the release that has it |
+| Content Security Policy | `tauri.conf.json` carried `"csp": null`; replace it with an explicit whitelist | done — `default-src`, `script-src`, `style-src` and `font-src` at `'self'`, images may add `data:`, and `object-src`, `frame-src`, `frame-ancestors`, `base-uri` and `form-action` are closed. The frontend loads nothing remote, so nothing had to be widened; verified in the running app, where a deliberate remote `fetch` is refused and everything the app itself loads is not |
+| macOS | Selection capture through the Accessibility API with a permission onboarding flow; the popup becomes an `NSPanel` that does not take focus; signing and notarisation | deferred — the interface it will be written against is in place, but no macOS code exists, because none of it could be compiled or run here |
+| Linux | X11 first, where the `PRIMARY` selection maps naturally onto select-to-translate. On Wayland the global hook is not available, so it is documented as an unsupported combination rather than silently failing | deferred, at the maintainer's request |
+| Code signing | Azure Trusted Signing or an EV certificate, so a fresh install no longer shows a SmartScreen warning | deferred — the installer and the MSI are still unsigned |
 
-Estimated effort: 8–15 days.
+What the release leaves behind: the OS-bound modules were moved, not rewritten, so the
+behaviour of a selection is the one it had before, and the split is not finished. The
+hotkey's key parsing, the speech queue, `secrets::is_protected`, `context::sentence_in`
+and the click chain in `selection.rs` are portable and still sit in Windows files.
+`src/platform/mod.rs` names each of them where it belongs; moving one is a
+self-contained change with tests already around it.
+
+Estimated effort: 8–15 days, of which the abstraction, the packaging matrix and the
+policy are done.
 
 ## v2.0.0 — Format freeze and the long-run promises
 
@@ -174,10 +182,12 @@ Estimated effort: 5–10 days.
 ## Priority
 
 When time is short, the order of return on effort is: **provider fallback in
-v1.1.0 → the settings window rework → v1.2.0**.
-Cross-platform support is the only item large enough that it may never be finished,
-so it is deliberately scheduled last; decide on it after v1.1.0 rather than investing
-in it early.
+v1.1.0 → the settings window rework → the rest of v1.2.0**.
+The abstraction layer, the packaging matrix and the Content Security Policy are in the
+tree, so what is left of v1.2.0 is the part that cannot be finished on this machine:
+macOS, Linux, ARM64 and code signing. Cross-platform support is the only item large
+enough that it may never be finished, so decide on it after the settings window rework
+rather than investing in it early.
 
 ## Risks
 
@@ -185,10 +195,11 @@ in it early.
 | --- | --- | --- |
 | The Google endpoint is unofficial | It can start rate-limiting or change protocol at any time, and its terms of use are unclear | A retry across two clients already lives in `google.rs`; provider fallback in v1.1.0 is the real fix |
 | A currency rate service changes shape or goes down | An amount in the card loses its conversion | Two independent sources (exchangerate-api.com, and the ECB through `frankfurter.app`), a six-hour memory and disk cache, a stale table that stays usable for seven days and is labelled as such, and a two-minute quiet period after both fail |
-| Antivirus flags the low-level mouse hook | Installs and runs get blocked | Code signing in v1.2.0, plus a README section explaining what the hook does and why |
-| macOS and Linux permission models | The port costs more than expected | Kept as its own release, X11 first, Wayland explicitly unsupported |
+| Antivirus flags the low-level mouse hook | Installs and runs get blocked | The README's note on the hook says what it does and why it is needed; code signing, which is what actually removes the warning, slipped out of v1.2.0 and is still the mitigation |
+| The portable zip is assembled outside Tauri | Tauri has no zip target, so the archive is packed by script, and an archive that loses `WebView2Loader.dll` unpacks into an app that cannot start | `scripts/release.ps1` stages the release binary and the loader together, puts both at the archive root, and checksums the archive next to the installers |
+| macOS and Linux permission models | The port costs more than expected | The contract is in place: a non-Windows target fails to compile and names the layer, so the port starts from one file. X11 first, Wayland explicitly unsupported |
 | Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
-| Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer itself is still built locally by `scripts/release.ps1`, and a tagged release workflow is the next step |
+| Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer, the MSI and the portable zip are still built locally by `scripts/release.ps1`, which fails rather than staging an incomplete set, and a tagged release workflow is the next step |
 
 ## Release process
 
@@ -196,9 +207,11 @@ in it early.
    `powershell -ExecutionPolicy Bypass -File scripts/version.ps1 -Set X.Y.Z` writes all
    six locations, and `-Check` lists any that drifted apart.
 2. `cargo test`, the frontend tests and CI all pass.
-3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` builds the installer
-   and stages it in `release/vX.Y.Z/` with `SHA256SUMS.txt` and the text for the
-   release description. The notes it writes are trilingual: English from
+3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` builds the installer,
+   the MSI and the portable zip, and stages all three in `release/vX.Y.Z/` with
+   `SHA256SUMS.txt` and the text for the release description. It stops if a build was
+   asked for a bundle target and produced none, and it verifies that the portable archive
+   carries the loader the binary needs. The notes it writes are trilingual: English from
    `CHANGELOG.md`, then the same text translated into Chinese and Spanish, each behind
    an anchor (`<a id="en">`, `<a id="zh-cn">`, `<a id="es">`) that the links at the top
    jump to, so one file serves all three languages. A freshly generated file still
@@ -208,11 +221,12 @@ in it early.
 4. Tag `vX.Y.Z` on `main` and push the tag.
 5. Publish a GitHub release at that tag, titled `Glossy X.Y.Z` — the tag carries the
    `v`, the title does not. Paste `release/vX.Y.Z/RELEASE_NOTES.md` into the
-   description - all three languages, anchors included - and attach the installer
-   together with the checksum. Check that the installer is the one this version staged,
-   that its name carries the version, and that `SHA256SUMS.txt` lists it: v0.3.1 went
-   out with v0.3.0's installer attached, so the release did not contain the fixes the
-   notes described.
+   description - all three languages, anchors included - and attach the installer, the
+   MSI, the portable zip and the checksum. Check that each artefact is the one this
+   version staged, that its name carries the version, and that `SHA256SUMS.txt` lists
+   it, and say in the description which download suits whom: v0.3.1 went out with
+   v0.3.0's installer attached, so the release did not contain the fixes the notes
+   described.
 6. From v0.2.0 on, the release also serves as the auto-update feed.
 
 ## What is explicitly out of scope
@@ -235,13 +249,13 @@ in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.0.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
-| 规模 | 约 15,700 行：Rust 约 8,300 行，前端约 4,600 行（纯 HTML/CSS/JS），前端测试约 1,000 行，`server/` 约 1,900 行，含注释 |
-| 测试 | Rust 160 个测试、前端 155 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
-| 平台 | 仅 Windows —— 没有 `cfg(target_os)` 分支，`windows` crate 无条件使用 |
-| 分发 | 只有 NSIS 安装包；没有代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
+| 版本 | `1.2.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 规模 | 约 20,300 行：Rust 约 10,800 行，前端约 5,750 行（纯 HTML/CSS/JS），前端测试约 1,400 行，`server/` 约 2,400 行，含注释 |
+| 测试 | Rust 191 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
+| 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
+| 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。尚无代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
-| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.0.1` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
+| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.2.0` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
 
 下面的计划里没有遗留缺陷。最后一个 —— API 密钥以明文躺在
 `%APPDATA%\com.glossy.translator\settings.json` 里 —— 由 v0.2.0 的第一项修复，
@@ -362,16 +376,22 @@ in it early.
 
 目标：走出 Windows，并且不再被 SmartScreen 拦下。
 
-| 工作项 | 细节 |
-| --- | --- |
-| 平台抽象 | 把 `input.rs`、`platform.rs`、`clipboard.rs` 和 `hotkey.rs` 里直接调用的 Win32 挪到 `platform/windows.rs` 之后，用 `cfg(target_os)` 分派。这是前置条件 —— 目前完全没有分派 |
-| macOS | 通过 Accessibility API 捕捉选区，并配一个权限引导流程；弹窗改为不抢焦点的 `NSPanel`；签名与公证 |
-| Linux | 先做 X11，那里的 `PRIMARY` 选区天然对应“划词翻译”。Wayland 上没有全局钩子，因此明确记为不支持的组合，而不是悄悄失效 |
-| 代码签名 | Azure Trusted Signing 或 EV 证书，让全新安装不再弹 SmartScreen 警告 |
-| 打包矩阵 | NSIS、MSI 和便携 zip；x64 与 ARM64 |
-| 内容安全策略 | `tauri.conf.json` 目前是 `"csp": null`；换成显式白名单（前端不加载任何远程脚本，所以这一步很便宜） |
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 平台抽象 | 把直接调用的 Win32 挪到一层分派之后，让移植只需要面对一个地方 | 完成 —— `src/platform/mod.rs` 声明后端可以假设操作系统的哪些能力，`src/platform/windows/` 收拢十个与 Win32 打交道的模块，其他目标会编译失败并提示去看这一层 |
+| 打包矩阵 | NSIS、MSI 和便携 zip；x64 与 ARM64 | 部分完成 —— 安装包、MSI 和 `Glossy_<version>_x64_portable.zip` 都由 `scripts/release.ps1` 构建、暂存并计算校验和；ARM64 需要 MSVC 工具链，而本机只有 GNU 工具链，因此挪到装好它的那一版 |
+| 内容安全策略 | `tauri.conf.json` 原本是 `"csp": null`，换成显式白名单 | 完成 —— `default-src`、`script-src`、`style-src`、`font-src` 均为 `'self'`，图片可额外用 `data:`，并关闭 `object-src`、`frame-src`、`frame-ancestors`、`base-uri` 和 `form-action`。前端不加载任何远程内容，所以无需放宽；已在运行中的应用里验证：刻意发起的远程 `fetch` 被拒绝，而应用自身加载的东西没有被拒 |
+| macOS | 通过 Accessibility API 捕捉选区，并配一个权限引导流程；弹窗改为不抢焦点的 `NSPanel`；签名与公证 | 推迟 —— 它将要针对的那套接口已经就位，但没有写任何 macOS 代码，因为在这里既编译不了也跑不起来 |
+| Linux | 先做 X11，那里的 `PRIMARY` 选区天然对应“划词翻译”。Wayland 上没有全局钩子，因此明确记为不支持的组合，而不是悄悄失效 | 推迟，按维护者的要求 |
+| 代码签名 | Azure Trusted Signing 或 EV 证书，让全新安装不再弹 SmartScreen 警告 | 推迟 —— 安装包和 MSI 仍未签名 |
 
-预计工作量：8–15 天。
+这次发布留下的是：与操作系统绑定的模块是被“搬走”而不是重写的，所以划词的行为和
+以前一致，而拆分并没有做完。热键的按键解析、朗读队列、`secrets::is_protected`、
+`context::sentence_in`，以及 `selection.rs` 里的点击判定链，都是可移植的，却仍然
+待在 Windows 文件里。`src/platform/mod.rs` 在哪一处就标注哪一处；搬走其中一个是
+自成一体的改动，周围已有测试。
+
+预计工作量：8–15 天，其中抽象层、打包矩阵与安全策略已经完成。
 
 ## v2.0.0 —— 格式冻结与长期承诺
 
@@ -390,9 +410,10 @@ in it early.
 ## 优先级
 
 时间紧张时，投入产出比的顺序是：**v1.1.0 的服务商回退 → 设置窗口重做 →
-v1.2.0**。
-跨平台是大到可能永远做不完的一项，所以它有意排在最后；在 v1.1.0 之后再决定要不要
-做，而不是提前投入。
+v1.2.0 的剩余部分**。
+抽象层、打包矩阵和安全策略都已在代码库里，所以 v1.2.0 剩下的是在这台机器上做不完
+的部分：macOS、Linux、ARM64 和代码签名。跨平台是大到可能永远做不完的一项，所以等
+设置窗口重做之后再决定要不要做，而不是提前投入。
 
 ## 风险
 
@@ -400,10 +421,11 @@ v1.2.0**。
 | --- | --- | --- |
 | Google 接口并非官方 | 它随时可能开始限流或改变协议，使用条款也不清晰 | `google.rs` 里已有跨两个客户端的重试；v1.1.0 的服务商回退才是真正的解法 |
 | 汇率服务改结构或宕机 | 卡片里的金额失去换算 | 两个独立来源（exchangerate-api.com，以及通过 `frankfurter.app` 的欧洲央行），六小时的内存与磁盘缓存，过期表在七天内仍可用并明确标注，以及两者都失败后的两分钟静默期 |
-| 杀毒软件拦截底层鼠标钩子 | 安装与运行被阻止 | v1.2.0 的代码签名，外加 README 里一节说明这个钩子做什么、为什么需要 |
-| macOS 与 Linux 的权限模型 | 移植成本超出预期 | 保持为独立版本，先 X11，明确不支持 Wayland |
+| 杀毒软件拦截底层鼠标钩子 | 安装与运行被阻止 | README 里关于钩子的那节说明了它做什么、为什么需要；真正能消掉警告的代码签名没能进入 v1.2.0，仍然有待完成 |
+| 便携 zip 由 Tauri 之外拼装 | Tauri 没有 zip 目标，压缩包由脚本打包；一旦丢掉 `WebView2Loader.dll`，解压出来就是一个起不来的应用 | `scripts/release.ps1` 把发布二进制和这个 DLL 一起暂存、都放在压缩包根目录，并把该压缩包与安装包一起算校验和 |
+| macOS 与 Linux 的权限模型 | 移植成本超出预期 | 约定已经就位：非 Windows 目标会编译失败并点名那一层，移植只需从一个文件开始。先 X11，明确不支持 Wayland |
 | 凭据泄露 | 磁盘上有可读的 API 密钥 | v0.2.0 已修复：密钥用 DPAPI 加密，在输入它们的 Windows 登录之外不可读 |
-| 手工构建的发布 | 安装包无法复现 | 自 v0.1.1 起版本检查、格式、lint 和测试都在 CI 里跑；安装包本身仍由 `scripts/release.ps1` 在本地构建，带标签的发布工作流是下一步 |
+| 手工构建的发布 | 安装包无法复现 | 自 v0.1.1 起版本检查、格式、lint 和测试都在 CI 里跑；安装包、MSI 与便携 zip 仍由 `scripts/release.ps1` 在本地构建，产物不全时它会直接失败，带标签的发布工作流是下一步 |
 
 ## 发布流程
 
@@ -411,18 +433,20 @@ v1.2.0**。
    `powershell -ExecutionPolicy Bypass -File scripts/version.ps1 -Set X.Y.Z` 会写入全部
    六个位置，`-Check` 会列出任何走样的位置。
 2. `cargo test`、前端测试和 CI 全部通过。
-3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` 构建安装包，并把
-   它暂存到 `release/vX.Y.Z/`，附上 `SHA256SUMS.txt` 和发布说明文本。它写出的说明
-   是三语的：英文取自 `CHANGELOG.md`，随后是同一段文字的中文和西班牙文译版，各自
-   带一个锚点（`<a id="en">`、`<a id="zh-cn">`、`<a id="es">`），顶部链接跳转到这些
-   锚点，因此一个文件服务三种语言。新生成的文件里译文还是占位符，脚本会就此警告；
-   发布前需手工写好两份译文（拿 Google Translate 起稿即可）。
+3. `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` 构建安装包、MSI 和
+   便携 zip，把三者一并暂存到 `release/vX.Y.Z/`，附上 `SHA256SUMS.txt` 和发布说明
+   文本。如果某个打包目标被写进了配置却没产出产物，它会直接停下；它也会检查便携
+   压缩包里是否带着二进制需要的那个 DLL。它写出的说明是三语的：英文取自
+   `CHANGELOG.md`，随后是同一段文字的中文和西班牙文译版，各自带一个锚点
+   （`<a id="en">`、`<a id="zh-cn">`、`<a id="es">`），顶部链接跳转到这些锚点，
+   因此一个文件服务三种语言。新生成的文件里译文还是占位符，脚本会就此警告；发布前
+   需手工写好两份译文（拿 Google Translate 起稿即可）。
 4. 在 `main` 上打 `vX.Y.Z` 标签并推送该标签。
 5. 在该标签处发布 GitHub release，标题为 `Glossy X.Y.Z` —— 标签带 `v`，标题不带。
    把 `release/vX.Y.Z/RELEASE_NOTES.md` 粘进描述 —— 三种语言、锚点一并保留 —— 并
-   上传安装包与校验和。确认安装包正是本版本暂存的那个、文件名带版本号、且
-   `SHA256SUMS.txt` 里列出了它：v0.3.1 发布时附上的却是 v0.3.0 的安装包，于是发布里
-   并不包含说明所描述的修复。
+   上传安装包、MSI、便携 zip 与校验和。确认每个产物都正是本版本暂存的那个、文件名
+   带版本号、且 `SHA256SUMS.txt` 里列出了它，并在描述里说明哪个下载适合谁：v0.3.1
+   发布时附上的却是 v0.3.0 的安装包，于是发布里并不包含说明所描述的修复。
 6. 从 v0.2.0 起，发布同时充当自动更新的更新源。
 
 ## 明确不在范围内

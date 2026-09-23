@@ -29,13 +29,21 @@ translation under the cursor.
 
 ## Install
 
-Download the latest installer from
-[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest)
-(`Glossy_<version>_x64-setup.exe`) and run it. Windows 11 x64; WebView2 is
-required and ships with current Windows builds.
+Download the latest release from
+[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest) and pick the
+one that suits you:
 
-The installer is not code-signed yet, so SmartScreen warns about an unknown
-publisher. To build from source instead, see [Development](#development).
+| Download | What it is |
+| --- | --- |
+| `Glossy_<version>_x64-setup.exe` | The installer, and the one to use if you want the automatic update to work. Registers Glossy in **Installed apps**, so it can be uninstalled the usual way |
+| `Glossy_<version>_x64_en-US.msi` | The same application as an MSI package, for anyone deploying it with a policy or an installer script |
+| `Glossy_<version>_x64_portable.zip` | Nothing to install: unpack it anywhere and run `glossy.exe` from that folder. Keep `WebView2Loader.dll` beside it, and note that start with Windows remembers the folder you unpacked to, so leave it where it is |
+
+Windows 11 x64; WebView2 is required and ships with current Windows builds. The
+`SHA256SUMS.txt` in the same release lists the hashes of all three.
+
+None of them is code-signed yet, so SmartScreen warns about an unknown publisher.
+To build from source instead, see [Development](#development).
 
 ## Using it
 
@@ -284,17 +292,24 @@ rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --comp
 rustup default stable-x86_64-pc-windows-gnu
 npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
-npm.cmd run tauri build  # release build (installer + .exe)
+npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
 
 `npm.cmd run icon` regenerates `src-tauri/icons` from `assets/`.
 
-`npm.cmd run tauri build` writes the installer to
-`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe` and the
-standalone binary to `src-tauri\target\release\Glossy.exe`. The NSIS bundler needs
-a network connection the first time it runs, to download its plug-ins.
+`npm.cmd run tauri build` writes the NSIS installer to
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe`, the MSI to
+`src-tauri\target\release\bundle\msi\Glossy_<version>_x64_en-US.msi` and the
+standalone binary to `src-tauri\target\release\Glossy.exe`. Both bundlers need a
+network connection the first time they run, to download their tooling — WiX for the
+MSI, NSIS plug-ins for the installer — into `%LOCALAPPDATA%\tauri`.
 
-`scripts\release.ps1` wraps the release build: it stages the installer in
+The portable zip is not a Tauri target, since Tauri has none: `scripts\release.ps1`
+packs it from the release binary and the `WebView2Loader.dll` that sits next to it
+and that the GNU build loads at run time.
+
+`scripts\release.ps1` wraps the release build: it builds and stages the installer,
+the MSI and the portable zip in
 `release\v<version>\` together with a checksum and the text for the release
 description. Run it as `powershell -ExecutionPolicy Bypass -File
 scripts\release.ps1` — scripts are blocked by the default execution policy, the same
@@ -304,11 +319,11 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 181 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 189 Rust tests
+cargo test --locked                                                  # 191 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -408,8 +423,28 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 196 tests; see "Checks" above for lint and format runs
+cargo test   # 191 tests; see "Checks" above for lint and format runs
 ```
+
+### Content Security Policy
+
+`app.security.csp` in `src-tauri/tauri.conf.json` is an explicit whitelist rather
+than `null`:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'none';
+object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none';
+form-action 'none'
+```
+
+The windows load nothing remote — no CDN, no remote font, no remote image — so a
+page that tries to reach the network is refused. Two entries exist for the
+framework rather than for the app: `connect-src` names `ipc:` and
+`http://ipc.localhost`, which is how a window talks to the Rust side on Windows,
+and Tauri adds the `script-src` and `style-src` hashes it needs itself. `img-src`
+allows `data:` so an icon can be inlined without editing the policy. Translation
+requests are unaffected: they leave from Rust, not from the window.
 
 ## Layout
 
@@ -430,27 +465,25 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
-  selection.rs           global mouse hook, gesture tracking, capture
-  hotkey.rs              global hotkey registration and parsing
+  selection.rs           what a gesture meant: click, drag, double click, capture
   classify.rs            word/phrase vs. sentence detection
   text.rs                cleanup of the text a selection comes back as
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
-  speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
   translate/             google and cloud providers, word dictionary
+  platform/
+    mod.rs               what the backend may assume about an operating system
+    windows/             the modules that talk to Win32: clipboard, console, desktop,
+                         hotkey, input, input_hook, instance, secrets, speech, uia
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
   autostart.rs           the login item and the --autostart marker
   updater.rs             the release feed behind the Updates section
-  secrets.rs             DPAPI protection for the stored API keys
   notice.rs              start card placement and lifetime
   tray.rs                notification area icon: open the window, quit
-  instance.rs            named-mutex guard against a second Glossy
-  console.rs             borrows the console of the terminal that started Glossy
-  platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
-  clipboard.rs  settings.rs  state.rs  input.rs
+  settings.rs  state.rs
 server/
   src/                   the proxy: quota rules, the providers, the two hosts
   test/                  node --test suite for the rules and the signatures
@@ -492,9 +525,18 @@ process. Each release maps to a GitHub milestone of the same name.
 
 ## 安装
 
-从 [Releases](https://github.com/SpencerZXWu/Glossy/releases/latest) 下载最新安装包（`Glossy_<version>_x64-setup.exe`）并运行。Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。
+从 [Releases](https://github.com/SpencerZXWu/Glossy/releases/latest) 下载最新发布，按需要选一个：
 
-安装包尚未代码签名，因此 SmartScreen 会警告未知发布者。若想改为从源码构建，请见 [开发](#开发)。
+| 下载 | 它是什么 |
+| --- | --- |
+| `Glossy_<version>_x64-setup.exe` | 安装包，想用自动更新就选它。会把 Glossy 注册进「已安装的应用」，因此可以按常规方式卸载 |
+| `Glossy_<version>_x64_en-US.msi` | 同一个应用，以 MSI 包形式提供，适合用策略或安装脚本部署的人 |
+| `Glossy_<version>_x64_portable.zip` | 无需安装：解压到任意位置，在该目录运行 `glossy.exe`。请让 `WebView2Loader.dll` 和它待在一起；另外「开机自启」记住的是你解压的那个目录，所以别随意搬动它 |
+
+Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发布里的
+`SHA256SUMS.txt` 列出了三者的哈希。
+
+三者都尚未代码签名，因此 SmartScreen 会警告未知发布者。若想改为从源码构建，请见 [开发](#开发)。
 
 ## 使用方法
 
@@ -622,16 +664,21 @@ rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --comp
 rustup default stable-x86_64-pc-windows-gnu
 npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
-npm.cmd run tauri build  # release build (installer + .exe)
+npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
 
 `npm.cmd run icon` 会从 `assets/` 重新生成 `src-tauri/icons`。
 
-`npm.cmd run tauri build` 会把安装包写到
-`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe`，把独立可执行文件写到
-`src-tauri\target\release\Glossy.exe`。NSIS 打包器首次运行需要网络连接，以下载它的插件。
+`npm.cmd run tauri build` 会把 NSIS 安装包写到
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe`，把 MSI 写到
+`src-tauri\target\release\bundle\msi\Glossy_<version>_x64_en-US.msi`，把独立可执行文件写到
+`src-tauri\target\release\Glossy.exe`。两个打包器首次运行都需要网络连接，以下载各自的
+工具（MSI 用 WiX，安装包用 NSIS 插件）到 `%LOCALAPPDATA%\tauri`。
 
-`scripts\release.ps1` 封装了发布构建：它会把安装包暂存到
+便携 zip 不是 Tauri 的打包目标，因为 Tauri 没有这种目标：它由 `scripts\release.ps1`
+从发布二进制和紧挨着它的 `WebView2Loader.dll`（GNU 构建在运行时加载它）打包而成。
+
+`scripts\release.ps1` 封装了发布构建：它会构建安装包、MSI 和便携 zip，并把三者暂存到
 `release\v<version>\`，连同校验和与发布说明的文本。用
 `powershell -ExecutionPolicy Bypass -File
 scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这也是上面使用 `npm.cmd` 的同一个原因。参见 [release/README.md](./release/README.md)。
@@ -640,11 +687,11 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 181 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 189 Rust tests
+cargo test --locked                                                  # 191 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -728,8 +775,25 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 196 tests; see "Checks" above for lint and format runs
+cargo test   # 191 tests; see "Checks" above for lint and format runs
 ```
+
+### 内容安全策略
+
+`src-tauri/tauri.conf.json` 里的 `app.security.csp` 不再是 `null`，而是一份显式白名单：
+
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'none';
+object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none';
+form-action 'none'
+```
+
+窗口不加载任何远程内容 —— 没有 CDN、没有远程字体、没有远程图片 —— 所以试图联网的
+页面会被拒绝。其中两项是为框架而不是为应用准备的：`connect-src` 里的 `ipc:` 和
+`http://ipc.localhost` 是窗口在 Windows 上与 Rust 侧通信的方式，`script-src` 与
+`style-src` 需要的哈希由 Tauri 自己补上。`img-src` 允许 `data:`，这样要内联一个图标
+时不必改动策略。翻译请求不受影响：它们从 Rust 发出，而不是从窗口发出。
 
 ## 目录结构
 
@@ -750,27 +814,25 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
-  selection.rs           global mouse hook, gesture tracking, capture
-  hotkey.rs              global hotkey registration and parsing
+  selection.rs           what a gesture meant: click, drag, double click, capture
   classify.rs            word/phrase vs. sentence detection
   text.rs                cleanup of the text a selection comes back as
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
-  speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
   translate/             google and cloud providers, word dictionary
+  platform/
+    mod.rs               what the backend may assume about an operating system
+    windows/             the modules that talk to Win32: clipboard, console, desktop,
+                         hotkey, input, input_hook, instance, secrets, speech, uia
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
   autostart.rs           the login item and the --autostart marker
   updater.rs             the release feed behind the Updates section
-  secrets.rs             DPAPI protection for the stored API keys
   notice.rs              start card placement and lifetime
   tray.rs                notification area icon: open the window, quit
-  instance.rs            named-mutex guard against a second Glossy
-  console.rs             borrows the console of the terminal that started Glossy
-  platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
-  clipboard.rs  settings.rs  state.rs  input.rs
+  settings.rs  state.rs
 server/
   src/                   the proxy: quota rules, the providers, the two hosts
   test/                  node --test suite for the rules and the signatures
@@ -820,12 +882,20 @@ con la traducción bajo el cursor.
 
 ## Instalación
 
-Descarga el instalador más reciente desde
-[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest)
-(`Glossy_<version>_x64-setup.exe`) y ejecútalo. Windows 11 x64; se necesita
-WebView2, que viene incluido en las versiones actuales de Windows.
+Descarga la última versión desde
+[Releases](https://github.com/SpencerZXWu/Glossy/releases/latest) y elige lo que
+te convenga:
 
-El instalador todavía no está firmado con un certificado de código, así que
+| Descarga | Qué es |
+| --- | --- |
+| `Glossy_<version>_x64-setup.exe` | El instalador, y la opción que hay que elegir si quieres que funcione la actualización automática. Registra Glossy en **Aplicaciones instaladas**, así que se desinstala de la forma habitual |
+| `Glossy_<version>_x64_en-US.msi` | La misma aplicación como paquete MSI, para quien la despliegue con una directiva o un script de instalación |
+| `Glossy_<version>_x64_portable.zip` | Nada que instalar: descomprímelo donde quieras y ejecuta `glossy.exe` desde esa carpeta. Deja `WebView2Loader.dll` a su lado y ten en cuenta que el inicio con Windows recuerda la carpeta donde lo descomprimiste, así que no la muevas |
+
+Windows 11 x64; se necesita WebView2, que viene incluido en las versiones actuales
+de Windows. El `SHA256SUMS.txt` de la misma publicación lista los hashes de los tres.
+
+Ninguno está firmado con un certificado de código todavía, así que
 SmartScreen advierte de un editor desconocido. Para compilarlo desde el código
 fuente, consulta [Desarrollo](#desarrollo).
 
@@ -1103,18 +1173,26 @@ rustup toolchain install stable-x86_64-pc-windows-gnu --component rustfmt --comp
 rustup default stable-x86_64-pc-windows-gnu
 npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
-npm.cmd run tauri build  # release build (installer + .exe)
+npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
 
 `npm.cmd run icon` regenera `src-tauri/icons` a partir de `assets/`.
 
-`npm.cmd run tauri build` escribe el instalador en
-`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe` y el binario
-independiente en `src-tauri\target\release\Glossy.exe`. El empaquetador NSIS
-necesita conexión de red la primera vez que se ejecuta, para descargar sus
-complementos.
+`npm.cmd run tauri build` escribe el instalador NSIS en
+`src-tauri\target\release\bundle\nsis\Glossy_<version>_x64-setup.exe`, el MSI en
+`src-tauri\target\release\bundle\msi\Glossy_<version>_x64_en-US.msi` y el binario
+independiente en `src-tauri\target\release\Glossy.exe`. Los dos empaquetadores
+necesitan conexión de red la primera vez que se ejecutan, para descargar sus
+herramientas — WiX para el MSI, los complementos de NSIS para el instalador — en
+`%LOCALAPPDATA%\tauri`.
 
-`scripts\release.ps1` envuelve la compilación de publicación: prepara el instalador
+El zip portátil no es un destino de Tauri, porque Tauri no tiene ninguno:
+`scripts\release.ps1` lo empaqueta a partir del binario de publicación y del
+`WebView2Loader.dll` que está a su lado y que la compilación GNU carga en tiempo de
+ejecución.
+
+`scripts\release.ps1` envuelve la compilación de publicación: compila y prepara el
+instalador, el MSI y el zip portátil
 en `release\v<version>\` junto con una suma de comprobación y el texto para la
 descripción de la publicación. Ejecútalo como `powershell -ExecutionPolicy Bypass
 -File scripts\release.ps1` — los scripts están bloqueados por la directiva de
@@ -1125,11 +1203,11 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 177 frontend tests
+node --test                                                          # 181 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 189 Rust tests
+cargo test --locked                                                  # 191 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1236,8 +1314,29 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 196 tests; see "Checks" above for lint and format runs
+cargo test   # 191 tests; see "Checks" above for lint and format runs
 ```
+
+### Política de seguridad de contenido
+
+`app.security.csp` en `src-tauri/tauri.conf.json` ya no es `null`, sino una lista
+blanca explícita:
+
+```
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
+font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'none';
+object-src 'none'; frame-src 'none'; frame-ancestors 'none'; base-uri 'none';
+form-action 'none'
+```
+
+Las ventanas no cargan nada remoto — ni CDN, ni fuentes remotas, ni imágenes
+remotas — así que una página que intente salir a la red es rechazada. Dos entradas
+existen para el framework y no para la aplicación: `connect-src` nombra `ipc:` y
+`http://ipc.localhost`, que es como una ventana habla con el lado de Rust en
+Windows, y los hashes que necesitan `script-src` y `style-src` los añade Tauri por
+su cuenta. `img-src` permite `data:` para poder incrustar un icono sin tocar la
+política. Las peticiones de traducción no se ven afectadas: salen de Rust, no de la
+ventana.
 
 ## Estructura
 
@@ -1258,27 +1357,25 @@ src/                     frontend (plain HTML/CSS/JS, no bundler)
 tests/                   node --test suite for i18n.js and render.js
 src-tauri/src/
   main.rs  lib.rs        window setup, Tauri commands
-  selection.rs           global mouse hook, gesture tracking, capture
-  hotkey.rs              global hotkey registration and parsing
+  selection.rs           what a gesture meant: click, drag, double click, capture
   classify.rs            word/phrase vs. sentence detection
   text.rs                cleanup of the text a selection comes back as
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
-  speech.rs              reading out loud with the voices Windows ships
   units/                 unit and currency conversion for the card
   translate/             google and cloud providers, word dictionary
+  platform/
+    mod.rs               what the backend may assume about an operating system
+    windows/             the modules that talk to Win32: clipboard, console, desktop,
+                         hotkey, input, input_hook, instance, secrets, speech, uia
   popup.rs               placement/clamping geometry
   surface.rs             Mica backdrop and title bar colour
   history.rs             the translation store behind the History panel
   autostart.rs           the login item and the --autostart marker
   updater.rs             the release feed behind the Updates section
-  secrets.rs             DPAPI protection for the stored API keys
   notice.rs              start card placement and lifetime
   tray.rs                notification area icon: open the window, quit
-  instance.rs            named-mutex guard against a second Glossy
-  console.rs             borrows the console of the terminal that started Glossy
-  platform.rs            DPI aware cursor, work area, visible windows, click-through helpers
-  clipboard.rs  settings.rs  state.rs  input.rs
+  settings.rs  state.rs
 server/
   src/                   the proxy: quota rules, the providers, the two hosts
   test/                  node --test suite for the rules and the signatures

@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "1.1.2"
+version = "1.2.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"
@@ -25,6 +25,13 @@ serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2"
 base64 = "0.22"
+md-5 = "0.10.6"
+tokio = { version = "1", features = ["time"] }
+
+# The only platform implementation the crate has; `src/platform/windows/` is the
+# single place that depends on it (see `src/platform/mod.rs`).
+[target.'cfg(windows)'.dependencies]
+window-vibrancy = "0.6"
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Globalization",
@@ -48,9 +55,6 @@ windows = { version = "0.61", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ] }
-md-5 = "0.10.6"
-tokio = { version = "1", features = ["time"] }
-window-vibrancy = "0.6"
 
 [profile.release]
 codegen-units = 1

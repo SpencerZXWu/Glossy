@@ -1,12 +1,12 @@
 //! Placement, sizing and dismissal of the floating translation popup.
 
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicIsize, AtomicU32, Ordering};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow};
 
 use crate::platform::ScreenRect;
-use crate::speech;
+use crate::platform::{self, speech};
 use crate::state::AppState;
 use crate::translate::TranslationResult;
 
@@ -37,6 +37,10 @@ struct PopupBounds {
     /// Set while the user has pinned the card, which is what keeps a click
     /// elsewhere from dismissing it.
     pinned: AtomicBool,
+    /// Native window the card is drawn in, zero until one has been seen.
+    handle: AtomicIsize,
+    /// Browser process drawing the card, zero until one has been seen.
+    webview: AtomicU32,
 }
 
 static BOUNDS: PopupBounds = PopupBounds {
@@ -46,6 +50,8 @@ static BOUNDS: PopupBounds = PopupBounds {
     bottom: AtomicI32::new(0),
     visible: AtomicBool::new(false),
     pinned: AtomicBool::new(false),
+    handle: AtomicIsize::new(0),
+    webview: AtomicU32::new(0),
 };
 
 fn bounds() -> Option<ScreenRect> {
@@ -86,9 +92,58 @@ pub fn set_pinned(pinned: bool) {
 /// Whether a mouse click at this screen point dismisses the card.
 ///
 /// Only a click outside an unpinned card does: a pinned one was asked to stay,
-/// and a click inside it belongs to the card itself.
+/// and a click inside it belongs to the card itself. A click on a window the
+/// card owns is a click on the card too, even when it falls outside its edges;
+/// see [`owns_point`].
 pub fn dismisses_click(x: i32, y: i32) -> bool {
     !contains(x, y) && !pinned()
+}
+
+/// True when the screen point lands on a window the popup owns.
+///
+/// The list of a `<select>` is a window of its own, drawn by the browser
+/// process of the card, and it is taller than the card: its entries reach well
+/// below the card's bottom edge, where a click would otherwise count as a click
+/// on the program behind us and take the card away with it.
+///
+/// Two questions are asked, because the two ways the list can answer for itself
+/// are independent: which window owns the one under the point, and which
+/// process draws it.
+///
+/// Both answers are cached while the card is placed, because the mouse hook
+/// cannot look them up and it and the worker have to reach the same answer.
+pub fn owns_point(x: i32, y: i32) -> bool {
+    let handle = BOUNDS.handle.load(Ordering::Relaxed);
+    if handle == 0 {
+        return false;
+    }
+    if platform::desktop::owns_point(platform::desktop::Handle(handle), x, y) {
+        return true;
+    }
+    webview_process_id()
+        .is_some_and(|pid| platform::desktop::process_id_under_point(x, y) == Some(pid))
+}
+
+fn webview_process_id() -> Option<u32> {
+    let pid = BOUNDS.webview.load(Ordering::Relaxed);
+    if pid == 0 {
+        None
+    } else {
+        Some(pid)
+    }
+}
+
+/// Remembers the native window the card lives in and the browser process
+/// drawing it, so [`owns_point`] can be asked from outside the main thread.
+fn store_handle(window: &WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        BOUNDS.handle.store(hwnd.0 as isize, Ordering::Relaxed);
+        if let Some(pid) =
+            platform::desktop::child_process_id(platform::desktop::Handle(hwnd.0 as isize))
+        {
+            BOUNDS.webview.store(pid, Ordering::Relaxed);
+        }
+    }
 }
 
 /// Follows the window while the user drags the popup by its header.
@@ -236,6 +291,7 @@ pub fn place(
     show: bool,
 ) -> Result<f64, String> {
     let window = popup_window(app).ok_or("popup window is not available")?;
+    store_handle(&window);
 
     let width = width.clamp(160.0, 1200.0);
     // The popup itself keeps the card inside the screen; this is only a guard
@@ -243,7 +299,7 @@ pub fn place(
     let height = height.clamp(40.0, 4096.0);
 
     let anchor = state.anchor().unwrap_or_else(|| {
-        let (x, y) = crate::platform::cursor_pos();
+        let (x, y) = crate::platform::desktop::cursor_pos();
         (x as f64, y as f64)
     });
 
@@ -251,7 +307,7 @@ pub fn place(
     let physical_width = width * scale;
     let physical_height = height * scale;
 
-    let area = crate::platform::work_area_for_point(anchor.0 as i32, anchor.1 as i32)
+    let area = crate::platform::desktop::work_area_for_point(anchor.0 as i32, anchor.1 as i32)
         .unwrap_or(FALLBACK_AREA);
 
     // While the popup is already on screen the user may have dragged it, so it
@@ -331,6 +387,7 @@ pub fn hide(app: &AppHandle) {
 /// Re-anchors the popup after the user dragged it to a new position.
 pub fn sync_anchor(app: &AppHandle, state: &AppState) -> Result<(), String> {
     let window = popup_window(app).ok_or("popup window is not available")?;
+    store_handle(&window);
     let position = window.outer_position().map_err(|e| e.to_string())?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
     // The anchor is compared against physical cursor coordinates, so the CSS

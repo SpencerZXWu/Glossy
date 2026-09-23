@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Checks the version numbers, then runs a release build, copies the NSIS
-    installer into release/v<version>/ and writes SHA256SUMS.txt next to it.
+    installer and the MSI package into release/v<version>/, packs the portable
+    zip next to them and writes SHA256SUMS.txt alongside.
 
     The version comes from scripts/version.ps1, which reads the authoritative
     number out of src-tauri/tauri.conf.json and refuses to continue when
@@ -171,6 +172,40 @@ foreach ($installer in $installers) {
     Write-Host "Staged $($installer.Name)" -ForegroundColor Green
 }
 
+$msiDir = Join-Path $root 'src-tauri\target\release\bundle\msi'
+$msis = @(Get-ChildItem -LiteralPath $msiDir -Filter '*.msi' -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like "Glossy_$($version)_*" })
+if ($msis.Count -eq 0) {
+    throw "No MSI for $version found in $msiDir. 'bundle.targets' in tauri.conf.json lists msi, so a build that skipped it is a failure, not a shortcut."
+}
+
+foreach ($msi in $msis) {
+    Copy-Item -LiteralPath $msi.FullName -Destination $stage -Force
+    $staged += (Join-Path $stage $msi.Name)
+    Write-Host "Staged $($msi.Name)" -ForegroundColor Green
+}
+
+# The portable package is the release binary plus the loader it links against, and
+# nothing else: unzip it and double-click glossy.exe, no installer involved.
+$releaseDir = Join-Path $root 'src-tauri\target\release'
+$exe = Join-Path $releaseDir 'glossy.exe'
+if (-not (Test-Path -LiteralPath $exe)) {
+    throw "$exe is missing; the portable zip would ship an empty folder."
+}
+
+$zip = Join-Path $stage ("Glossy_{0}_x64_portable.zip" -f $version)
+$portable = Join-Path $env:TEMP ('glossy-portable-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $portable -Force | Out-Null
+try {
+    Copy-Item -LiteralPath $exe -Destination $portable
+    Copy-Item -LiteralPath $loader -Destination $portable
+    Compress-Archive -Path (Join-Path $portable '*') -DestinationPath $zip -Force
+} finally {
+    Remove-Item -LiteralPath $portable -Recurse -Force -ErrorAction SilentlyContinue
+}
+$staged += $zip
+Write-Host "Packed $(Split-Path -Leaf $zip)" -ForegroundColor Green
+
 $sums = foreach ($file in $staged) {
     $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $(Split-Path -Leaf $file)"
@@ -289,7 +324,7 @@ if ($Publish) {
 } else {
     Write-Host 'Publish: re-run with -Publish, or do it by hand - create the tag vX.Y.Z,'
     Write-Host 'then the release titled "Glossy X.Y.Z" (the tag keeps the v, the title does'
-    Write-Host 'not), paste RELEASE_NOTES.md into the description and attach the installer'
-    Write-Host 'together with SHA256SUMS.txt.'
+    Write-Host 'not), paste RELEASE_NOTES.md into the description and attach the installer,'
+    Write-Host 'the MSI, the portable zip and SHA256SUMS.txt.'
     Write-Host 'The notes switch language through the links at the top; keep all three translated.'
 }
