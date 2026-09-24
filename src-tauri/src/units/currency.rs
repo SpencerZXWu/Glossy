@@ -5,6 +5,10 @@
 //! allowed to be slow: every request has its own timeout, a chain of failures
 //! stops asking for a while, and an answer that is too old is still used, only
 //! marked as stale.
+//!
+//! The first source asked is Glossy's own server, which reaches the vendors
+//! from its own network and knows which of them it can reach. The two vendors
+//! below stay as the direct fallback.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -12,6 +16,10 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
+
+use crate::translate::cloud_rates;
+
+use super::Relay;
 
 /// A table younger than this is used without asking again.
 const FRESH: Duration = Duration::from_secs(6 * 60 * 60);
@@ -33,7 +41,8 @@ const CACHE_FILE: &str = "rates.json";
 #[derive(Debug, Clone)]
 pub struct Rate {
     pub value: f64,
-    pub source: &'static str,
+    /// Where the numbers came from, for the line under the conversion.
+    pub source: String,
     pub date: Option<String>,
     /// The only rate available was older than the freshness window.
     pub stale: bool,
@@ -42,7 +51,7 @@ pub struct Rate {
 /// Every rate one source returned for one base currency.
 #[derive(Debug, Clone)]
 struct Table {
-    source: &'static str,
+    source: String,
     date: Option<String>,
     /// Unix seconds when the table was received.
     fetched: u64,
@@ -78,6 +87,7 @@ pub async fn rate(
     from: &str,
     to: &str,
     cache: Option<&Path>,
+    relay: Option<Relay<'_>>,
 ) -> Option<Rate> {
     let from = from.to_ascii_uppercase();
     let to = to.to_ascii_uppercase();
@@ -93,7 +103,7 @@ pub async fn rate(
 
     let cooling_down = *quiet_until().lock().expect("poisoned") > now();
     if !cooling_down {
-        match fetch(client, &from).await {
+        match fetch(client, &from, relay).await {
             Some(table) => {
                 remember(&from, &table, cache);
                 return lookup(&table, &to);
@@ -117,7 +127,7 @@ fn lookup(table: &Table, to: &str) -> Option<Rate> {
     let value = *table.rates.get(to)?;
     Some(Rate {
         value,
-        source: table.source,
+        source: table.source.clone(),
         date: table.date.clone(),
         stale: false,
     })
@@ -160,11 +170,12 @@ fn read_cache(cache: Option<&Path>) -> Option<HashMap<String, Table>> {
     let data: Value = serde_json::from_str(&text).ok()?;
     let mut tables = HashMap::new();
     for (base, entry) in data.as_object()? {
-        let source = match entry.get("source").and_then(Value::as_str) {
-            Some(SOURCE_PRIMARY) => SOURCE_PRIMARY,
-            Some(SOURCE_FALLBACK) => SOURCE_FALLBACK,
-            _ => SOURCE_FALLBACK,
-        };
+        let source = entry
+            .get("source")
+            .and_then(Value::as_str)
+            .filter(|name| !name.is_empty())
+            .unwrap_or(SOURCE_FALLBACK)
+            .to_string();
         let Some(fetched) = entry.get("fetched").and_then(Value::as_u64) else {
             continue;
         };
@@ -221,12 +232,30 @@ fn write_cache(cache: Option<&Path>, tables: &HashMap<String, Table>) {
     let _ = std::fs::write(path, text);
 }
 
-/// Asks the two sources in turn and returns the first usable table.
-async fn fetch(client: &reqwest::Client, base: &str) -> Option<Table> {
+/// Asks the App's own server first, then the two vendors in turn, and returns
+/// the first usable table.
+async fn fetch(client: &reqwest::Client, base: &str, relay: Option<Relay<'_>>) -> Option<Table> {
+    if let Some(relay) = relay {
+        if let Some(table) = fetch_relay(client, base, relay).await {
+            return Some(table);
+        }
+    }
     if let Some(table) = fetch_primary(client, base).await {
         return Some(table);
     }
     fetch_fallback(client, base).await
+}
+
+/// The table the server keeps. It answers with the numbers plus the vendor they
+/// came from, which is what the card names under the conversion.
+async fn fetch_relay(client: &reqwest::Client, base: &str, relay: Relay<'_>) -> Option<Table> {
+    let table = cloud_rates(client, base, relay.endpoint, relay.install_id).await?;
+    Some(Table {
+        source: table.source,
+        date: table.date,
+        fetched: now(),
+        rates: table.rates,
+    })
 }
 
 async fn fetch_primary(client: &reqwest::Client, base: &str) -> Option<Table> {
@@ -245,7 +274,7 @@ async fn fetch_primary(client: &reqwest::Client, base: &str) -> Option<Table> {
         return None;
     }
     Some(Table {
-        source: SOURCE_PRIMARY,
+        source: SOURCE_PRIMARY.to_string(),
         date: data
             .get("time_last_update_utc")
             .and_then(Value::as_str)
@@ -272,7 +301,7 @@ async fn fetch_fallback(client: &reqwest::Client, base: &str) -> Option<Table> {
     // of the map.
     rates.insert(base.to_string(), 1.0);
     Some(Table {
-        source: SOURCE_FALLBACK,
+        source: SOURCE_FALLBACK.to_string(),
         date: data.get("date").and_then(Value::as_str).map(str::to_string),
         fetched: now(),
         rates,
@@ -315,9 +344,9 @@ fn iso_date(text: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn table(source: &'static str, fetched: u64, rates: &[(&str, f64)]) -> Table {
+    fn table(source: &str, fetched: u64, rates: &[(&str, f64)]) -> Table {
         Table {
-            source,
+            source: source.to_string(),
             date: Some("2026-02-05".to_string()),
             fetched,
             rates: rates

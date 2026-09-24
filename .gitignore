@@ -6,6 +6,7 @@ src-tauri/gen/schemas/
 src-tauri/resources/WebView2Loader.dll
 .tmp/
 .mixmark/
+.impeccable/
 *.log
 
 # Built installers are uploaded to GitHub Releases instead of committed; see release/README.md

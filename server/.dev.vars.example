@@ -22,5 +22,9 @@ BAIDU_APP_ID = "202xxxxxxxxx"
 BAIDU_KEY = "你在百度翻译开放平台拿到的密钥"
 # 用来给 IP 做哈希，随便一串随机字符即可，避免明文存 IP。
 IP_SALT = "换成一串随机字符"
+# 汇率接口（客户端货币换算用），不需要密钥，线上不设就用下面这两个官方地址。
+# 只在本地调试时用：把它们换成自己的假接口。
+# RATES_ENDPOINT = "https://open.er-api.com/v6/latest/"
+# RATES_FALLBACK_ENDPOINT = "https://api.frankfurter.app/latest?from="
 # 只在本地调试时用：把百度地址换成自己的假接口。
 # BAIDU_ENDPOINT = "http://127.0.0.1:8791/api/trans/vip/translate"

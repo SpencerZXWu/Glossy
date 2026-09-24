@@ -120,7 +120,14 @@
     return text.startsWith("/") || text.startsWith("[") ? text : `/${text}/`;
   }
 
-  function loading(target) {
+  /**
+   * The card while an answer is on its way. It keeps the bottom row of a
+   * finished one, so the engine can be changed without waiting for the first
+   * answer: the name is the service that was asked, not the one that answered,
+   * which is not known yet.
+   */
+  function loading(target, options) {
+    const opts = options || {};
     clear(target);
     const wrap = node("div", "skeleton");
     wrap.setAttribute("aria-busy", "true");
@@ -128,6 +135,39 @@
     wrap.appendChild(node("span"));
     wrap.appendChild(node("span"));
     target.appendChild(wrap);
+    foot(target, opts.provider, opts);
+  }
+
+  /**
+   * Puts the name of an engine at the left of the bottom row. It is a button when
+   * the caller offers a way to choose another one, plain text otherwise.
+   */
+  function engineName(row, provider, options) {
+    if (!provider) return;
+    const opts = options || {};
+    const name = Glossy.i18n.providerName(provider);
+    if (typeof opts.onChooseService === "function") {
+      const choose = node("button", "service", name);
+      choose.type = "button";
+      choose.setAttribute("aria-haspopup", "true");
+      choose.setAttribute("aria-expanded", "false");
+      choose.setAttribute("title", Glossy.i18n.t("popup.chooseService"));
+      choose.addEventListener("click", (event) => {
+        if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+        opts.onChooseService(choose);
+      });
+      row.appendChild(choose);
+    } else {
+      row.appendChild(node("span", "engine", name));
+    }
+  }
+
+  /** The bottom row of the card, added only when it has something to hold. */
+  function foot(target, provider, options) {
+    const row = node("div", "foot");
+    engineName(row, provider, options);
+    if (row.childNodes.length) target.appendChild(row);
+    return row;
   }
 
   function error(target, message, onRetry) {
@@ -226,29 +266,13 @@
     // The bottom line of the card: the name of the engine that answered on the
     // left, the pronunciation buttons on the right. Both go into the same row,
     // so neither can push the other onto a line of its own.
-    const foot = node("div", "foot");
-    if (data.provider) {
-      const name = Glossy.i18n.providerName(data.provider);
-      if (typeof opts.onChooseService === "function") {
-        const choose = node("button", "service", name);
-        choose.type = "button";
-        choose.setAttribute("aria-haspopup", "true");
-        choose.setAttribute("aria-expanded", "false");
-        choose.setAttribute("title", Glossy.i18n.t("popup.chooseService"));
-        choose.addEventListener("click", (event) => {
-          if (event && typeof event.stopPropagation === "function") event.stopPropagation();
-          opts.onChooseService(choose);
-        });
-        foot.appendChild(choose);
-      } else {
-        foot.appendChild(node("span", "engine", name));
-      }
-    }
+    const row = node("div", "foot");
+    engineName(row, data.provider, opts);
 
     // Added last, so the buttons sit in the bottom corner of the card.
-    if (opts.speak !== false) readOut(foot, data);
+    if (opts.speak !== false) readOut(row, data);
 
-    if (foot.childNodes.length) target.appendChild(foot);
+    if (row.childNodes.length) target.appendChild(row);
 
     // The card names the service that answered, and says so when that is not the
     // one the settings picked.

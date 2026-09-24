@@ -44,6 +44,63 @@ body.dragging {
   cursor: default;
 }
 
+/* ---------------------------------------------------------------- badge */
+
+/* The window before the card: a small icon under the selection. Nothing is
+   translated — and nothing is billed — until it is clicked, so it has to look
+   clickable and stay out of the way. */
+.badge {
+  display: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    border-color var(--g-dur-fast) var(--g-ease-standard);
+}
+
+.badge img {
+  width: 26px;
+  height: 26px;
+  display: block;
+  pointer-events: none;
+}
+
+/* The hover has to leave the box where it is: this is a 44px click target and
+   a moving one is a missed click, so the accent border carries the affordance
+   on its own. */
+.badge:hover {
+  border-color: var(--accent);
+}
+
+.badge:active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.badge:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+body[data-state="badge"] {
+  padding: 8px;
+}
+
+body[data-state="badge"] .card {
+  display: none;
+}
+
+body[data-state="badge"] .badge {
+  display: grid;
+  animation: rise var(--g-dur-fast) var(--g-ease-decelerate);
+}
+
 .card {
   position: relative;
   /* Keeps the surface layer below the content instead of behind the window. */

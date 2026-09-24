@@ -23,6 +23,22 @@ const MAX_CONVERSIONS: usize = 4;
 /// How long all the currency lookups of a single card may take together.
 const CURRENCY_BUDGET: Duration = Duration::from_millis(2500);
 
+/// Where Glossy's own server is.
+///
+/// Exchange rates are asked from it first, the same way translations are, so
+/// the rate vendors are reached from the server's network instead of the user's
+/// — which is also what keeps the address and the vendors in one place. The app
+/// still calls the vendors directly when the server has nothing to say, so an
+/// older deployment, or a home server that is down, changes nothing.
+#[derive(Debug, Clone, Copy)]
+pub struct Relay<'a> {
+    /// The address the settings hold. `translate::cloud` still decides whether
+    /// the one built into the app wins.
+    pub endpoint: &'a str,
+    /// The install id the server knows this device by.
+    pub install_id: &'a str,
+}
+
 /// One annotated unit switch, e.g. `12 ft` -> `≈ 3.66 m`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +69,7 @@ pub async fn conversions(
     text: &str,
     target_language: &str,
     cache: Option<&Path>,
+    relay: Option<Relay<'_>>,
 ) -> Vec<Conversion> {
     let text = text.trim();
     if text.is_empty() {
@@ -72,11 +89,13 @@ pub async fn conversions(
                 if remaining.is_zero() {
                     continue;
                 }
-                let rate =
-                    tokio::time::timeout(remaining, currency::rate(client, code, target, cache))
-                        .await
-                        .ok()
-                        .flatten();
+                let rate = tokio::time::timeout(
+                    remaining,
+                    currency::rate(client, code, target, cache, relay),
+                )
+                .await
+                .ok()
+                .flatten();
                 rate.and_then(|rate| money(&hit, code, value, target, &rate))
             }
         };
@@ -112,12 +131,13 @@ pub async fn conversions_for(
     translation: &str,
     target_language: &str,
     cache: Option<&Path>,
+    relay: Option<Relay<'_>>,
 ) -> Vec<Conversion> {
-    let from_translation = conversions(client, translation, target_language, cache).await;
+    let from_translation = conversions(client, translation, target_language, cache, relay).await;
     if !from_translation.is_empty() {
         return from_translation;
     }
-    conversions(client, original, target_language, cache).await
+    conversions(client, original, target_language, cache, relay).await
 }
 
 /// The conversion a measurement needs, or `None` when the reader already reads
@@ -656,7 +676,7 @@ mod tests {
     fn a_live_rate_becomes_a_conversion_with_its_source() {
         let rate = currency::Rate {
             value: 7.1234,
-            source: "exchangerate-api.com",
+            source: "exchangerate-api.com".to_string(),
             date: Some("2026-01-31".to_string()),
             stale: false,
         };
@@ -679,7 +699,7 @@ mod tests {
     fn the_readers_own_currency_is_left_alone() {
         let rate = currency::Rate {
             value: 1.0,
-            source: "exchangerate-api.com",
+            source: "exchangerate-api.com".to_string(),
             date: None,
             stale: false,
         };
@@ -703,6 +723,7 @@ mod tests {
             original,
             translation,
             language,
+            None,
             None,
         ))
     }

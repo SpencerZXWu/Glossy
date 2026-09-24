@@ -10,7 +10,9 @@ DAILY_CHARS_PER_CLIENT = "20000"
 # 同一个 IP 每天的上限，挡住「换个安装 ID 继续刷」。
 DAILY_CHARS_PER_IP = "30000"
 # 全局每天的上限，真正的保险丝：别把上游的额度（或钱包）刷爆。
-DAILY_CHARS_TOTAL = "300000"
+# 和 `src/handler.js` 里的默认值一致（≈ 百度认证版 100 万字符/月摊到每天）。
+# SCF 那份没配这个变量，用的就是这个默认值，两边不该是两条不同的保险丝。
+DAILY_CHARS_TOTAL = "30000"
 # 单次请求的字符上限（百度接口本身也在这个量级）。
 MAX_CHARS_PER_REQUEST = "2000"
 # 同一个 IP 每分钟的请求数上限，挡住脚本狂刷。

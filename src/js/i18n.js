@@ -30,7 +30,7 @@
     "status.hook.title": "The global mouse hook is not running.",
 
     "master.title": "Enable text selection translation",
-    "master.hint": "Translate a selection as soon as you release the mouse.",
+    "master.hint": "A selection shows the Glossy icon; click it to translate.",
     "option.drag": "Translate when the mouse drags across text",
     "option.doubleClick": "Translate a word on double click",
     "option.restoreClipboard": "Put the clipboard back after reading a selection",
@@ -197,6 +197,8 @@
 
     "popup.copy": "Copy translation",
     "popup.close": "Close",
+    "popup.settings": "Open the settings",
+    "popup.translate": "Translate the selection",
     "popup.pin": "Pin the card, so it stays open",
     "popup.unpin": "Unpin the card",
     "popup.chooseService": "Translation service",
@@ -256,7 +258,7 @@
     "status.hook.title": "全局鼠标钩子没有运行。",
 
     "master.title": "开启划词翻译",
-    "master.hint": "松开鼠标即翻译选中的内容。",
+    "master.hint": "选中文字后显示 Glossy 图标，点击图标才会翻译。",
     "option.drag": "拖动鼠标划过文字时翻译",
     "option.doubleClick": "双击单词时翻译",
     "option.restoreClipboard": "读取选区后恢复剪贴板",
@@ -422,6 +424,8 @@
 
     "popup.copy": "复制译文",
     "popup.close": "关闭",
+    "popup.settings": "打开设置",
+    "popup.translate": "翻译所选内容",
     "popup.pin": "固定窗口，不随点击关闭",
     "popup.unpin": "取消固定",
     "popup.chooseService": "翻译渠道",

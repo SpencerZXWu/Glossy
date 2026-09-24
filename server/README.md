@@ -12,6 +12,9 @@
 
 大模型失败了（连不上、限流、额度用尽）会自动交回机器翻译，用户那边不会看到报错。只配一个也能跑，一个都不配时 `/v1/translate` 返回 `not_configured`。
 
+另外这台服务器还给客户端转发**货币汇率**（`GET /v1/rates`）：上游是 `open.er-api.com`，取不到就换欧洲央行的
+`api.frankfurter.app`，两家都不需要密钥，返回的汇率不占翻译额度。
+
 客户端可以在请求里带 `"vendor": "baidu"` 或 `"youdao"` 点名要用哪个上游（就是渠道列表里的
 「百度翻译」「有道翻译」）：点名的那个排到最前面先试，失败仍会按顺序兜底，全都不行才报错。
 不带 `vendor`（或写了不认识的名字）就从默认顺序开始。`GET /v1/health` 里的 `vendors`
@@ -112,6 +115,9 @@ exec /var/lang/node18/bin/node index.mjs
 | `LLM_ENDPOINT` | 大模型接口地址（可选，默认智谱 `https://open.bigmodel.cn/api/paas/v4/chat/completions`） |
 | `LLM_MODEL` | 模型名（可选，默认 `glm-4-flash`） |
 | `IP_SALT` | 随便一串长一点的随机字符，用来给 IP 做哈希 |
+| `RATES_ENDPOINT` | 汇率接口地址（可选，默认 `https://open.er-api.com/v6/latest/`，**不需要密钥**） |
+| `RATES_FALLBACK_ENDPOINT` | 备用汇率接口（可选，默认 `https://api.frankfurter.app/latest?from=`，即欧洲央行） |
+| `RATES_TIMEOUT_MS` | 取汇率超时毫秒数（可选，默认 6000） |
 
 额度参数也可以在同一个地方配（不配就是用下面的默认值）：`DAILY_CHARS_PER_CLIENT`、
 `DAILY_CHARS_PER_IP`、`DAILY_CHARS_TOTAL`、`MAX_CHARS_PER_REQUEST`、`MAX_REQUESTS_PER_MINUTE`。
@@ -236,6 +242,22 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 
 返回今天这个客户端的用量、剩余字符和各项上限。
 
+### `GET /v1/rates?client=<安装ID>&base=<三位货币代码>`
+
+客户端做货币换算用的汇率表。`base` 是基准货币（如 `USD`），`rates` 里是「1 个 `base` 值多少」，
+只留下有限的正数，货币代码一律大写。
+
+```json
+{ "ok": true, "base": "USD", "source": "exchangerate-api.com", "date": "2025-09-01", "rates": { "CNY": 7.12, "EUR": 0.86 } }
+```
+
+`source` 是实际回答的那一家（`exchangerate-api.com`，取不到就换 `frankfurter.app`）。两边都取不到时
+返回 `{ "ok": false, "code": "upstream_unreachable", "message": "..." }`（502），参数不对是 `invalid_request`（400）。
+
+这个接口**不花字符额度**（按 `chars: 0` 记账，失败也不用退还），只计入每分钟请求数，所以卡片上多一条
+换算不会吃掉当天的翻译量。客户端取不到 `/v1/rates`（比如服务端还没更新）时会自己直连上面两家，
+最坏情况是换算不出来，不影响翻译。
+
 ### `POST /v1/translate`
 
 ```json
@@ -316,7 +338,8 @@ cp .dev.vars.example .dev.vars   # Windows: Copy-Item .dev.vars.example .dev.var
 npx wrangler dev                 # 默认 http://127.0.0.1:8787
 ```
 
-`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`YOUDAO_ENDPOINT`、`LLM_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
+`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`YOUDAO_ENDPOINT`、`LLM_ENDPOINT`、`RATES_ENDPOINT`、
+`RATES_FALLBACK_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
 
 ```bash
 curl http://127.0.0.1:9000/v1/health

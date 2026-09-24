@@ -52,12 +52,19 @@ function memoryStore() {
   };
 }
 
-function setup({ translateImpl, env = {}, configured = true } = {}) {
+function setup({ translateImpl, ratesImpl, env = {}, configured = true } = {}) {
   const store = memoryStore();
   const calls = [];
+  const rateCalls = [];
   const upstream = {
     isLanguageTag,
     configured,
+    rates: async (input) => {
+      rateCalls.push(input);
+      return ratesImpl
+        ? ratesImpl(input)
+        : { ok: true, base: "USD", source: "exchangerate-api.com", date: "2026-02-05", rates: { USD: 1, CNY: 7.12 } };
+    },
     translate: async (input) => {
       calls.push(input);
       return translateImpl ? translateImpl(input) : { ok: true, from: "en", to: "zh", translation: "你好" };
@@ -88,7 +95,7 @@ function setup({ translateImpl, env = {}, configured = true } = {}) {
     );
   const translate = (body) =>
     call("/v1/translate", { method: "POST", body: JSON.stringify({ clientId: "install-0001", ...body }) });
-  return { store, calls, call, translate, upstream };
+  return { store, calls, rateCalls, call, translate, upstream };
 }
 
 test("health reports whether the upstream has credentials", async () => {
@@ -229,4 +236,53 @@ test("counts characters by code point", async () => {
   const { translate } = setup();
   const body = await (await translate({ text: "😀😀", to: "zh" })).json();
   assert.equal(body.chars, 2);
+});
+
+test("serves exchange rates without spending characters", async () => {
+  const { call, translate, rateCalls } = setup();
+  await translate({ text: "hello", to: "zh" });
+
+  const response = await call("/v1/rates?client=install-0001&base=usd");
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.base, "USD");
+  assert.equal(body.source, "exchangerate-api.com");
+  assert.equal(body.date, "2026-02-05");
+  assert.equal(body.rates.CNY, 7.12);
+  assert.deepEqual(rateCalls, [{ base: "usd" }]);
+
+  // A conversion is an annotation on the card, so the characters booked by the
+  // translation are the only ones the counters hold.
+  assert.equal((await (await call("/v1/quota?client=install-0001")).json()).usage.client, 5);
+});
+
+test("rejects a rate request before touching the counters", async () => {
+  const { call, store, rateCalls } = setup();
+  assert.equal((await call("/v1/rates?client=nope&base=USD")).status, 400);
+  assert.equal((await call("/v1/rates?client=install-0001&base=US")).status, 400);
+  assert.equal((await call("/v1/rates?client=install-0001")).status, 400);
+  assert.equal((await call("/v1/rates?client=install-0001&base=USD", { method: "POST" })).status, 405);
+  assert.equal(store.calls.reserve, 0);
+  assert.equal(rateCalls.length, 0);
+});
+
+test("reports a rate vendor that cannot answer", async () => {
+  const { call } = setup({
+    ratesImpl: async () => ({ ok: false, code: "upstream_unreachable", message: "取不到汇率" }),
+  });
+  const response = await call("/v1/rates?client=install-0001&base=USD");
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).code, "upstream_unreachable");
+});
+
+test("rate limits rate requests as well", async () => {
+  const { call } = setup();
+  for (let i = 0; i < 3; i += 1) {
+    assert.equal((await call("/v1/rates?client=install-0001&base=USD")).status, 200);
+  }
+  const response = await call("/v1/rates?client=install-0001&base=USD");
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).code, "rate_limited");
 });

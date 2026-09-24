@@ -12,7 +12,8 @@
   const langSwap = document.getElementById("langSwap");
   const copyButton = document.getElementById("copy");
   const pinButton = document.getElementById("pin");
-  const closeButton = document.getElementById("close");
+  const settingsButton = document.getElementById("settings");
+  const badge = document.getElementById("badge");
 
   /** Source value that lets the provider detect the language itself. */
   const AUTO = "auto";
@@ -24,6 +25,8 @@
   const CARD_WIDTH = 356;
   /** Transparent margin the body keeps around the card so its shadow shows. */
   const WINDOW_PADDING = 20;
+  /** Same margin around the badge, which keeps its own, smaller one (2×8px). */
+  const BADGE_PADDING = 16;
   /** Screen space the card leaves free for the taskbar and the edges. */
   const CARD_MARGIN = 32;
   /** Used when the screen size cannot be read. */
@@ -55,6 +58,8 @@
   /** True while the card is pinned: clicks elsewhere leave it alone and the
       "close by itself" countdown stands still. */
   let pinned = false;
+  /** The selection the badge is holding, waiting for its click. */
+  let waiting = "";
 
   /** Pair shown in the language bar. `source: AUTO` asks the provider to detect
       the language and `target: null` follows the configured target. */
@@ -70,6 +75,15 @@
   }
 
   function measure() {
+    // The badge is the whole window while it is up, and it is not the card, so
+    // it is measured instead of it.
+    if (document.body.dataset.state === "badge") {
+      const icon = badge.getBoundingClientRect();
+      return {
+        width: Math.ceil(icon.width) + BADGE_PADDING,
+        height: Math.ceil(icon.height) + BADGE_PADDING,
+      };
+    }
     const rect = card.getBoundingClientRect();
     return {
       width: cardWidth() + WINDOW_PADDING,
@@ -82,7 +96,8 @@
     Glossy.i18n.set(preferences.uiLang);
     Glossy.i18n.apply(document);
     copyButton.setAttribute("aria-label", Glossy.i18n.t("popup.copy"));
-    closeButton.setAttribute("aria-label", Glossy.i18n.t("popup.close"));
+    settingsButton.setAttribute("aria-label", Glossy.i18n.t("popup.settings"));
+    badge.setAttribute("aria-label", Glossy.i18n.t("popup.translate"));
     pinButton.setAttribute("aria-label", pinLabel());
     langFrom.setAttribute("aria-label", Glossy.i18n.t("popup.sourceLang"));
     langTo.setAttribute("aria-label", Glossy.i18n.t("popup.targetLang"));
@@ -289,6 +304,32 @@
     run(value);
   }
 
+  /**
+   * Shows the badge for a fresh selection instead of the card. Nothing is
+   * translated — and nothing is billed — until the badge is clicked, so this is
+   * also the state the daily allowance is still untouched in.
+   */
+  async function showBadge(selection) {
+    const value = String(selection || "").trim();
+    if (value.length < minimumLength()) return;
+
+    waiting = value;
+    ticket += 1;
+    clearTimeout(closeTimer);
+    // A badge belongs to a new selection and has to answer to a click anywhere
+    // else; a pin left over from the card before would swallow that click.
+    pinned = false;
+    showPin();
+    Glossy.invoke("popup_set_pinned", { pinned: false }).catch(() => {});
+    serviceMenu = null;
+    current = null;
+    text = value;
+    Glossy.render.stopSpeaking();
+    document.body.dataset.state = "badge";
+    size = { width: 0, height: 0 };
+    await place(true);
+  }
+
   async function run(selection) {
     const value = String(selection || "").trim();
     if (value.length < minimumLength()) return;
@@ -304,7 +345,12 @@
     headword.textContent = value;
     langbar.hidden = true;
     document.body.dataset.state = "loading";
-    Glossy.render.loading(content);
+    // The card is the shape of the answer that is coming, and the engine can be
+    // changed from it while it is on its way.
+    Glossy.render.loading(content, {
+      provider: SERVICE_ENGINES[service],
+      onChooseService: toggleServiceMenu,
+    });
     size = { width: 0, height: 0 };
     // A pinned card stays where it is; only a fresh, unpinned one follows the
     // cursor to the new selection.
@@ -331,6 +377,8 @@
       refine(result, mine);
     } catch (error) {
       if (mine !== ticket) return;
+      // The card that held the list is gone with the loading state.
+      serviceMenu = null;
       document.body.dataset.state = "error";
       Glossy.render.error(content, Glossy.errorMessage(error), () => run(text));
       await place(false);
@@ -361,6 +409,7 @@
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
       pending: true,
+      onChooseService: toggleServiceMenu,
     });
     await place(false);
 
@@ -398,6 +447,8 @@
 
   /** Draws the card the way the reading and compactness settings ask for. */
   function draw(result) {
+    // The list goes with the card that held it.
+    serviceMenu = null;
     Glossy.render.result(content, result, {
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
@@ -411,6 +462,9 @@
    * asked which entry it adds up to instead of deriving it again here.
    */
   const SERVICES = ["cloud-baidu", "cloud-youdao", "google"];
+
+  /** The name each of them answers under, as the backend spells it. */
+  const SERVICE_ENGINES = { "cloud-baidu": "baidu", "cloud-youdao": "youdao", google: "google" };
 
   /** The service list while it is open, and the name it was opened from. */
   let serviceMenu = null;
@@ -581,6 +635,7 @@
     clearTimeout(closeTimer);
     // The card is about to be hidden with whatever is on it.
     serviceMenu = null;
+    waiting = "";
     // Unpinning here keeps the button in step with the card that is about to
     // vanish; the backend forgets the pin with the card.
     pinned = false;
@@ -593,7 +648,17 @@
 
   copyButton.addEventListener("click", copyResult);
   pinButton.addEventListener("click", () => setPinned(!pinned));
-  closeButton.addEventListener("click", dismiss);
+  // The badge is the only thing that starts a translation: the selection alone
+  // only puts it on screen.
+  badge.addEventListener("click", () => {
+    const value = waiting;
+    waiting = "";
+    run(value);
+  });
+  settingsButton.addEventListener("click", () => {
+    dismiss();
+    Glossy.invoke("open_settings").catch(() => {});
+  });
   langFrom.addEventListener("change", () => {
     pair.source = langFrom.value;
     detected = "";
@@ -627,7 +692,7 @@
 
   Glossy.listen("glossy://selection", (event) => {
     resetLanguages();
-    run(event && event.payload ? event.payload.text : "");
+    showBadge(event && event.payload ? event.payload.text : "");
   });
 
   Glossy.listen("glossy://result", (event) => {
@@ -652,8 +717,16 @@
     const sample = new URLSearchParams(location.search).get("sample") || "word";
     document.body.dataset.state = sample;
 
+    if (sample === "badge") {
+      // What a selection looks like before it is clicked: the icon alone.
+      showBadge("running");
+      return;
+    }
     if (sample === "loading") {
-      Glossy.render.loading(content);
+      Glossy.render.loading(content, {
+        provider: SERVICE_ENGINES[service],
+        onChooseService: toggleServiceMenu,
+      });
       return;
     }
     if (sample === "error") {

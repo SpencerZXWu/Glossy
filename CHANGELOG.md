@@ -6,6 +6,83 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.2.4] - 2026-09-24
+
+The release v1.2.3 was meant to be: the same application, built from committed source. The
+v1.2.3 installers were built from a working copy that was never committed, so its tag
+pointed at a commit that declared 1.1.0. This version commits that work and builds the
+installers from the tag that names them.
+
+### Changed
+
+- **The installer is built from the tag that names it.** Pushing a `vX.Y.Z` tag now builds
+  the installer, the MSI and the portable package on a Windows runner
+  (`.github/workflows/release.yml`) through the same `scripts/release.ps1` a local release
+  uses, and the run stops before the build when the tag does not match the version its
+  commit declares, so a release cannot go out whose name and files disagree with the source
+  they came from. A release signed on a workstation is still what ships once there is a
+  certificate: `scripts/release.ps1 -Sign -Publish` pushes the same tag, and the workflow
+  that starts from that push finds the release already published and leaves it alone.
+- **The changelog has its 1.2.1 section back.** The 1.2.2 entry had swallowed the language
+  bar entry, and the `1.2.1` heading with it, so the exchange-rate change and the language
+  bar change were listed under one version. They are under 1.2.1 and 1.2.2 again.
+
+## [1.2.3] - 2026-09-24
+
+The engine can be changed while an answer is still on its way.
+
+### Changed
+
+- **The engine switcher is on the card before the answer is.** The name in the card's bottom
+  row was drawn from the engine that answered, so a card that had not been filled yet had no
+  bottom row at all: a translation that was slow — or one that went to the wrong engine — had
+  to be waited out before the list of engines could be opened, and the word card behaved the
+  same way while its dictionary lookups were still running. The row is now drawn on the
+  loading card too, and the name in it is the engine the settings picked, which is the one
+  that was asked rather than the one that answered (`src/js/render.js`, `src/js/popup.js`).
+  Choosing from it during a translation restarts that translation on the engine that was
+  picked: the answer on its way is dropped, and the characters are billed to the new engine.
+- **The Worker's default daily allowance matches the code.** `DAILY_CHARS_TOTAL` in
+  `server/wrangler.toml` said `300000` while the code default and the function that is
+  deployed both use `30000`; the file now says `30000`, with the reasoning written next to
+  it, so a Worker deployed from it allows the same day as the function already running.
+
+## [1.2.2] - 2026-09-24
+
+A selection no longer costs anything the moment it is made. Glossy answers it with a small
+icon under the text, and the translation — and the day's allowance with it — waits for a
+click on that icon. The card's close button is gone, and a settings button has taken its
+place.
+
+### Changed
+
+- **A selection shows an icon instead of the card.** Releasing the mouse used to start the
+  translation straight away, which spent one of the day's translations on every word the
+  reader happened to swipe over. The selection now puts a 44px Glossy icon under the text
+  and stops there: the translation is asked for when the icon is clicked, so a selection
+  that was never meant to be translated costs nothing. Clicking anywhere else dismisses
+  the icon, and the shortcut (`Ctrl+Alt+C`) behaves the same way.
+- **The card's close button is a settings button.** Closing the card is what a click
+  anywhere else already does, so the `×` was one button for something the window never
+  needed help with; it now opens the settings window through the new `open_settings`
+  command. `Esc` still closes the card.
+
+The unit card's currency conversions now go through Glossy's own server instead of straight
+to a third-party rate feed.
+
+### Changed
+
+- **The exchange rate is fetched through the server.** Every currency conversion used to
+  reach out to `open.er-api.com` (with `api.frankfurter.app` as a fallback) from the client,
+  which made one third-party service per conversion the one call in the app that bypassed
+  the relay. The server gained `GET /v1/rates?client=<id>&base=<code>`
+  (`server/src/rates.js`, wired into `server/src/upstream.js` and `server/src/handler.js`):
+  it normalises both vendors into one table and costs **no character allowance** — it is
+  booked as `chars: 0`, so a card that adds a converted amount never eats into the day's
+  translations. `src-tauri/src/units/currency.rs` asks the relay first and only falls back
+  to calling the two vendors itself when the server cannot answer, so an older deployment
+  keeps working exactly as before.
+
 ## [1.2.1] - 2026-09-24
 
 A language bar now tells the truth about the engine behind it. The eight languages a

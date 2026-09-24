@@ -23,9 +23,11 @@ leaving the document and without losing the place they were reading.
 ## Product Purpose
 
 Glossy is a lightweight Windows desktop translation popup. The user drags across
-text — or double-clicks a word — in any application, and a small floating card
-appears under the cursor with the translation. The source language is detected
-automatically.
+text — or double-clicks a word — in any application, and a small Glossy icon
+appears under the cursor; clicking it opens the floating card with the
+translation. Nothing is translated, and nothing is charged against the day's
+allowance, until that icon is clicked, so a selection that was never meant to be
+translated costs nothing. The source language is detected automatically.
 
 Success: the reader gets the meaning they were missing in a moment and keeps
 reading. Nothing has to be pasted anywhere, no page has to be opened, and the

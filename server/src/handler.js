@@ -6,6 +6,8 @@
  * built by `createUpstream` reports that through its `configured` flag.
  */
 
+import { isBaseCode } from "./rates.js";
+
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BODY = 64 * 1024;
 
@@ -99,6 +101,45 @@ export function createHandler({ store, upstream, config, now = () => Date.now() 
         },
         usage,
         remaining: Math.max(0, limits.charsPerClient - usage.client),
+      });
+    }
+
+    if (route === "/v1/rates") {
+      if (request.method !== "GET") return fail(405, "method_not_allowed", "只支持 GET。");
+      const clientId = url.searchParams.get("client") || "";
+      const base = url.searchParams.get("base") || "";
+      if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");
+      if (!isBaseCode(base)) return fail(400, "invalid_request", "需要三个字母的货币代码，例如 USD。");
+
+      // Rates cost no characters, so the daily allowances are untouched: the
+      // call is only booked against the per-minute limit, which keeps a card
+      // that shows a conversion free for the user.
+      const reserved = await store.reserve(day, { clientId, ipHash, chars: 0, limits, now: at, minute });
+      if (!reserved.ok) {
+        return fail(429, reserved.code, reserved.message, {
+          retryAfter: reserved.retryAfter ?? null,
+          limit: reserved.limit ?? null,
+          remaining: reserved.remaining ?? 0,
+        });
+      }
+
+      let result;
+      try {
+        result = await upstream.rates({ base });
+      } catch (error) {
+        return fail(502, "upstream_error", `汇率服务调用失败：${error}`);
+      }
+      if (!result.ok) {
+        const status = result.code === "invalid_request" ? 400 : 502;
+        return fail(status, result.code, result.message);
+      }
+
+      return json({
+        ok: true,
+        base: result.base,
+        source: result.source,
+        date: result.date ?? null,
+        rates: result.rates,
       });
     }
 

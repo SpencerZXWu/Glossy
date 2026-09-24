@@ -292,6 +292,7 @@
       case "popup_close":
       case "popup_set_pinned":
       case "show_popup":
+      case "open_settings":
         return null;
       default:
         return null;

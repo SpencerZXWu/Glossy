@@ -4,7 +4,8 @@
 //! without any: the app only sends the text plus an install id, and the server
 //! decides what is left of the day's quota.
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
@@ -86,6 +87,14 @@ fn endpoint_from(configured: &str, build_default: &str) -> Result<String, String
         return Err("The cloud translator address has to start with `https://`.".to_string());
     }
     Ok(endpoint.to_string())
+}
+
+/// The address this build sends requests to, for the callers that need the same
+/// choice `endpoint_of` makes without wanting its error path: what they do with
+/// a missing address is skip the server entirely, so an empty string is the
+/// answer for a build that carries no address of its own.
+pub fn resolved_endpoint(configured: &str) -> String {
+    endpoint_from(configured, DEFAULT_ENDPOINT).unwrap_or_default()
 }
 
 /// What one translation asks the server for.
@@ -235,6 +244,80 @@ pub async fn quota(
     })
 }
 
+/// One exchange-rate table the server fetched for this device.
+#[derive(Debug, Clone)]
+pub struct RateTable {
+    /// Which vendor the numbers came from, shown under the conversion.
+    pub source: String,
+    /// The day the table was published, `YYYY-MM-DD`, when the vendor said.
+    pub date: Option<String>,
+    /// Rates per currency code, all relative to the base that was asked for.
+    pub rates: HashMap<String, f64>,
+}
+
+/// How long the rate lookup may take. The card asks for this on the way to the
+/// first paint, so it is bounded well below the translation's own budget.
+const RATE_TIMEOUT: Duration = Duration::from_secs(4);
+
+/// The exchange-rate table for one base currency, or `None` when the server has
+/// nothing to say — a deployment from before this route existed, or no network.
+///
+/// A conversion is an annotation next to the translation rather than the thing
+/// the user asked for, so every failure here is silent: `currency` keeps asking
+/// the vendors directly and the card simply carries no rate when none answers.
+///
+/// The server books these calls against its per-minute limit and nothing
+/// against the daily characters, so a card that only holds a currency
+/// conversion still costs no quota.
+pub async fn rates(
+    client: &reqwest::Client,
+    base: &str,
+    configured_endpoint: &str,
+    install_id: &str,
+) -> Option<RateTable> {
+    let endpoint = endpoint_of(configured_endpoint).ok()?;
+    let response = client
+        .get(format!("{endpoint}/v1/rates"))
+        .query(&[("base", base), ("client", install_id)])
+        .timeout(RATE_TIMEOUT)
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+
+    let data: serde_json::Value = response.json().await.ok()?;
+    if data.get("ok").and_then(|value| value.as_bool()) != Some(true) {
+        return None;
+    }
+
+    let mut rates = HashMap::new();
+    for (code, value) in data.get("rates")?.as_object()?.iter() {
+        if let Some(value) = value.as_f64() {
+            if value.is_finite() && value > 0.0 {
+                rates.insert(code.to_ascii_uppercase(), value);
+            }
+        }
+    }
+    if rates.is_empty() {
+        return None;
+    }
+
+    Some(RateTable {
+        source: data
+            .get("source")
+            .and_then(|value| value.as_str())
+            .unwrap_or("glossy-cloud")
+            .to_string(),
+        date: data
+            .get("date")
+            .and_then(|value| value.as_str())
+            .map(str::to_string),
+        rates,
+    })
+}
+
 /// Turns a refusal from the server into a sentence the popup can show.
 ///
 /// The server answers in Chinese, and a desktop app that may be running in
@@ -321,6 +404,13 @@ mod tests {
             DEFAULT_ENDPOINT
         );
         assert!(endpoint_from("glossy.example.workers.dev", "").is_err());
+        // Callers that answer with "no server" instead of an error get the same
+        // address: the one the build was made with, whatever the file says.
+        assert_eq!(
+            resolved_endpoint("https://glossy.example.workers.dev"),
+            DEFAULT_ENDPOINT
+        );
+        assert_eq!(resolved_endpoint("  "), DEFAULT_ENDPOINT);
     }
 
     #[test]

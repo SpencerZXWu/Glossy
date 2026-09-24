@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 use crate::classify::{self, Kind};
 use crate::settings::{Service, Settings};
 
-pub use self::cloud::{new_install_id, quota as cloud_quota, Quota as CloudQuota};
+pub use self::cloud::{
+    new_install_id, quota as cloud_quota, rates as cloud_rates,
+    resolved_endpoint as cloud_endpoint, Quota as CloudQuota,
+};
 
 /// The free public endpoints reject requests without a browser like agent.
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \

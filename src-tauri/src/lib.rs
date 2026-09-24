@@ -154,12 +154,19 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
         return;
     };
     let cache = app.path().app_config_dir().ok();
+    // The same address the translator would use, so a stale value left in an
+    // older settings file cannot point the rates at a server that is gone.
+    let endpoint = translate::cloud_endpoint(&settings.cloud_endpoint);
     result.conversions = units::conversions_for(
         client,
         &result.source_text,
         &result.translation,
         &result.target_lang,
         cache.as_deref(),
+        Some(units::Relay {
+            endpoint: &endpoint,
+            install_id: &settings.cloud_id,
+        }),
     )
     .await;
 }
@@ -180,7 +187,7 @@ async fn cloud_status(
     let settings = state.settings();
     let endpoint = endpoint
         .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| settings.cloud_endpoint.clone());
+        .unwrap_or_else(|| translate::cloud_endpoint(&settings.cloud_endpoint));
     let client = translate::client()?;
     translate::cloud_quota(client, &endpoint, &settings.cloud_id).await
 }
@@ -302,6 +309,15 @@ fn popup_close(app: AppHandle) {
 #[tauri::command]
 fn popup_set_pinned(pinned: bool) {
     popup::set_pinned(pinned);
+}
+
+/// The gear button of the card is a request for the settings window; the card
+/// itself has just been dismissed by the interface.
+#[tauri::command]
+fn open_settings(app: AppHandle) {
+    // The runtime is spelled out: leaving it to inference makes the macro expand
+    // to a never type fallback.
+    tray::show_main::<tauri::Wry>(&app);
 }
 
 #[tauri::command]
@@ -620,6 +636,7 @@ pub fn run() {
             popup_sync_anchor,
             popup_close,
             popup_set_pinned,
+            open_settings,
             copy_text,
             say,
             stop_speaking,

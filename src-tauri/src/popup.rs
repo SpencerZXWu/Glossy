@@ -293,7 +293,10 @@ pub fn place(
     let window = popup_window(app).ok_or("popup window is not available")?;
     store_handle(&window);
 
-    let width = width.clamp(160.0, 1200.0);
+    // The floor is low because the popup is not always the card: the badge that
+    // waits for a click is a single icon in a window of its own size, and any
+    // slack around it would be transparent window that still swallows clicks.
+    let width = width.clamp(40.0, 1200.0);
     // The popup itself keeps the card inside the screen; this is only a guard
     // against nonsense values.
     let height = height.clamp(40.0, 4096.0);

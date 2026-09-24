@@ -26,9 +26,11 @@
             <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
           </svg>
         </button>
-        <button class="icon-button" id="close" type="button" data-i18n-title="popup.close" title="Close" aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M6 6l12 12M18 6L6 18" />
+        <button class="icon-button" id="settings" type="button" data-i18n-title="popup.settings" title="Open the settings" aria-label="Open the settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8h6M14 8h6M4 16h10M18 16h2" />
+            <circle cx="12" cy="8" r="2" />
+            <circle cx="16" cy="16" r="2" />
           </svg>
         </button>
       </header>
@@ -44,6 +46,9 @@
       </div>
       <div class="content" id="content"></div>
     </div>
+    <button class="badge" id="badge" type="button" data-i18n-title="popup.translate" title="Translate the selection" aria-label="Translate the selection">
+      <img src="images/logo.png" alt="" />
+    </button>
     <script src="js/bridge.js"></script>
     <script src="js/i18n.js"></script>
     <script src="js/render.js"></script>

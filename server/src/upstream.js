@@ -10,6 +10,7 @@
 
 import { translateWithLlm } from "./llm.js";
 import { md5 } from "./md5.js";
+import { fetchRates } from "./rates.js";
 import { translateWithYoudao } from "./youdao.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
@@ -242,6 +243,19 @@ export function createUpstream(config) {
     configured: upstreamConfigured(config),
     /** Names of the vendors this deployment can serve, in the order it tries them. */
     vendors: backends.map((backend) => backend.name),
+    /**
+     * Live exchange rates, fetched from here rather than from the user's own
+     * network. No key and no vendor choice involved, so this is always offered
+     * — a deployment without keys can still serve rates.
+     */
+    rates: (input = {}) =>
+      fetchRates({
+        fetchImpl,
+        primary: config.RATES_ENDPOINT,
+        fallback: config.RATES_FALLBACK_ENDPOINT,
+        timeoutMs: Number.parseInt(config.RATES_TIMEOUT_MS ?? "", 10) || undefined,
+        ...input,
+      }),
     async translate(input = {}) {
       if (!backends.length) {
         return { ok: false, code: "not_configured", message: "服务端还没有配置翻译密钥。" };
