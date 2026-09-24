@@ -1,13 +1,26 @@
 //! User settings, persisted as JSON in the application config directory.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager};
 
 /// Minimum selection length (in characters) that may trigger the popup.
 pub const MIN_SELECTION_LEN: usize = 2;
+
+/// Version of the settings file format, written into every file as
+/// `formatVersion`.
+///
+/// `contract/contract.json` publishes this number next to the keys this build
+/// writes and the IPC commands it answers to, and a test fails when the file and
+/// the code disagree. The number only moves when the stored shape changes in a
+/// way `parse` cannot absorb on its own — a key that is renamed or removed, or
+/// one that changes meaning. Added keys come from `#[serde(default)]` and leave
+/// the number alone. When it does move, `migrate` carries every file written
+/// before it up to it, so a settings file from any `1.3.0` or later release
+/// keeps loading.
+pub const FORMAT_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Provider {
@@ -382,6 +395,9 @@ fn default_target_lang() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
+    /// Version of the format this file was written in, so a later release can
+    /// tell what it has to migrate and an older one what it cannot read.
+    pub format_version: u32,
     /// Master switch for the select-to-translate feature.
     pub enabled: bool,
     /// Trigger when the mouse drags across text.
@@ -484,6 +500,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            format_version: FORMAT_VERSION,
             enabled: true,
             trigger_on_drag: true,
             trigger_on_double_click: true,
@@ -588,6 +605,21 @@ impl Settings {
         };
         match std::fs::read_to_string(&path) {
             Ok(raw) => {
+                if Self::unreadable(&raw) {
+                    // A copy is kept next to the file, because the next save
+                    // overwrites it: a hand edit that broke the JSON, or a file
+                    // written by a newer release, stays recoverable either way.
+                    let kept = match Self::set_aside(&path) {
+                        Some(backup) => format!(", kept as {}", backup.display()),
+                        None => String::new(),
+                    };
+                    eprintln!(
+                        "glossy: {} is not in format {FORMAT_VERSION}{kept}, \
+                         so Glossy starts from the defaults",
+                        path.display()
+                    );
+                    return Settings::default();
+                }
                 let mut settings = Self::parse(&raw);
                 let mut rewrite = settings.reveal_credentials();
                 // A file written before the cloud provider existed carries no
@@ -613,6 +645,47 @@ impl Settings {
         }
     }
 
+    /// Whether a stored file is in a shape this build cannot read, which means
+    /// the defaults are used instead.
+    ///
+    /// Two cases. A file that is not a JSON object at all — a hand edit that
+    /// broke it, or half a file after a crash — and one written by a *newer*
+    /// format, whose settings this build would only misread: a key that means
+    /// something else there would be taken as the value it used to have. A file
+    /// that names no version is the one written before the freeze, which is
+    /// version `0` and is migrated rather than set aside.
+    fn unreadable(raw: &str) -> bool {
+        let text = raw.trim_start_matches('\u{feff}');
+        match serde_json::from_str::<serde_json::Value>(text) {
+            Ok(serde_json::Value::Object(stored)) => stored
+                .get("formatVersion")
+                .and_then(serde_json::Value::as_u64)
+                .is_some_and(|version| version > u64::from(FORMAT_VERSION)),
+            // A file that is JSON but not an object holds no setting at all,
+            // which `parse` answers with the defaults anyway; going through the
+            // same path keeps the backup in one place.
+            Ok(_) => true,
+            Err(_) => true,
+        }
+    }
+
+    /// Copies the settings file to `settings.backup-<unix seconds>.json` and
+    /// answers with the copy, or with nothing when it could not be written.
+    fn set_aside(path: &Path) -> Option<PathBuf> {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_secs())
+            .unwrap_or(0);
+        let backup = path.with_file_name(format!("settings.backup-{stamp}.json"));
+        match std::fs::copy(path, &backup) {
+            Ok(_) => Some(backup),
+            Err(error) => {
+                eprintln!("glossy: cannot keep a copy of {}: {error}", path.display());
+                None
+            }
+        }
+    }
+
     /// Whether a stored file holds a given key at all, which `parse` cannot
     /// tell: it merges the file into the defaults, so a key that is missing
     /// there shows up as the default value.
@@ -624,6 +697,38 @@ impl Settings {
             .unwrap_or(false)
     }
 
+    /// Brings a stored file up to `FORMAT_VERSION`, one version at a time.
+    ///
+    /// Every step belongs here and none of them belongs in `parse`: a file
+    /// written by an older release is read through this, and the merge that
+    /// follows only has to deal with the current shape. A step is gated on the
+    /// version it upgrades from, so the chain stays readable as it grows.
+    fn migrate(stored: &mut serde_json::Map<String, serde_json::Value>, from: u32) {
+        if from < 1 {
+            // Version 0 is every file written before the freeze. One of them
+            // names a provider and no channel, and merging it into the defaults
+            // would silently move it to the cloud channel: everything it could
+            // have named needs an account of the user's, except the proxy
+            // itself, which is what the cloud channel replaced.
+            if !stored.contains_key("channel") {
+                let channel = match stored.get("provider").and_then(serde_json::Value::as_str) {
+                    Some(name) if name != "cloud" => Channel::Api,
+                    _ => Channel::Cloud,
+                };
+                stored.insert(
+                    "channel".to_string(),
+                    serde_json::to_value(channel).unwrap_or(serde_json::json!("cloud")),
+                );
+            }
+        }
+        // Whatever the file said, the shape read from here on is the current
+        // one, and the next save writes that number back.
+        stored.insert(
+            "formatVersion".to_string(),
+            serde_json::json!(FORMAT_VERSION),
+        );
+    }
+
     /// Reads persisted JSON, falling back to the defaults for anything unusable.
     ///
     /// The file is merged into the defaults one setting at a time: a value that
@@ -631,10 +736,15 @@ impl Settings {
     /// provider that no longer exists) costs only that setting instead of
     /// resetting the whole file - which the next save would then write back as
     /// defaults, losing everything the user had configured.
+    ///
+    /// What the file declares about itself is read first, by `migrate`: a file
+    /// from an older release is brought up to `FORMAT_VERSION` before any of it
+    /// is merged, and a file this build cannot read at all never reaches here
+    /// (`load` sets it aside instead).
     fn parse(raw: &str) -> Settings {
         // Editors on Windows like to write a UTF-8 byte order mark.
         let text = raw.trim_start_matches('\u{feff}');
-        let Ok(serde_json::Value::Object(stored)) = serde_json::from_str(text) else {
+        let Ok(serde_json::Value::Object(mut stored)) = serde_json::from_str(text) else {
             return Settings::default().sanitized();
         };
 
@@ -643,16 +753,11 @@ impl Settings {
             .and_then(|value| value.as_object().cloned())
             .unwrap_or_default();
 
-        // A file written before the channels existed names a provider and no
-        // channel, and merging it into the defaults would silently move it to
-        // the cloud one. Everything it could have named needs an account of the
-        // user's, except the proxy itself, which is what the cloud channel
-        // replaced.
-        let pre_channel = !stored.contains_key("channel");
-        let stored_provider = stored
-            .get("provider")
-            .and_then(|value| value.as_str())
-            .map(str::to_string);
+        let from = stored
+            .get("formatVersion")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0) as u32;
+        Self::migrate(&mut stored, from);
 
         for (key, value) in stored {
             // Keys written by older versions are kept: they are migrated into
@@ -669,17 +774,6 @@ impl Settings {
                 }
                 Err(error) => eprintln!("glossy: ignoring the stored setting `{key}`: {error}"),
             }
-        }
-
-        if pre_channel {
-            let channel = match stored_provider.as_deref() {
-                Some(name) if name != "cloud" => Channel::Api,
-                _ => Channel::Cloud,
-            };
-            merged.insert(
-                "channel".to_string(),
-                serde_json::to_value(channel).unwrap_or(serde_json::json!("cloud")),
-            );
         }
 
         serde_json::from_value::<Settings>(serde_json::Value::Object(merged))
@@ -1328,5 +1422,135 @@ mod tests {
         };
 
         assert_eq!(settings.sanitized().speech_rate, 10);
+    }
+
+    /// The frozen contract, as published in `contract/contract.json`.
+    ///
+    /// It is the promise the `2.x` line is built on: the shape of the settings
+    /// file and the names of the IPC commands do not change under it. Editing
+    /// either one deliberately means editing the contract in the same commit,
+    /// which is what this file makes visible in review.
+    fn contract() -> serde_json::Value {
+        serde_json::from_str(include_str!("../../contract/contract.json"))
+            .expect("the contract is JSON")
+    }
+
+    fn strings(value: &serde_json::Value) -> Vec<String> {
+        value
+            .as_array()
+            .expect("an array")
+            .iter()
+            .map(|entry| entry.as_str().expect("a string").to_string())
+            .collect()
+    }
+
+    #[test]
+    fn the_stored_shape_is_the_one_the_contract_publishes() {
+        let contract = contract();
+        let written = serde_json::to_value(Settings::default()).expect("settings serialize");
+        let keys: Vec<String> = written
+            .as_object()
+            .expect("an object")
+            .keys()
+            .cloned()
+            .collect();
+
+        assert_eq!(keys, strings(&contract["settingsKeys"]));
+        assert_eq!(contract["formatVersion"], serde_json::json!(FORMAT_VERSION));
+        assert_eq!(written["formatVersion"], serde_json::json!(FORMAT_VERSION));
+    }
+
+    #[test]
+    fn a_settings_file_says_which_format_it_is_in() {
+        let json = serde_json::to_string(&Settings::default()).expect("settings serialize");
+
+        // The file is written by this build, so it carries this format.
+        assert_eq!(Settings::parse(&json).format_version, FORMAT_VERSION);
+        // A file written before the freeze names no version, and reading it
+        // migrates it up to the current one rather than leaving it at `0`.
+        assert_eq!(
+            Settings::parse("{\"enabled\":true}").format_version,
+            FORMAT_VERSION
+        );
+        assert_eq!(
+            Settings::parse("{\"formatVersion\":0,\"enabled\":true}").format_version,
+            FORMAT_VERSION
+        );
+    }
+
+    #[test]
+    fn a_file_from_before_the_freeze_is_migrated_before_it_is_merged() {
+        // A file written before the channels existed names a provider and no
+        // channel, and the migration is what keeps its intent: the free
+        // endpoint stays the free endpoint instead of sliding into the cloud
+        // channel, which is what a plain merge into the defaults would do.
+        let free = Settings::parse("{\"provider\":\"google\"}");
+        assert_eq!(free.channel, Channel::Api);
+        assert_eq!(free.service(), Service::Google);
+
+        let proxy = Settings::parse("{\"provider\":\"cloud\"}");
+        assert_eq!(proxy.channel, Channel::Cloud);
+
+        // A provider that wanted an account of the user's is not offered any
+        // more: the migration still reads it as that shape, and the first save
+        // replaces it with an entry this build has.
+        assert_eq!(
+            Settings::parse("{\"provider\":\"baidu\"}").service(),
+            Service::CloudBaidu
+        );
+
+        // The single credential pair of those files survives the migration.
+        let settings = Settings::parse(
+            "{\"apiKey\":\"stored-key\",\"provider\":\"baidu\",\"targetLang\":\"ja\"}",
+        );
+        assert_eq!(settings.active_credentials().api_key, "stored-key");
+        assert_eq!(settings.target_lang, "ja");
+    }
+
+    #[test]
+    fn a_file_this_build_cannot_read_is_set_aside() {
+        // A newer format can give a key a meaning this build does not know, so
+        // none of it may be merged into the defaults.
+        assert!(Settings::unreadable(
+            "{\"formatVersion\":2,\"targetLang\":\"ja\"}"
+        ));
+        // Half a file after a crash, and a file that is JSON but holds nothing.
+        assert!(Settings::unreadable("{\"targetLang\":"));
+        assert!(Settings::unreadable("[]"));
+        assert!(Settings::unreadable(""));
+
+        // The current format, and every file written before the freeze.
+        assert!(!Settings::unreadable(&format!(
+            "{{\"formatVersion\":{FORMAT_VERSION}}}"
+        )));
+        assert!(!Settings::unreadable("{\"formatVersion\":1}"));
+        assert!(!Settings::unreadable("{\"enabled\":true}"));
+    }
+
+    #[test]
+    fn the_file_that_could_not_be_read_is_kept_next_to_the_settings() {
+        let dir = std::env::temp_dir().join(format!(
+            "glossy-settings-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("the clock is set")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("the directory is writable");
+        let path = dir.join("settings.json");
+        std::fs::write(&path, "{\"targetLang\":").expect("the file is writable");
+
+        let backup = Settings::set_aside(&path).expect("the copy is written");
+
+        assert_eq!(backup.parent(), path.parent());
+        let name = backup.file_name().unwrap().to_string_lossy().to_string();
+        assert!(name.starts_with("settings.backup-"), "{name}");
+        assert!(name.ends_with(".json"), "{name}");
+        assert!(path.exists(), "the original file is still there");
+        assert_eq!(
+            std::fs::read_to_string(&backup).expect("the copy is readable"),
+            "{\"targetLang\":"
+        );
+        std::fs::remove_dir_all(&dir).expect("the directory is removable");
     }
 }

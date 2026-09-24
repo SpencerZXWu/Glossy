@@ -197,6 +197,12 @@ relay it that way:
   OK, ~83 MB int8, ~300 MB RAM). `NLLB-200` is CC-BY-NC-4.0 and must **not** be shipped.
 
 Settings are stored as JSON in `%APPDATA%\com.glossy.translator\settings.json`.
+The file opens with `formatVersion`, which says which shape it is written in; from
+`1.3.0` onwards the keys are only ever added and the IPC command names do not move, so
+a file written by an earlier build keeps loading. A file this build cannot read — one
+that is not a JSON object, or one written by a newer format version — is copied to
+`settings.backup-<unix seconds>.json` next to it and the app starts from the defaults,
+rather than being overwritten.
 The `firstRun` flag in that file records that the welcome window was already
 shown; removing it (or the whole file) brings the window back on the next start.
 Translation credentials live in a `credentials` map keyed by provider, and existing
@@ -333,7 +339,7 @@ reason `npm.cmd` is used above. See [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 181 frontend tests
+node --test                                                          # 202 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -437,7 +443,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 192 tests; see "Checks" above for lint and format runs
+cargo test   # 204 tests; see "Checks" above for lint and format runs
 ```
 
 ### Content Security Policy
@@ -657,6 +663,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 - **完全离线** —— `Opus-MT` / `Argos Translate` 权重是 CC-BY-4.0/Apache-2.0（可商用，int8 约 83 MB，内存约 300 MB）。`NLLB-200` 是 CC-BY-NC-4.0，**不能**发布。
 
 设置以 JSON 形式保存在 `%APPDATA%\com.glossy.translator\settings.json`。
+文件开头是 `formatVersion`，标明它用的是哪一版格式；自 `1.3.0` 起设置项只增不改，IPC 命令名也不再变动，因此较早版本写出的文件始终能被读入。本构建读不了的文件——不是 JSON 对象，或格式版本比本构建更新的——会被复制为旁边的 `settings.backup-<Unix 秒数>.json`，应用则从默认值开始，而不是把它覆盖掉。
 该文件中的 `firstRun` 标记记录着欢迎窗口已经显示过；删除它（或整个文件）会在下次启动时把该窗口带回来。
 翻译凭证存放在一个以渠道为键的 `credentials` 映射中，已有的单渠道 `apiKey`/`appId` 值会在首次启动时迁移进该映射。
 该映射中的每个值在写入文件之前都会用 Windows DPAPI（`CryptProtectData`，当前用户范围）加密，因此文件里保存的是
@@ -722,7 +729,7 @@ scripts\release.ps1` 运行它——脚本会被默认执行策略拦截，这�
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 181 frontend tests
+node --test                                                          # 202 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -810,7 +817,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 192 tests; see "Checks" above for lint and format runs
+cargo test   # 204 tests; see "Checks" above for lint and format runs
 ```
 
 ### 内容安全策略
@@ -1115,6 +1122,12 @@ eso las dos entradas que responden desde el servidor las intermedian así:
   `NLLB-200` es CC-BY-NC-4.0 y **no** debe distribuirse.
 
 Los ajustes se guardan como JSON en `%APPDATA%\com.glossy.translator\settings.json`.
+El archivo empieza por `formatVersion`, que indica en qué forma está escrito; desde
+`1.3.0` las claves solo se añaden y los nombres de los comandos IPC no cambian, así
+que un archivo escrito por una compilación anterior se sigue cargando. Un archivo que
+esta compilación no puede leer —uno que no sea un objeto JSON, o uno escrito por una
+versión de formato más nueva— se copia a `settings.backup-<segundos unix>.json` a su
+lado y la aplicación arranca con los valores por defecto, en lugar de sobrescribirlo.
 El indicador `firstRun` de ese archivo registra que la ventana de bienvenida ya se
 mostró; si lo eliminas (o eliminas el archivo entero), la ventana vuelve a aparecer
 en el siguiente arranque.
@@ -1267,7 +1280,7 @@ Consulta [release/README.md](./release/README.md).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\version.ps1 -Check   # all version numbers agree
-node --test                                                          # 181 frontend tests
+node --test                                                          # 202 frontend tests
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
@@ -1378,7 +1391,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 192 tests; see "Checks" above for lint and format runs
+cargo test   # 204 tests; see "Checks" above for lint and format runs
 ```
 
 ### Política de seguridad de contenido

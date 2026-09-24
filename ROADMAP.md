@@ -12,9 +12,9 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.2.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~20,300 lines: ~10,800 Rust, ~5,750 frontend (plain HTML/CSS/JS), ~1,400 frontend test lines and ~2,400 in `server/`, comments included |
-| Tests | 192 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Version | `1.3.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~23,000 lines: ~12,500 Rust, ~6,700 frontend (plain HTML/CSS/JS), ~1,700 frontend test lines and ~3,100 in `server/`, comments included |
+| Tests | 204 Rust tests, 202 frontend tests (`node --test`) and 86 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
 | Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. Unsigned by default, with `scripts/release.ps1 -Sign` ready to sign and verify all three once a certificate or cloud signing credential exists; a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
@@ -35,9 +35,13 @@ ends that:
   `#[serde(default)]`, so files written by older versions keep loading.
 - `1.x` — feature releases. Settings are only added, never removed or renamed, and IPC
   command names and their arguments stay as they are; a file written before an addition
-  keeps loading. Anything that does break either of those waits for `2.0.0`.
-- `2.0.0` — the freeze. The settings JSON format and the IPC command names stop
-  changing for the whole `2.x` line; later additions go through a migration function.
+  keeps loading. Since `1.3.0` this is a published contract rather than a habit:
+  `contract/contract.json` lists the format version of the settings file, every key it
+  holds and every command the app answers to, and CI fails when the code and the
+  contract disagree.
+- `2.0.0` — the release that may break the contract. Anything from `1.3.0` onwards is
+  migrated instead of dropped, and a file this build cannot read is copied aside before
+  the defaults are used, so a deliberate break still never costs anyone their settings.
 - Every `X.Y.0` gets a GitHub milestone, and every release is a `vX.Y.Z` tag with the
   NSIS installer attached.
 
@@ -176,19 +180,80 @@ the reader picked.
 
 Estimated effort: 1 day.
 
-## v2.0.0 — Format freeze and the long-run promises
+## v1.3.0 — Format freeze
 
-Goal: turn a personal tool into something that can be promised.
+Goal: stop the shape of the stored file and the names of the commands from moving, so
+that a later release can honestly promise to keep reading what an earlier one wrote.
 
-| Work item | Details |
-| --- | --- |
-| Format freeze | Settings JSON and IPC command names frozen, with a migration function and a fallback that backs up the original file and starts from defaults |
-| Performance budget | Idle CPU below 0.5%, memory below 80 MB, selection to popup under 150 ms, and no handle or GDI leak over long runs — the hook and the clipboard are the places to watch |
-| Stability | Crash recovery and optional anonymous error reporting, off by default and asked about on first run |
-| Accessibility | Full keyboard operability, a high-contrast theme, correct focus order and aria labels |
-| Documentation | The README already carries all three languages; still to write: the FAQ and a note on provider quotas and terms of use |
+| Work item | Details | State |
+| --- | --- | --- |
+| A version in the file | Every settings file carries `formatVersion` alongside the settings. Two numbers move independently here: the file this release writes says `formatVersion: 1`, and the release that introduced the rule is `1.3.0`. Adding a key does not move the file version; renaming one, removing one, or changing what one means does | done — `FORMAT_VERSION` in `src-tauri/src/settings.rs` |
+| Migration before the merge | The version the file was written with decides what has to be translated before the file is merged: an older file is read as it was written, brought forward, and only then compared key by key against the current shape, so nothing is lost on the way | done — `Settings::migrate`, called by `parse` |
+| A fallback that keeps the original | A file that is not a JSON object, or that names a version newer than this build understands, is copied to `settings.backup-<unix seconds>.json` next to it, one line is printed, and the app starts from the defaults. The file is never overwritten invisibly | done — `unreadable` and `set_aside`, called by `load` |
+| The contract, published | `contract/contract.json` is the contract: the format version, every key the settings file holds, and every command the app answers to | done |
+| Two tests that hold it | The Rust suite compares the shape `Settings::default()` actually serializes to against the frozen key list and both format versions; the frontend suite compares the command list in `lib.rs` and every `invoke("…")` in `src/js/` against the frozen command list | done — `settings.rs` and `tests/contract.test.js` |
 
-Estimated effort: 5–10 days.
+Acceptance criteria for the milestone: `cargo test` and `node --test` pass with the two
+contract tests among them; a settings file written by `1.2.4` loads into `1.3.0` with
+nothing dropped; a file claiming a newer format version is set aside instead of
+overwritten. Adding a setting or a command now fails CI until the contract is edited in
+the same commit, which is the point of the release.
+
+Estimated effort: 1 day.
+
+## v1.4.0 — Performance budget
+
+Goal: the numbers a background tool has to keep, held by a measurement instead of an
+impression.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Idle cost | Below 0.5% CPU and below 80 MB of memory with the popup closed and the hook listening, measured on a release build — a debug build is not a number anyone runs | planned |
+| Latency | Selection to popup under 150 ms, from the mouse-up that ends the drag to the moment the card is painted | planned |
+| Long-run behaviour | No handle or GDI leak over a day of use; the mouse hook, the clipboard and the speech voice are the three places to watch, and each gets a counter a test can read | planned |
+| The number in the README | What was measured, on what machine and how to repeat it | planned |
+
+Estimated effort: 2–3 days.
+
+## v1.5.0 — Stability
+
+Goal: a tool that survives its own failures and can say what happened without asking
+anyone to trust it.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Crash recovery | A failure in the hook or in the popup does not take the tray icon with it: the process keeps answering, and if it cannot, it writes the reason down before it goes | planned |
+| Error log | A rotating log next to `settings.json` holding the failures the app already prints, with a size cap and a button that opens the folder | planned |
+| Anonymous reporting | Optional, off by default, asked about on the first run, with the exact payload shown before it is sent and described in `PRIVACY.md` | planned |
+
+Estimated effort: 2–4 days.
+
+## v1.6.0 — Accessibility
+
+Goal: both windows are usable with the keyboard alone and readable by a high-contrast
+theme.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Keyboard | Every control of both windows reachable and operable with Tab, Shift+Tab, Enter, Space and the arrow keys; the popup takes focus as its own window and gives it back when it closes | planned |
+| Focus order and labels | A focus order that follows the card top to bottom, `aria-label` on every icon-only button, and roles where the markup says nothing | planned |
+| High contrast | A theme built on the Windows high-contrast colours, selected through `prefers-contrast` rather than as another entry in the theme menu | planned |
+| A written pass | The keyboard and contrast passes added to the manual regression list in the README | planned |
+
+Estimated effort: 2–4 days.
+
+## v2.0.0 — The written promises
+
+Goal: what the project promises is written down, so a stranger can check it instead of
+trusting it.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| FAQ | The questions the README answers in passing, gathered in one place: why a selection needs a click, what is sent where, what happens when a provider quota runs out | planned |
+| Provider quotas and terms | A page per service: what is free, what it forbids, and what the app does when it is exhausted — the research is already in the README, and this is the part a user reads | planned |
+| Compatibility statement | What `2.x` reads (any settings file from `1.3.0` onwards), what it will not change (the contract), and what a future major release is allowed to break | planned |
+
+Estimated effort: 1–2 days.
 
 ## Priority
 
@@ -278,13 +343,13 @@ rather than investing in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.2.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
-| 规模 | 约 20,300 行：Rust 约 10,800 行，前端约 5,750 行（纯 HTML/CSS/JS），前端测试约 1,400 行，`server/` 约 2,400 行，含注释 |
-| 测试 | Rust 192 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
+| 版本 | `1.3.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 规模 | 约 23,000 行：Rust 约 12,500 行，前端约 6,700 行（纯 HTML/CSS/JS），前端测试约 1,700 行，`server/` 约 3,100 行，含注释 |
+| 测试 | Rust 204 个测试、前端 202 个测试（`node --test`）、`server/` 86 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
 | 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。默认不签名，但证书或云签名凭据一到位，`scripts/release.ps1 -Sign` 就能为三者签名并逐一校验；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
-| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.2.0` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
+| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.2.4` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
 
 下面的计划里没有遗留缺陷。最后一个 —— API 密钥以明文躺在
 `%APPDATA%\com.glossy.translator\settings.json` 里 —— 由 v0.2.0 的第一项修复，
@@ -299,9 +364,12 @@ rather than investing in it early.
 - `0.x.0`（x ≥ 2）—— 功能版本。可以新增设置；`Settings` 是
   `#[serde(default)]`，所以旧版本写出的文件照样能加载。
 - `1.x` —— 功能版本。设置只增不删、不改名，IPC 命令名及其参数保持原样；在新增项
-  之前写出的文件仍然能加载。任何会破坏这两点的改动都要等到 `2.0.0`。
-- `2.0.0` —— 冻结。设置 JSON 格式和 IPC 命令名在整个 `2.x` 线内不再变化；之后再
-  新增要走迁移函数。
+  之前写出的文件仍然能加载。自 `1.3.0` 起这不再是习惯而是公开的契约：
+  `contract/contract.json` 列出设置文件的格式版本、其中每一个键，以及应用能应答的
+  每一条命令，代码与契约不一致时 CI 会失败。
+- `2.0.0` —— 允许打破该契约的版本。`1.3.0` 及以后写出的文件会被迁移而不是被丢弃，
+  本构建读不了的文件会先被另存一份再使用默认值，所以即使是有意破坏，也不会让人丢
+  掉设置。
 - 每个 `X.Y.0` 都配一个 GitHub 里程碑，每个版本都是一个带 NSIS 安装包的
   `vX.Y.Z` 标签。
 
@@ -432,19 +500,75 @@ rather than investing in it early.
 
 预计工作量：1 天。
 
-## v2.0.0 —— 格式冻结与长期承诺
+## v1.3.0 —— 格式冻结
 
-目标：把个人工具变成可以承诺的东西。
+目标：让存下来的文件形状和命令名不再变动，好让后续版本能诚实地说出「旧版本写下的
+文件我照样读得懂」。
 
-| 工作项 | 细节 |
-| --- | --- |
-| 格式冻结 | 冻结设置 JSON 与 IPC 命令名，并配迁移函数和一个兜底：备份原文件、从默认值重新开始 |
-| 性能预算 | 空闲 CPU 低于 0.5%、内存低于 80 MB、从选区到弹窗低于 150 ms，长时间运行不泄漏句柄或 GDI —— 钩子和剪贴板是最需要盯的地方 |
-| 稳定性 | 崩溃恢复，以及可选的匿名错误上报，默认关闭并在首次运行时询问 |
-| 无障碍 | 完整键盘操作、高对比主题、正确的焦点顺序与 aria 标签 |
-| 文档 | README 已含三种语言；还要写：FAQ，以及一篇关于服务商配额与使用条款的说明 |
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 文件里带版本号 | 每个设置文件都写入 `formatVersion`。这里有两个各自独立的数字：本版本写出的文件是 `formatVersion: 1`，定下这条规矩的版本是 `1.3.0`。新增一个键不会推动文件版本；改名、删除或改变某个键的含义才会 | 已完成 —— `src-tauri/src/settings.rs` 里的 `FORMAT_VERSION` |
+| 先迁移再合并 | 文件写入时带的版本决定哪些内容要先翻译一遍再合并：旧文件按它当时的样子解读、往前带一步，然后才逐键与当前形状比对，过程中不丢任何东西 | 已完成 —— `Settings::migrate`，由 `parse` 调用 |
+| 保住原文件的兜底 | 不是 JSON 对象、或声明的版本比本构建更新的文件，会被复制为旁边的 `settings.backup-<Unix 秒数>.json`，打印一行提示，然后从默认值开始。原文件绝不会被无声覆盖 | 已完成 —— `unreadable` 与 `set_aside`，由 `load` 调用 |
+| 公布契约 | `contract/contract.json` 就是契约本身：格式版本、设置文件里的每一个键，以及应用能应答的每一条命令 | 已完成 |
+| 两个测试守住它 | Rust 测试把 `Settings::default()` 实际序列化出来的形状与冻结的键表、两个格式版本号逐一比对；前端测试把 `lib.rs` 里的命令表和 `src/js/` 里每一次 `invoke("…")` 与冻结的命令表比对 | 已完成 —— `settings.rs` 与 `tests/contract.test.js` |
 
-预计工作量：5–10 天。
+里程碑的验收标准：`cargo test` 与 `node --test` 通过，且包含这两个契约测试；`1.2.4`
+写出的设置文件能被 `1.3.0` 完整读入；声称格式版本更新的文件会被另存而不是被覆盖。
+从此新增一个设置项或一条命令都必须连同契约一起改，否则 CI 直接失败 —— 这正是这个
+版本的意义。
+
+预计工作量：1 天。
+
+## v1.4.0 —— 性能预算
+
+目标：后台工具必须守住的那些数字，靠测量而不是靠感觉。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 空闲开销 | 弹窗关闭、钩子还在听的情况下，CPU 低于 0.5%、内存低于 80 MB；量在 release 构建上 —— debug 构建的数字没人会真的去跑 | 计划中 |
+| 延迟 | 从选区到弹窗低于 150 ms，起点是结束拖选的鼠标抬起，终点是卡片绘制完成 | 计划中 |
+| 长时间运行 | 一整天使用不泄漏句柄或 GDI；鼠标钩子、剪贴板和朗读引擎是最需要盯的三处，各配一个测试能读到的计数 | 计划中 |
+| 把数字写进 README | 测了什么、在什么机器上测的、怎么复现 | 计划中 |
+
+预计工作量：2–3 天。
+
+## v1.5.0 —— 稳定性
+
+目标：一个能扛住自身故障的工具，并且不需要任何人「相信它」，自己就能说清发生了什么。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 崩溃恢复 | 钩子或弹窗里的失败不该把托盘图标一起带走：进程继续应答；实在不行，也要在退出前把原因写下来 | 计划中 |
+| 错误日志 | 在 `settings.json` 旁边写一份滚动日志，收录应用原本就打印的失败信息，带大小上限，以及一个打开所在文件夹的按钮 | 计划中 |
+| 匿名上报 | 可选、默认关闭、首次运行时询问；发送前展示将要发出的确切内容，并在 `PRIVACY.md` 里说明 | 计划中 |
+
+预计工作量：2–4 天。
+
+## v1.6.0 —— 无障碍
+
+目标：两个窗口都能只用键盘操作，也能被高对比主题读清。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 键盘 | 两个窗口的每个控件都能用 Tab、Shift+Tab、Enter、空格和方向键到达并操作；弹窗以自身窗口的身份获取焦点，关闭时把焦点还回去 | 计划中 |
+| 焦点顺序与标签 | 焦点顺序沿卡片自上而下；每个只有图标的按钮都带 `aria-label`；结构本身说明不了的地方补上 role | 计划中 |
+| 高对比 | 一套建立在 Windows 高对比配色上的主题，通过 `prefers-contrast` 选取，而不是在主题菜单里再加一项 | 计划中 |
+| 写成清单 | 键盘与对比度的梳理结果补进 README 的手工回归清单 | 计划中 |
+
+预计工作量：2–4 天。
+
+## v2.0.0 —— 写下来的承诺
+
+目标：项目承诺了什么，白纸黑字写出来，让陌生人可以去核对而不是只能相信。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| FAQ | 把 README 里顺带回答过的问题收拢到一处：为什么选中之后还要点一下、会往哪里发送什么、服务商额度用尽时会怎样 | 计划中 |
+| 服务商配额与条款 | 每个服务一页：哪些是免费的、禁止什么、额度耗尽时应用怎么做 —— 调研其实已经在 README 里，这一项是写给用户看的那一版 | 计划中 |
+| 兼容性声明 | `2.x` 读得懂什么（`1.3.0` 及以后的任何设置文件）、不会改什么（那份契约），以及将来某个大版本被允许打破什么 | 计划中 |
+
+预计工作量：1–2 天。
 
 ## 优先级
 

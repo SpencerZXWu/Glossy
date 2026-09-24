@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.3.0] - 2026-09-25
+
+The settings file and the command names stop moving. Nothing changes on screen; what this
+version adds is the promise that a future release keeps reading the file this one writes,
+and a test that fails when the promise is broken by accident.
+
+### Added
+
+- **The settings file says which format it is in.** `%APPDATA%\com.glossy.translator\settings.json`
+  now opens with `formatVersion`. Adding a setting does not move it; renaming one, removing
+  one, or changing what one means does, and a file written before the change is carried
+  forward by `Settings::migrate` before it is merged key by key, so nothing is lost on the
+  way up (`src-tauri/src/settings.rs`).
+- **A file this build cannot read is kept instead of overwritten.** A settings file that is
+  not a JSON object, or one that declares a `formatVersion` newer than this build
+  understands, is copied to `settings.backup-<unix seconds>.json` beside it, one line is
+  printed, and the app starts from the defaults. Losing the settings is recoverable;
+  overwriting them is not.
+
+### Changed
+
+- **The shape of the file and the names of the commands are frozen, and the freeze is
+  checked.** `contract/contract.json` is the published contract: the format version, every
+  key the settings file holds and every IPC command the app answers to. The Rust suite
+  compares it with the shape `Settings` actually serializes, and the frontend suite compares
+  it with the command list in `lib.rs` and with every `invoke("…")` in `src/js/`, so adding,
+  renaming or removing one of them fails CI until the contract is edited in the same
+  commit.
+
 ## [1.2.4] - 2026-09-24
 
 The release v1.2.3 was meant to be: the same application, built from committed source. The
