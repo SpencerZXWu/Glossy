@@ -1,0 +1,178 @@
+name: Release
+
+# Pushing the vX.Y.Z tag is what cuts a release. The runner builds the NSIS installer,
+# the MSI and the portable package the same way scripts/release.ps1 does locally, stages
+# them through that same script, and attaches them to a GitHub release whose description
+# is the RELEASE_NOTES.md committed under release/vX.Y.Z/ — the one with all three
+# translations written in it, never a freshly generated scaffold.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (nothing is published, the build is kept as an artifact)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: stable-x86_64-pc-windows-gnu
+
+jobs:
+  windows:
+    name: Windows release build
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          # gh release create --verify-tag looks the tag up, and a shallow checkout of a
+          # tag ref does not always bring the tag object with it.
+          fetch-depth: 0
+
+      - name: Read the version and check it against the tag
+        id: version
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # Through the environment rather than interpolated into the script: a tag name
+          # is user input, and a dispatch input never has to be trusted.
+          $tag = if ($env:EVENT_NAME -eq 'workflow_dispatch') { $env:DISPATCH_TAG } else { $env:REF_NAME }
+          if ($tag -notmatch '^v(\d+\.\d+\.\d+)$') {
+            throw "Tag '$tag' is not vX.Y.Z; release tags are named that way."
+          }
+          $version = $Matches[1]
+
+          $declared = (& pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/version.ps1 -Get).Trim()
+          if ($LASTEXITCODE -ne 0 -or $declared -ne $version) {
+            throw "The tag says $version but the checkout says '$declared'. scripts/version.ps1 -Check lists the files that drifted apart; the tag has to name the version the code declares."
+          }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Building $tag"
+
+      # The project is written for the GNU target: src-tauri/Cargo.toml keeps the library
+      # at crate-type = ["rlib"] and build.rs links libresource.a into every target, both
+      # of which are MinGW-specific. Same setup as ci.yml, for the same reasons.
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install $env:RUST_TOOLCHAIN --profile minimal
+          rustup default $env:RUST_TOOLCHAIN
+          rustc --version
+
+      - name: Make sure the MinGW linker is on PATH
+        run: |
+          $gcc = (Get-Command gcc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $gcc) {
+            $gcc = 'C:\mingw64\bin\gcc.exe'
+            if (-not (Test-Path $gcc)) { throw "No MinGW gcc found at $gcc" }
+            Add-Content -Path $env:GITHUB_PATH -Value (Split-Path -Parent $gcc)
+          }
+          & $gcc --version | Select-Object -First 1
+
+      - name: Cache the crates registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: registry-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: registry-${{ runner.os }}-
+
+      - name: Cache the build directory
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/target
+          key: target-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: target-${{ runner.os }}-
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the Tauri CLI
+        run: npm ci
+
+      # Signing is not wired in yet: SignPath Foundation has not approved the project and
+      # there is no certificate to sign with. Both routes end in the same place once one
+      # exists — scripts/release.ps1 -Sign, which verifies every artefact that ships and
+      # refuses to stage a half-signed release:
+      #   * a local certificate: set GLOSSY_SIGN_COMMAND or GLOSSY_CERT_THUMBPRINT from a
+      #     repository secret and add -Sign to the staging step below (the runner image
+      #     already carries the Windows SDK's signtool.exe);
+      #   * SignPath Foundation: submit the staged files through their signing action
+      #     between the staging step and the publishing step.
+      - name: Build the installer, the MSI and the portable package
+        run: npm run build
+
+      - name: Stage the release directory
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild
+
+      - name: Keep the build as a workflow artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glossy-${{ steps.version.outputs.version }}
+          path: |
+            release/v${{ steps.version.outputs.version }}/*.exe
+            release/v${{ steps.version.outputs.version }}/*.msi
+            release/v${{ steps.version.outputs.version }}/*.zip
+            release/v${{ steps.version.outputs.version }}/SHA256SUMS.txt
+          if-no-files-found: warn
+
+      - name: Publish the release
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.version.outputs.tag }}'
+          $version = '${{ steps.version.outputs.version }}'
+          $stage = "release/v$version"
+
+          $notes = Join-Path $stage 'RELEASE_NOTES.md'
+          if (-not (Test-Path -LiteralPath $notes)) {
+            throw "$notes is missing; the release description would be empty."
+          }
+          if (Select-String -LiteralPath $notes -SimpleMatch 'TODO: translate' -Quiet) {
+            throw 'RELEASE_NOTES.md still has an untranslated section; all three languages have to be filled in before publishing.'
+          }
+
+          $assets = @(Get-ChildItem -LiteralPath $stage -File |
+            Where-Object { $_.Name -ne 'RELEASE_NOTES.md' } |
+            ForEach-Object { $_.FullName })
+          if ($assets.Count -eq 0) { throw "Nothing to attach in $stage." }
+
+          # The release may already be there: publishing from a workstation with
+          # scripts/release.ps1 -Publish pushes this very tag, and that push is what
+          # started this run. Those artefacts were built with a certificate this runner
+          # does not have, so they are left alone rather than overwritten by unsigned
+          # ones. The probe goes through cmd.exe because a native exit code cannot
+          # become a terminating error the way redirected stderr can.
+          & $env:ComSpec /c "gh release view $tag --json tagName >nul 2>&1"
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists; keeping it and its assets. This build is in the run's artifacts."
+            exit 0
+          }
+
+          gh release create $tag --title "Glossy $version" --notes-file $notes --verify-tag @assets
+          if ($LASTEXITCODE -ne 0) { throw "gh release create $tag failed." }
+
+          Write-Host "Published $tag with $($assets.Count) asset(s)."

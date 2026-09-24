@@ -2,7 +2,8 @@
 
 Staging area for the files that get uploaded to
 [GitHub Releases](https://github.com/SpencerZXWu/Glossy/releases). It is built by
-`scripts/release.ps1`; nothing here is edited by hand except the two translations in
+`scripts/release.ps1` — locally, or by `.github/workflows/release.yml` on a runner when a
+release tag is pushed; nothing here is edited by hand except the two translations in
 `RELEASE_NOTES.md`.
 
 ## Layout
@@ -42,6 +43,36 @@ produced no file stops the script rather than staging an incomplete set: the NSI
 installer and the MSI are both mandatory. `RELEASE_NOTES.md` is written in three languages
 unless the file is already there, so notes written by hand survive; `-ForceNotes`
 regenerates them and resets the translations.
+
+## Releasing from CI
+
+Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`: a Windows runner installs the
+GNU Rust toolchain, builds the same three artefacts, stages them with
+`scripts/release.ps1 -SkipBuild` — so `SHA256SUMS.txt` and the trilingual notes come out of
+the same code path as a local release — and publishes the GitHub release through `gh`. The
+description is the `RELEASE_NOTES.md` committed under `release/vX.Y.Z/`, the file with all
+three translations in it, never a regenerated scaffold, and the run refuses to publish while
+that file still holds a `TODO: translate` placeholder.
+
+The workflow compares the tag with the version the tagged commit declares
+(`scripts/version.ps1 -Get`) and stops before building when they disagree, so a tag that
+names the wrong version is caught before an installer exists rather than after it is
+published.
+
+The manual route stays available, and is the one to use when the build has to be signed with
+a certificate on this machine:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Sign -Publish
+```
+
+`-Publish` pushes the same tag, so it also starts the workflow. That run finds the release
+already there and leaves it and its assets untouched: the artefacts signed with the local
+certificate are the ones that ship.
+
+`gh workflow run release.yml -f tag=vX.Y.Z` builds an existing tag without publishing
+anything — the build is kept as a run artifact — which is how the workflow itself is checked
+against a tag whose release is already out.
 
 ## Signing the release
 
@@ -118,16 +149,20 @@ without one.
    `powershell -ExecutionPolicy Bypass -File scripts/version.ps1 -Set X.Y.Z` — that
    writes all six places at once. `scripts/version.ps1 -Check` lists any that drifted
    apart, and CI fails on a file that does not agree.
-2. `git tag -a vX.Y.Z -m "Glossy vX.Y.Z"` and `git push origin vX.Y.Z`.
-3. Create the release on GitHub for that tag. The tag keeps the `v`, the release title
-   does not: it is `Glossy X.Y.Z`, never `Glossy vX.Y.Z`. Paste `RELEASE_NOTES.md`
-   into the description, all three languages and the anchor links included.
-4. Attach the installer, the MSI, the portable zip and `SHA256SUMS.txt`, and say in the
-   description which download suits whom. Every artefact has to be the one **this
-   version staged**, its file name has to carry the version, and `SHA256SUMS.txt` is
-   generated from those same files — a mismatched pair means the wrong build is going
-   out. v0.3.1 was published with v0.3.0's installer attached, which is how a release
-   shipped without the fixes it described.
+2. Commit everything, then `git tag -a vX.Y.Z -m "Glossy vX.Y.Z"` and
+   `git push origin vX.Y.Z`. The tag has to point at a commit where
+   `scripts/version.ps1 -Check` passes: the workflow builds the tagged commit, refuses a tag
+   that does not name the version that commit declares, and publishes the release for that
+   tag.
+3. What the published release has to look like, whether CI or a workstation made it: titled
+   `Glossy X.Y.Z` (the tag keeps the `v`, the title does not), described by
+   `release/vX.Y.Z/RELEASE_NOTES.md` with all three languages and the anchor links included,
+   and carrying the installer, the MSI, the portable zip and `SHA256SUMS.txt`. Say in the
+   description which download suits whom.
+4. Check that every artefact is the one **this version staged**, that its file name carries
+   the version, and that `SHA256SUMS.txt` is generated from those same files — a mismatched
+   pair means the wrong build is going out. v0.3.1 was published with v0.3.0's installer
+   attached, which is how a release shipped without the fixes it described.
 
 The GNU build links `WebView2Loader.dll` dynamically, so a release that does not carry it
 produces an app that dies on launch with "WebView2Loader.dll was not found".

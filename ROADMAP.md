@@ -153,7 +153,7 @@ Goal: leave Windows behind and stop being flagged by SmartScreen.
 | Content Security Policy | `tauri.conf.json` carried `"csp": null`; replace it with an explicit whitelist | done — `default-src`, `script-src`, `style-src` and `font-src` at `'self'`, images may add `data:`, and `object-src`, `frame-src`, `frame-ancestors`, `base-uri` and `form-action` are closed. The frontend loads nothing remote, so nothing had to be widened; verified in the running app, where a deliberate remote `fetch` is refused and everything the app itself loads is not |
 | macOS | Selection capture through the Accessibility API with a permission onboarding flow; the popup becomes an `NSPanel` that does not take focus; signing and notarisation | deferred — the interface it will be written against is in place, but no macOS code exists, because none of it could be compiled or run here |
 | Linux | X11 first, where the `PRIMARY` selection maps naturally onto select-to-translate. On Wayland the global hook is not available, so it is documented as an unsupported combination rather than silently failing | deferred, at the maintainer's request |
-| Code signing | A certificate behind the installers, so a fresh install no longer shows a SmartScreen warning. Azure Trusted Signing (now Artifact Signing) is the cheapest of them, but it issues Public Trust certificates to organizations in the US, Canada, the EU, the UK, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway and Israel only, and to individuals in the US and Canada only, which rules it out for a maintainer in China. The route taken instead is the free signing [SignPath Foundation](https://signpath.org) gives open source projects: the certificate is issued to the foundation and the signing runs in their cloud, from CI | in progress — the artefacts are still unsigned, and the local path is finished: `scripts/release.ps1 -Sign` merges a `bundle.windows` signing override (`signCommand`, or `certificateThumbprint`, plus `digestAlgorithm` and `timestampUrl`) from the environment and fails the release when any staged artefact lacks a valid, timestamped signature, so a certificate of one's own is all that path waits for. The conditions the application has to meet are in place too: the **Code signing policy** section of the [README](./README.md#code-signing-policy) names the foundation, the roles and the MFA requirement, and [PRIVACY.md](./PRIVACY.md) says what the app sends where |
+| Code signing | A certificate behind the installers, so a fresh install no longer shows a SmartScreen warning. Azure Trusted Signing (now Artifact Signing) is the cheapest of them, but it issues Public Trust certificates to organizations in the US, Canada, the EU, the UK, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway and Israel only, and to individuals in the US and Canada only, which rules it out for a maintainer in China. The route taken instead is the free signing [SignPath Foundation](https://signpath.org) gives open source projects: the certificate is issued to the foundation and the signing runs in their cloud, from CI | in progress — the artefacts are still unsigned, and the local path is finished: `scripts/release.ps1 -Sign` merges a `bundle.windows` signing override (`signCommand`, or `certificateThumbprint`, plus `digestAlgorithm` and `timestampUrl`) from the environment and fails the release when any staged artefact lacks a valid, timestamped signature, so a certificate of one's own is all that path waits for. The conditions the application has to meet are in place too: the **Code signing policy** section of the [README](./README.md#code-signing-policy) names the foundation, the roles and the MFA requirement, and [PRIVACY.md](./PRIVACY.md) says what the app sends where. The tag-triggered build workflow, `.github/workflows/release.yml`, is where their signing step gets submitted from once the application is approved |
 
 What the release leaves behind: the OS-bound modules were moved, not rewritten, so the
 behaviour of a selection is the one it had before, and the split is not finished. The
@@ -210,7 +210,7 @@ rather than investing in it early.
 | The portable zip is assembled outside Tauri | Tauri has no zip target, so the archive is packed by script, and an archive that loses `WebView2Loader.dll` unpacks into an app that cannot start | `scripts/release.ps1` stages the release binary and the loader together, puts both at the archive root, and checksums the archive next to the installers |
 | macOS and Linux permission models | The port costs more than expected | The contract is in place: a non-Windows target fails to compile and names the layer, so the port starts from one file. X11 first, Wayland explicitly unsupported |
 | Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
-| Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer, the MSI and the portable zip are still built locally by `scripts/release.ps1`, which fails rather than staging an incomplete set, and a tagged release workflow is the next step |
+| Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer, the MSI and the portable zip are built by `scripts/release.ps1`, which fails rather than staging an incomplete set, and pushing a release tag now builds and publishes them on a runner through `.github/workflows/release.yml`, so the artefacts stop depending on this machine |
 
 ## Release process
 
@@ -240,15 +240,22 @@ rather than investing in it early.
    unsigned run behaves exactly as it did before. A release that asked for signing
    and did not get a valid, timestamped signature on all three artefacts fails
    instead of staging itself; a run without `-Sign` says so in one line.
-4. Tag `vX.Y.Z` on `main` and push the tag.
-5. Publish a GitHub release at that tag, titled `Glossy X.Y.Z` — the tag carries the
-   `v`, the title does not. Paste `release/vX.Y.Z/RELEASE_NOTES.md` into the
-   description - all three languages, anchors included - and attach the installer, the
-   MSI, the portable zip and the checksum. Check that each artefact is the one this
-   version staged, that its name carries the version, and that `SHA256SUMS.txt` lists
-   it, and say in the description which download suits whom: v0.3.1 went out with
-   v0.3.0's installer attached, so the release did not contain the fixes the notes
-   described.
+4. Tag `vX.Y.Z` on `main` and push the tag. `.github/workflows/release.yml` then builds the
+   installer, the MSI and the portable zip on a Windows runner, stages them with
+   `scripts/release.ps1 -SkipBuild` and publishes what step 5 describes. It stops before
+   building when the tag does not name the version the tagged commit declares, so a tag that
+   points at the wrong commit is caught instead of published.
+5. What the published release has to look like, whether CI or this machine built it: titled
+   `Glossy X.Y.Z` — the tag carries the `v`, the title does not — with
+   `release/vX.Y.Z/RELEASE_NOTES.md` as the description, all three languages, anchors
+   included, and the installer, the MSI, the portable zip and `SHA256SUMS.txt` attached.
+   Check that each artefact is the one this version staged, that its name carries the
+   version, and that `SHA256SUMS.txt` lists it, and say in the description which download
+   suits whom: v0.3.1 went out with v0.3.0's installer attached, so the release did not
+   contain the fixes the notes described. A release signed with a certificate on this
+   machine still goes out locally, with `scripts/release.ps1 -Sign -Publish`: it pushes the
+   same tag, and the workflow that starts from that push finds the release already there and
+   leaves it and its assets alone.
 6. From v0.2.0 on, the release also serves as the auto-update feed.
 
 ## What is explicitly out of scope
@@ -405,7 +412,7 @@ rather than investing in it early.
 | 内容安全策略 | `tauri.conf.json` 原本是 `"csp": null`，换成显式白名单 | 完成 —— `default-src`、`script-src`、`style-src`、`font-src` 均为 `'self'`，图片可额外用 `data:`，并关闭 `object-src`、`frame-src`、`frame-ancestors`、`base-uri` 和 `form-action`。前端不加载任何远程内容，所以无需放宽；已在运行中的应用里验证：刻意发起的远程 `fetch` 被拒绝，而应用自身加载的东西没有被拒 |
 | macOS | 通过 Accessibility API 捕捉选区，并配一个权限引导流程；弹窗改为不抢焦点的 `NSPanel`；签名与公证 | 推迟 —— 它将要针对的那套接口已经就位，但没有写任何 macOS 代码，因为在这里既编译不了也跑不起来 |
 | Linux | 先做 X11，那里的 `PRIMARY` 选区天然对应“划词翻译”。Wayland 上没有全局钩子，因此明确记为不支持的组合，而不是悄悄失效 | 推迟，按维护者的要求 |
-| 代码签名 | 安装包背后要有证书，让全新安装不再弹 SmartScreen 警告。Azure Trusted Signing（现已改名 Artifact Signing）是最便宜的一种，但 Public Trust 证书只签发给美、加、欧盟、英、澳、新西兰、日、韩、新、瑞士、挪、以色列的组织，个人仅限美、加，因此对身在中国大陆的维护者不适用。改走的是 [SignPath Foundation](https://signpath.org) 面向开源项目的免费签名：证书签发给该基金会，签名在它们的云端、由 CI 发起 | 进行中 —— 产物仍未签名；本地那条路已经做完：`scripts/release.ps1 -Sign` 会从环境变量拼出 `bundle.windows` 的签名覆盖项（`signCommand` 或 `certificateThumbprint`，外加 `digestAlgorithm` 与 `timestampUrl`），并在任何产物缺少有效且带时间戳的签名时让发布失败，所以这条路只等一张自己的证书。申请要满足的条件也已就位：[README](./README.md#code-signing-policy) 的 **Code signing policy** 一节写明基金会、角色和双因素认证要求，[PRIVACY.md](./PRIVACY.md) 说明应用会把什么发到哪里 |
+| 代码签名 | 安装包背后要有证书，让全新安装不再弹 SmartScreen 警告。Azure Trusted Signing（现已改名 Artifact Signing）是最便宜的一种，但 Public Trust 证书只签发给美、加、欧盟、英、澳、新西兰、日、韩、新、瑞士、挪、以色列的组织，个人仅限美、加，因此对身在中国大陆的维护者不适用。改走的是 [SignPath Foundation](https://signpath.org) 面向开源项目的免费签名：证书签发给该基金会，签名在它们的云端、由 CI 发起 | 进行中 —— 产物仍未签名；本地那条路已经做完：`scripts/release.ps1 -Sign` 会从环境变量拼出 `bundle.windows` 的签名覆盖项（`signCommand` 或 `certificateThumbprint`，外加 `digestAlgorithm` 与 `timestampUrl`），并在任何产物缺少有效且带时间戳的签名时让发布失败，所以这条路只等一张自己的证书。申请要满足的条件也已就位：[README](./README.md#code-signing-policy) 的 **Code signing policy** 一节写明基金会、角色和双因素认证要求，[PRIVACY.md](./PRIVACY.md) 说明应用会把什么发到哪里。由标签触发的构建工作流 `.github/workflows/release.yml` 就是申请批准后提交签名的那一处 |
 
 这次发布留下的是：与操作系统绑定的模块是被“搬走”而不是重写的，所以划词的行为和
 以前一致，而拆分并没有做完。热键的按键解析、朗读队列、`secrets::is_protected`、
@@ -457,7 +464,7 @@ v1.2.0 的剩余部分**。
 | 便携 zip 由 Tauri 之外拼装 | Tauri 没有 zip 目标，压缩包由脚本打包；一旦丢掉 `WebView2Loader.dll`，解压出来就是一个起不来的应用 | `scripts/release.ps1` 把发布二进制和这个 DLL 一起暂存、都放在压缩包根目录，并把该压缩包与安装包一起算校验和 |
 | macOS 与 Linux 的权限模型 | 移植成本超出预期 | 约定已经就位：非 Windows 目标会编译失败并点名那一层，移植只需从一个文件开始。先 X11，明确不支持 Wayland |
 | 凭据泄露 | 磁盘上有可读的 API 密钥 | v0.2.0 已修复：密钥用 DPAPI 加密，在输入它们的 Windows 登录之外不可读 |
-| 手工构建的发布 | 安装包无法复现 | 自 v0.1.1 起版本检查、格式、lint 和测试都在 CI 里跑；安装包、MSI 与便携 zip 仍由 `scripts/release.ps1` 在本地构建，产物不全时它会直接失败，带标签的发布工作流是下一步 |
+| 手工构建的发布 | 安装包无法复现 | 自 v0.1.1 起版本检查、格式、lint 和测试都在 CI 里跑；安装包、MSI 与便携 zip 由 `scripts/release.ps1` 构建，产物不全时它会直接失败，而现在推送发布标签就会由 `.github/workflows/release.yml` 在 runner 上构建并发布，产物不再依赖这台机器 |
 
 ## 发布流程
 
@@ -482,12 +489,18 @@ v1.2.0 的剩余部分**。
    东西，不签名时的行为与以前完全一致。要求签名却没能让三个产物都带上有效且带时间
    戳的签名时，脚本会直接失败而不是照旧暂存；没传 `-Sign` 时它会用一行说明本次为
    未签名发布。
-4. 在 `main` 上打 `vX.Y.Z` 标签并推送该标签。
-5. 在该标签处发布 GitHub release，标题为 `Glossy X.Y.Z` —— 标签带 `v`，标题不带。
-   把 `release/vX.Y.Z/RELEASE_NOTES.md` 粘进描述 —— 三种语言、锚点一并保留 —— 并
-   上传安装包、MSI、便携 zip 与校验和。确认每个产物都正是本版本暂存的那个、文件名
-   带版本号、且 `SHA256SUMS.txt` 里列出了它，并在描述里说明哪个下载适合谁：v0.3.1
-   发布时附上的却是 v0.3.0 的安装包，于是发布里并不包含说明所描述的修复。
+4. 在 `main` 上打 `vX.Y.Z` 标签并推送该标签。`.github/workflows/release.yml` 会在
+   Windows runner 上构建安装包、MSI 与便携 zip，用 `scripts/release.ps1 -SkipBuild`
+   暂存它们，并发布第 5 步所述的内容。若标签所指提交里声明的版本与标签不一致，它会在
+   构建之前就停下，于是打错位置的标签会被拦下而不是被发布出去。
+5. 发布出来要长什么样，无论构建者是 CI 还是这台机器：标题 `Glossy X.Y.Z` —— 标签带
+   `v`，标题不带 —— 描述用 `release/vX.Y.Z/RELEASE_NOTES.md`，三种语言、锚点一并
+   保留，附件是安装包、MSI、便携 zip 与 `SHA256SUMS.txt`。确认每个产物都正是本版本
+   暂存的那个、文件名带版本号、且 `SHA256SUMS.txt` 里列出了它，并在描述里说明哪个
+   下载适合谁：v0.3.1 发布时附上的却是 v0.3.0 的安装包，于是发布里并不包含说明所描述
+   的修复。若要用自己机器上的证书签名的发布，仍走本地：`scripts/release.ps1 -Sign
+   -Publish` 会推送同一个标签，而由此触发的工作流发现该发布已存在，便不再动它和它的
+   附件。
 6. 从 v0.2.0 起，发布同时充当自动更新的更新源。
 
 ## 明确不在范围内
