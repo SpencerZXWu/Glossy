@@ -1,6 +1,6 @@
 {
   "name": "glossy",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Glossy - a lightweight select-to-translate desktop app built with Tauri",
   "scripts": {

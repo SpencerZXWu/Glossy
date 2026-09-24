@@ -12,7 +12,7 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.2.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Version | `1.2.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~20,300 lines: ~10,800 Rust, ~5,750 frontend (plain HTML/CSS/JS), ~1,400 frontend test lines and ~2,400 in `server/`, comments included |
 | Tests | 192 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
@@ -165,6 +165,17 @@ self-contained change with tests already around it.
 Estimated effort: 8–15 days, of which the abstraction, the packaging matrix and the
 policy are done.
 
+## v1.2.1 — Language honesty
+
+Goal: stop offering a language the chosen engine does not translate, and keep the language
+the reader picked.
+
+| Work item | Details | Status |
+| --- | --- | --- |
+| Channel language lists | Each engine is offered, and accepts, only the languages it translates: a standard Baidu account refuses eight of Glossy's 31, so the two language bars build themselves from the chosen engine's table. The target a reader picks becomes the configured target, so the next selection starts from it | done — `src-tauri/src/translate/languages.rs` is the only table, published to both windows through `service_languages`, the backend's `resolve_target` clamps a target no engine serves, and `set_target_lang` remembers the pick |
+
+Estimated effort: 1 day.
+
 ## v2.0.0 — Format freeze and the long-run promises
 
 Goal: turn a personal tool into something that can be promised.
@@ -249,7 +260,7 @@ rather than investing in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.2.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 版本 | `1.2.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
 | 规模 | 约 20,300 行：Rust 约 10,800 行，前端约 5,750 行（纯 HTML/CSS/JS），前端测试约 1,400 行，`server/` 约 2,400 行，含注释 |
 | 测试 | Rust 192 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
@@ -392,6 +403,16 @@ rather than investing in it early.
 自成一体的改动，周围已有测试。
 
 预计工作量：8–15 天，其中抽象层、打包矩阵与安全策略已经完成。
+
+## v1.2.1 —— 语言诚实
+
+目标：不再提供所选渠道翻不了的语言，并记住读者选定的语言。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 渠道语言表 | 每个渠道只提供、也只接受它能翻的语言：百度普通账号会拒绝 Glossy 提供的 31 种中的 8 种，因此两个语言栏按所选渠道的表来构建。读者手动选定的目标语言会成为已配置的目标语言，下一次选区直接从它开始 | 完成 —— `src-tauri/src/translate/languages.rs` 是唯一的表，通过 `service_languages` 下发给两个窗口，后端 `resolve_target` 会拦下没有渠道支持的目标语言，`set_target_lang` 记住这次选择 |
+
+预计工作量：1 天。
 
 ## v2.0.0 —— 格式冻结与长期承诺
 

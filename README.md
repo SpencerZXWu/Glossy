@@ -67,7 +67,9 @@ To build from source instead, see [Development](#development).
    from the dropdowns to translate again with that language, or press the `⇄`
    button to translate the result back into the language it came from. The pair
    resets to *detect the source and use the configured target* for every new
-   selection.
+   selection; a target you pick by hand is remembered and becomes that configured
+   target, so the next selection already starts from it, while the source you
+   pick is good for the card on screen only.
 5. Selections shorter than the configured minimum (2 characters by default) are
    ignored, and a drag that starts or ends on the popup itself never triggers a
    translation.
@@ -143,6 +145,12 @@ with, and it falls back to another one when that engine cannot answer.
 | `cloud-baidu` | nothing to fill in | **Baidu Translate**: a server deployed from [`server/`](./server/README.md) does the translating with the project's own account, named `vendor: "baidu"` on the wire. The app only sends the text plus an install id, the credentials stay on the server, and it works from mainland China. The daily allowance is counted per device, per address and in total, and the settings window shows what is left of it; running your own deployment is a one-line change of the address inside the build. |
 | `cloud-youdao` | nothing to fill in | **Youdao Translate** — the same server, asked to translate with 有道智云 (`vendor: "youdao"` on the wire). Nothing to fill in either, and the same fallback when Youdao cannot answer. |
 | `google` | free, no key | Public `translate.googleapis.com` endpoint. Blocked on some networks, including much of mainland China. Always queried with the `dict-chrome-ex` client id; the throttled `gtx` id is only used as a fallback. |
+
+Every engine translates a different set of languages: a standard Baidu account
+refuses eight of the 31 Glossy offers (`uk`, `tr`, `hi`, `id`, `ms`, `he`, `no`,
+`sk`), while Youdao and Google take all of them. Both language bars list only the
+languages of the engine the card is using, so one it would refuse is never offered
+and never sent.
 
 Phonetics and definitions for single words come from `api.dictionaryapi.dev`, which is free,
 needs no key and is reachable from mainland China. The Google endpoint is only asked for
@@ -226,7 +234,8 @@ app: it is the same setting as the one in **Units** further down, and it is the
 one place where the conversions of a card can be flipped on the spot. The
 language bar follows the popup rules, so the source starts on *Detect language*,
 the target follows the configured language, and a new selection resets the pair
-(the overrides are never saved). Press **Show in floating popup** to open the
+(the source override is never saved; the target you pick is, and becomes the
+configured language). Press **Show in floating popup** to open the
 real popup with the current selection (or with the whole text when nothing is
 selected) — this exercises the popup without the global hook.
 
@@ -471,7 +480,8 @@ src-tauri/src/
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
   units/                 unit and currency conversion for the card
-  translate/             google and cloud providers, word dictionary
+  translate/             google and cloud providers, word dictionary,
+                         and the languages each of them translates
   platform/
     mod.rs               what the backend may assume about an operating system
     windows/             the modules that talk to Win32: clipboard, console, desktop,
@@ -543,7 +553,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 1. 启动 Glossy。设置窗口只在首次启动时打开——之后的启动都会安静地在通知区域运行，Glossy 从启动那一刻起就开始监听选区。
 2. 关闭该窗口并不会退出 Glossy——它会在后台继续监听选区。点击通知区域中的 Glossy 图标（或在其菜单中选择**打开 Glossy**）可以把窗口重新调出来，用同一个菜单中的**退出**来结束 Glossy。在已经运行时再次启动 Glossy，只会显示一条简短提示。静默启动会由右下角的一张小卡片告知；它几秒后淡出，点击它会打开设置窗口。Windows 11 会把新的通知区域图标收进溢出菜单（时钟旁的 `^`）——把图标拖到任务栏上，或在**设置 → 个性化 → 任务栏 → 其他系统托盘图标**中打开它，即可让它保持可见。
 3. 在任何应用中，**拖动划过文字**（或**双击一个单词**）即可选中它。
-4. 弹窗出现在光标下方。拖动它的标题栏可以移动它，用按钮复制结果或将它关闭，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*。
+4. 弹窗出现在光标下方。拖动它的标题栏可以移动它，用按钮复制结果或将它关闭，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*；手动选定的目标语言会被记住并成为已配置的目标语言，所以下一次选区直接以它为译文语言，而手动选定的源语言只对当前这张卡片有效。
 5. 短于所设最小长度的选区（默认 2 个字符）会被忽略，起点或终点落在弹窗本身的拖动永远不会触发翻译。
 
 单词卡片会显示音标、各词性及其释义、一个简单例句，并在同一张卡片里补上这个词的词形变化、意思相近的词、它被选中时所在的句子及该句译文，以及卡片两侧各一个朗读按钮。句子或段落直接显示译文，原文在译文上方（最多四行），段落较长时下方还有逐句对照。
@@ -604,6 +614,8 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 | `cloud-youdao` | 无需填写 | **有道翻译**：同一台服务器，只是指定用有道智云来译（`vendor: "youdao"`）。同样无需填写，有道答不上来时同样会自动改用别的上游。 |
 | `google` | 免费，无需密钥 | 公开的 `translate.googleapis.com` 接口。在部分网络中被屏蔽，包括中国大陆的大部分地区。始终以 `dict-chrome-ex` 客户端 id 查询；被限流的 `gtx` id 只作为后备。 |
 
+每个渠道能翻的语言并不相同：百度普通账号会拒绝 Glossy 提供的 31 种语言中的 8 种（`uk`、`tr`、`hi`、`id`、`ms`、`he`、`no`、`sk`），而有道和 Google 全部支持。两个语言栏只列出卡片当前所用渠道支持的语言，因此它翻不了的语言既不会出现在列表里，也不会被发出去。
+
 单个单词的音标和释义来自 `api.dictionaryapi.dev`，它免费、无需密钥，且中国大陆可直接访问。只有在所选服务没有返回某些细节时，才会去请求 Google 接口。
 
 ### 免费额度与商业使用
@@ -631,7 +643,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 ### 在应用内翻译
 
-设置窗口顶部是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与下方**单位换算**面板里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（这些临时覆盖永远不会被保存）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
+设置窗口顶部是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与下方**单位换算**面板里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（源语言的临时选择不会被保存，目标语言则会被保存下来并成为已配置的语言）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
 
 ### 常见问题
 
@@ -820,7 +832,8 @@ src-tauri/src/
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
   units/                 unit and currency conversion for the card
-  translate/             google and cloud providers, word dictionary
+  translate/             google and cloud providers, word dictionary,
+                         and the languages each of them translates
   platform/
     mod.rs               what the backend may assume about an operating system
     windows/             the modules that talk to Win32: clipboard, console, desktop,
@@ -924,7 +937,9 @@ fuente, consulta [Desarrollo](#desarrollo).
    los desplegables para volver a traducir con ese idioma, o pulsa el botón `⇄`
    para traducir el resultado de vuelta al idioma del que procede. El par se
    restablece a *detectar el idioma de origen y usar el destino configurado* en
-   cada nueva selección.
+   cada nueva selección; el destino que elijas a mano se recuerda y pasa a ser ese
+   destino configurado, de modo que la siguiente selección ya empieza en él,
+   mientras que el origen elegido solo vale para la tarjeta que tienes delante.
 5. Las selecciones más cortas que el mínimo configurado (2 caracteres por
    defecto) se ignoran, y un arrastre que empieza o termina sobre el propio
    emergente nunca activa una traducción.
@@ -1003,6 +1018,12 @@ proveedor debe traducir el servidor, y si ese no responde se usa otro motor.
 | `cloud-baidu` | nada que rellenar | **Baidu Translate**: un servidor desplegado desde [`server/`](./server/README.md) traduce con la cuenta del propio proyecto, y en la red se llama `vendor: "baidu"`. La aplicación solo envía el texto más un id de instalación, las credenciales se quedan en el servidor y funciona desde China continental. La cuota diaria se cuenta por dispositivo, por dirección y en total, y la ventana de ajustes muestra lo que queda; usar tu propio despliegue es cambiar una línea de la dirección dentro de la compilación. |
 | `cloud-youdao` | nada que rellenar | **Youdao Translate**: otra vez el servidor de Glossy, esta vez con 有道智云 (`vendor: "youdao"`). Igual: sin clave, nada que rellenar, y con motor de reserva cuando Youdao no responde. |
 | `google` | gratis, sin clave | Punto de conexión público `translate.googleapis.com`. Bloqueado en algunas redes, incluida buena parte de China continental. Siempre se consulta con el id de cliente `dict-chrome-ex`; el id `gtx`, limitado, solo se usa como alternativa. |
+
+Cada motor traduce un conjunto distinto de idiomas: una cuenta estándar de Baidu
+rechaza ocho de los 31 que ofrece Glossy (`uk`, `tr`, `hi`, `id`, `ms`, `he`, `no`,
+`sk`), mientras que Youdao y Google los admiten todos. Las dos barras de idioma
+solo listan los idiomas del motor que está usando la tarjeta, así que uno que
+rechazaría no se ofrece nunca y nunca se envía.
 
 Los símbolos fonéticos y las definiciones de palabras sueltas provienen de
 `api.dictionaryapi.dev`, que es gratuito, no necesita clave y es accesible desde
@@ -1097,8 +1118,9 @@ encabezado activa o desactiva la conversión de unidades para toda la aplicació
 el mismo ajuste que el del panel **Units** de más abajo, y es el único sitio donde
 las conversiones de una tarjeta se pueden cambiar al momento. La barra de idioma
 sigue las reglas del emergente, así que el origen empieza en *Detect language*, el
-destino sigue al idioma configurado y una nueva selección restablece el par (las
-anulaciones nunca se guardan). Pulsa **Show in floating popup** para abrir el
+destino sigue al idioma configurado y una nueva selección restablece el par (el
+origen elegido no se guarda nunca; el destino sí, y pasa a ser el idioma
+configurado). Pulsa **Show in floating popup** para abrir el
 emergente real con la selección actual (o con todo el texto cuando no hay nada
 seleccionado): así se prueba el emergente sin el enganche global.
 
@@ -1363,7 +1385,8 @@ src-tauri/src/
   morphology.rs          the forms of an English word (run, runs, running, ran)
   context.rs             the sentence a selected word stands in, via UI Automation
   units/                 unit and currency conversion for the card
-  translate/             google and cloud providers, word dictionary
+  translate/             google and cloud providers, word dictionary,
+                         and the languages each of them translates
   platform/
     mod.rs               what the backend may assume about an operating system
     windows/             the modules that talk to Win32: clipboard, console, desktop,

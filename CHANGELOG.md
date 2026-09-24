@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.2.1] - 2026-09-24
+
+A language bar now tells the truth about the engine behind it. The eight languages a
+standard Baidu account refuses are no longer offered, and the language a reader picks in
+the card is the language the next selection starts from.
+
+### Changed
+
+- **A language bar offers only the languages the chosen engine translates.** The bars were
+  built from one list for all three engines, and a standard Baidu account refuses eight of
+  its 31 entries — `uk`, `tr`, `hi`, `id`, `ms`, `he`, `no` and `sk` — so 百度 could be
+  asked for a language it answers with `58001`. `src-tauri/src/translate/languages.rs` is
+  now the only table (`ALL`, plus `BAIDU`, `YOUDAO` and Google's, which is every language),
+  published to both windows through the new `service_languages` command, and the two bars —
+  the card's and the settings window's — rebuild themselves from it whenever the engine
+  changes, in either direction. A code the provider detected that the shared menu never had
+  stays selectable, so a bar is never blank, and a target the backend is handed anyway is
+  clamped to a language the engine does take rather than sent and refused.
+- **The language a reader picks in the card is the configured language from then on.** The
+  target chosen in either window's bar was good for the card on screen and forgotten at the
+  next selection, so translating a page into Japanese and then selecting the next word put
+  it back into the configured language. The new `set_target_lang` stores the pick, and the
+  source language keeps its old behaviour — it is reset to *detect it* for every selection.
+  The swap button does not save either, so a reversal does not change the setting.
+
 ## [1.2.0] - 2026-09-22
 
 Windows is no longer the operating system of the whole backend: every call into Win32 now
@@ -727,7 +752,8 @@ First public release.
 - Global hotkey (default `Ctrl+Alt+C`) that translates the clipboard content, and a
   setting to restore the previous clipboard content after reading a selection.
 
-[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/SpencerZXWu/Glossy/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/SpencerZXWu/Glossy/compare/v1.1.0...v1.1.1

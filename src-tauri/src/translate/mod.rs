@@ -3,6 +3,7 @@
 mod cloud;
 mod dictionary;
 mod google;
+pub mod languages;
 
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -295,7 +296,7 @@ pub async fn translate(
     let kind = classify::classify(text);
     let client = client()?;
     let source = languages.source_code();
-    let (mut target, forced) = resolve_target(text, &settings.target_lang, languages);
+    let (mut target, forced) = resolve_target(text, &settings.target_lang, languages, settings);
 
     let mut result = call_provider(client, settings, text, source, &target, kind).await?;
     result.source_lang = normalize_lang_code(&result.source_lang);
@@ -354,10 +355,9 @@ pub async fn word_details(
 
     let client = client()?;
     let source = languages.source_code();
-    let target = match languages.target_code() {
-        Some(code) => code.to_string(),
-        None => effective_target(text, &settings.target_lang),
-    };
+    // The same target the translation went into, so the dictionary is looked up
+    // in the language the card is showing.
+    let target = resolve_target(text, &settings.target_lang, languages, settings).0;
 
     let mut result = TranslationResult::new(Kind::Word, "", text, &target);
     // The dictionary and the free endpoint answer independently, and the free
@@ -438,7 +438,7 @@ pub async fn sentence_context(
     let text = sentence.filter(|text| !text.trim().is_empty())?;
     let client = client().ok()?;
     let source = languages.source_code();
-    let (target, _) = resolve_target(&text, &settings.target_lang, languages);
+    let (target, _) = resolve_target(&text, &settings.target_lang, languages, settings);
     let result = call_provider(client, settings, &text, source, &target, Kind::Sentence)
         .await
         .ok()?;
@@ -528,10 +528,31 @@ async fn call_service(
 /// picked it by hand. An explicit choice is used as it is; otherwise the
 /// settings decide and a selection already in the target language is translated
 /// away from it.
-fn resolve_target(text: &str, configured: &str, languages: &Languages) -> (String, bool) {
-    match languages.target_code() {
+///
+/// A language the channel does not translate never reaches it: a choice the
+/// card kept from another channel falls back on the configured target, and a
+/// configured target the channel does not take falls back on the first language
+/// it does.
+fn resolve_target(
+    text: &str,
+    configured: &str,
+    languages: &Languages,
+    settings: &Settings,
+) -> (String, bool) {
+    let service = settings.service();
+    let picked = languages
+        .target_code()
+        .filter(|code| languages::serves(service, code));
+
+    match picked {
         Some(code) => (code.to_string(), true),
-        None => (effective_target(text, configured), false),
+        None => {
+            if languages::serves(service, configured) {
+                (effective_target(text, configured), false)
+            } else {
+                (languages::fallback(service).to_string(), false)
+            }
+        }
     }
 }
 
@@ -730,8 +751,9 @@ mod tests {
         let none = Languages::default();
         assert_eq!(none.source_code(), "auto");
         assert_eq!(none.target_code(), None);
+        let settings = Settings::default();
         assert_eq!(
-            resolve_target("你好世界", "zh-CN", &none),
+            resolve_target("你好世界", "zh-CN", &none, &settings),
             ("en".to_string(), false)
         );
 
@@ -741,7 +763,47 @@ mod tests {
         };
         assert_eq!(auto.source_code(), "auto");
         assert_eq!(auto.target_code(), None);
-        assert_eq!(resolve_target("hello", "zh-CN", &auto).0, "zh-CN");
+        assert_eq!(
+            resolve_target("hello", "zh-CN", &auto, &settings).0,
+            "zh-CN"
+        );
+    }
+
+    /// The two languages a channel does not take, kept from a channel that did.
+    #[test]
+    fn an_unserved_language_never_reaches_the_provider() {
+        let baidu = Settings::default();
+        assert_eq!(baidu.service(), Service::CloudBaidu);
+
+        // A language the card kept from another channel falls back on the
+        // configured target, and is still unforced, so the away-from-it
+        // handling is left to run.
+        let kept = Languages {
+            source: Some("auto".to_string()),
+            target: Some("tr".to_string()),
+        };
+        assert_eq!(
+            resolve_target("hello", "fr", &kept, &baidu),
+            ("fr".to_string(), false)
+        );
+        assert_eq!(
+            resolve_target("你好", "zh-CN", &kept, &baidu),
+            ("en".to_string(), false)
+        );
+        // A configured target the channel does not take falls back on the first
+        // language it does, rather than being sent and refused.
+        assert_eq!(
+            resolve_target("hello", "tr", &Languages::default(), &baidu),
+            ("en".to_string(), false)
+        );
+        // A channel that does take it is left exactly as it was.
+        let mut google = Settings::default();
+        google.set_service(Service::Google);
+        assert_eq!(google.service(), Service::Google);
+        assert_eq!(
+            resolve_target("hello", "tr", &kept, &google),
+            ("tr".to_string(), true)
+        );
     }
 
     #[test]
@@ -754,7 +816,7 @@ mod tests {
         assert_eq!(forced.target_code(), Some("fr"));
         // Even a selection that is already French keeps the chosen target.
         assert_eq!(
-            resolve_target("bonjour", "fr", &forced),
+            resolve_target("bonjour", "fr", &forced, &Settings::default()),
             ("fr".to_string(), true)
         );
     }

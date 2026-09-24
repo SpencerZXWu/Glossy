@@ -346,6 +346,15 @@ fn current_service(state: State<'_, Arc<AppState>>) -> String {
     state.settings().service().id().to_string()
 }
 
+/// Which languages each service translates, for both language bars.
+///
+/// A service that cannot take a language would refuse the request, so the bars
+/// leave it out; the tables live in one place rather than in a copy per window.
+#[tauri::command]
+fn service_languages() -> Vec<translate::languages::ServiceLanguages> {
+    translate::languages::table()
+}
+
 /// Switches the translation service, exactly as picking another entry in the
 /// settings window would.
 ///
@@ -364,6 +373,33 @@ fn set_service(
         return Ok(settings);
     }
     settings.set_service(service);
+    settings.save(&app)?;
+    state.set_settings(settings.clone());
+    let _ = app.emit("glossy://settings", settings.clone());
+    Ok(settings)
+}
+
+/// Remembers the language the reader translated into, so the next selection
+/// starts from it instead of from the target the settings used to hold.
+///
+/// What arrives is stored as it is, whichever service is chosen at the time:
+/// the two language bars only ever offer the languages of the service they are
+/// showing, so all this has to do is spell the code the way the menus do.
+#[tauri::command]
+fn set_target_lang(
+    app: AppHandle,
+    state: State<'_, Arc<AppState>>,
+    code: String,
+) -> Result<Settings, String> {
+    let code = translate::normalize_lang_code(&code);
+    if code.is_empty() {
+        return Err("A target language is needed.".to_string());
+    }
+    let mut settings = state.settings();
+    if settings.target_lang == code {
+        return Ok(settings);
+    }
+    settings.target_lang = code;
     settings.save(&app)?;
     state.set_settings(settings.clone());
     let _ = app.emit("glossy://settings", settings.clone());
@@ -590,6 +626,8 @@ pub fn run() {
             speaking,
             current_service,
             set_service,
+            service_languages,
+            set_target_lang,
             read_clipboard,
             history_list,
             history_clear,

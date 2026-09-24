@@ -61,6 +61,8 @@
   let pair = { source: AUTO, target: null };
   /** Language the provider reported for the current result. */
   let detected = "";
+  /** Engine that translates right now; the language bar offers its languages. */
+  let service = "";
 
   function cardWidth() {
     const width = Number(preferences.popupWidth);
@@ -209,13 +211,33 @@
   }
 
   /**
-   * Rebuilds one language dropdown. A code outside of the shared list (a
-   * detected language, or the target configured in the settings) is kept as an
-   * extra entry so the current value always has a matching option.
+   * The entries an engine can offer, plus the wanted code when the shared list
+   * never had it: a detected language comes from the provider rather than from
+   * the menu, so it stays selectable instead of leaving the bar blank.
+   *
+   * A language of the menu that the engine does not translate is left out, so
+   * the bar only offers what the translation through this engine can be.
+   */
+  function entries(selected) {
+    const codes = Glossy.languagesFor(service);
+    if (
+      selected &&
+      selected !== AUTO &&
+      codes.indexOf(selected) === -1 &&
+      Glossy.languageCodes.indexOf(selected) === -1
+    ) {
+      codes.unshift(selected);
+    }
+    return codes;
+  }
+
+  /**
+   * Rebuilds one language dropdown, and settles on the wanted value when the
+   * engine still offers it: otherwise on "detect it" (the source bar) or on the
+   * first language the engine does translate (the target bar).
    */
   function fillLanguageSelect(select, selected, withAuto) {
-    const codes = Glossy.languageCodes.slice();
-    if (selected && selected !== AUTO && codes.indexOf(selected) === -1) codes.unshift(selected);
+    const codes = entries(selected);
 
     select.innerHTML = "";
     if (withAuto) {
@@ -230,7 +252,8 @@
       option.textContent = Glossy.languageName(code);
       select.appendChild(option);
     });
-    select.value = selected || (withAuto ? AUTO : codes[0]);
+    const wanted = selected && codes.indexOf(selected) !== -1;
+    select.value = wanted ? selected : withAuto ? AUTO : codes[0];
   }
 
   /** Reflects the pair of the current result in the language bar. */
@@ -456,6 +479,25 @@
     place(false);
   }
 
+  /** Asks the backend which engine translates, and which languages it takes. */
+  async function loadService() {
+    try {
+      service = String((await Glossy.invoke("current_service")) || "");
+    } catch (error) {
+      service = "";
+    }
+  }
+
+  /** Reads the per-engine language tables once; the language bar filters with
+      them, and goes on offering everything if they cannot be read. */
+  async function loadLanguages() {
+    try {
+      Glossy.setServiceLanguages(await Glossy.invoke("service_languages"));
+    } catch (error) {
+      console.warn("glossy: cannot read the language tables", error);
+    }
+  }
+
   /** Switches the engine and translates the same text through it. */
   async function chooseService(id) {
     closeServiceMenu();
@@ -467,7 +509,28 @@
       console.warn("glossy: could not switch the translation service", error);
       return;
     }
+    service = id;
+    // A language the engine just left cannot stand in the bar any more, so the
+    // next run goes back to the configured pair instead of asking for it.
+    if (unserved(pair.source)) pair.source = AUTO;
+    if (unserved(pair.target)) pair.target = null;
     if (text) run(text);
+  }
+
+  /** Whether the chosen engine refuses a language the bar is holding. */
+  function unserved(code) {
+    return !!code && code !== AUTO && !Glossy.servesLanguage(service, code);
+  }
+
+  /**
+   * Remembers the language the card is translated into, so the next selection
+   * starts from it rather than from the target configured in the settings.
+   */
+  function rememberTarget(code) {
+    if (!code || code === AUTO) return;
+    Glossy.invoke("set_target_lang", { code }).catch((error) => {
+      console.warn("glossy: could not remember the target language", error);
+    });
   }
 
   /** Shows a translation the history already has, without asking the provider
@@ -538,6 +601,7 @@
   });
   langTo.addEventListener("change", () => {
     pair.target = langTo.value;
+    rememberTarget(pair.target);
     run(text);
   });
   langSwap.addEventListener("click", swapLanguages);
@@ -570,11 +634,13 @@
     showStored(event && event.payload);
   });
 
-  Glossy.listen("glossy://settings", (event) => {
+  Glossy.listen("glossy://settings", async (event) => {
     preferences = { ...preferences, ...(event.payload || {}) };
     applyAppearance();
     applyLanguage();
-    // The labels of the language bar are translated too.
+    // The engine may have been switched in the settings window, and another
+    // engine offers other languages; the labels of the bar are translated too.
+    await loadService();
     if (!langbar.hidden) showLanguages(current);
     // A different width or text size also changes the card size.
     const state = document.body.dataset.state;
@@ -618,6 +684,10 @@
     } catch (error) {
       console.warn("glossy: cannot read settings", error);
     }
+    // The engine and its languages are known before the card is filled, so the
+    // bar of the first result already leaves out what the engine cannot do.
+    await loadLanguages();
+    await loadService();
     applyAppearance();
     applyLanguage();
     showPin();

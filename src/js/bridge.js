@@ -237,6 +237,23 @@
         return previewSpeaking;
       case "current_service":
         return previewService;
+      case "service_languages":
+        // Stand-in for the backend's table: enough of a difference between the
+        // two engines to see the language lists change with them.
+        return [
+          {
+            id: "cloud-baidu",
+            languages: ["en", "zh-CN", "zh-TW", "ja", "ko", "fr", "de", "es", "pt", "it", "ru", "ar"],
+          },
+          {
+            id: "cloud-youdao",
+            languages: ["en", "zh-CN", "zh-TW", "ja", "ko", "fr", "de", "es", "pt", "it", "ru", "ar", "nl", "pl", "tr"],
+          },
+        ];
+      case "set_target_lang":
+        settings = { ...settings, targetLang: String(input.code || settings.targetLang) };
+        previewEmit("glossy://settings", { ...settings });
+        return { ...settings };
       case "set_service":
         if (!SERVICE_ENGINES[input.id]) throw new Error("unknown service");
         previewService = input.id;

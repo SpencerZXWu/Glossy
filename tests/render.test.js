@@ -3,8 +3,22 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { loadFrontend } = require("./helpers/load-scripts.js");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const { JS_DIR, loadFrontend } = require("./helpers/load-scripts.js");
 const { findByClass, classesOf, descendantsOf } = require("./helpers/fake-dom.js");
+
+/** The Rust module that decides which languages each channel translates. */
+const RUST_LANGUAGES = path.resolve(
+  JS_DIR,
+  "..",
+  "..",
+  "src-tauri",
+  "src",
+  "translate",
+  "languages.rs"
+);
 
 function newEnv() {
   const env = loadFrontend();
@@ -906,3 +920,77 @@ test("the name of the engine stays plain text without a way to switch", () => {
   assert.equal(findByClass(node, "service"), null);
   assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
 });
+
+/** The codes of one table in the Rust module that decides them. */
+function rustTable(name) {
+  const pattern = new RegExp(
+    `const ${name}: \\[&str; \\d+\\] = \\[([\\s\\S]*?)\\];`
+  );
+  const block = pattern.exec(fs.readFileSync(RUST_LANGUAGES, "utf8"));
+  assert.ok(block, `languages.rs no longer declares ${name}`);
+  return block[1]
+    .split(",")
+    .map((piece) => /"([^"]+)"/.exec(piece))
+    .filter(Boolean)
+    .map((match) => match[1]);
+}
+
+test("an engine the tables do not mention keeps every language", () => {
+  const fresh = newEnv().Glossy;
+  assert.deepEqual(
+    Array.from(fresh.languagesFor("cloud-baidu")),
+    Array.from(fresh.languageCodes)
+  );
+  assert.ok(fresh.servesLanguage("cloud-baidu", "tr"));
+});
+
+test("the languages of an engine are its table, in the order of the menu", () => {
+  const fresh = newEnv().Glossy;
+  // The table is written in the order a provider lists them, not the menu's.
+  fresh.setServiceLanguages([
+    { id: "cloud-baidu", languages: ["sv", "tr", "en", "zh-CN", "ceb"] },
+  ]);
+  assert.deepEqual(
+    Array.from(fresh.languagesFor("cloud-baidu")),
+    ["en", "zh-CN", "tr", "sv"]
+  );
+  assert.ok(fresh.servesLanguage("cloud-baidu", "en"));
+  // A language the engine takes but the menu never had is still taken; it is
+  // only the menu that holds no entry for it.
+  assert.ok(fresh.servesLanguage("cloud-baidu", "ceb"));
+  assert.ok(!fresh.servesLanguage("cloud-baidu", "de"));
+  assert.deepEqual(
+    Array.from(fresh.languagesFor("google")),
+    Array.from(fresh.languageCodes)
+  );
+  assert.ok(fresh.servesLanguage("google", "tr"));
+});
+
+test("an engine with no languages in the tables keeps the full list", () => {
+  const fresh = newEnv().Glossy;
+  fresh.setServiceLanguages([
+    { id: "cloud-youdao", languages: [] },
+    { id: "", languages: ["en"] },
+    { languages: ["en"] },
+    null,
+  ]);
+  assert.deepEqual(
+    Array.from(fresh.languagesFor("cloud-youdao")),
+    Array.from(fresh.languageCodes)
+  );
+  assert.ok(fresh.servesLanguage("cloud-youdao", "tr"));
+});
+
+test("the language list of the backend is the list the menus offer", () => {
+  assert.deepEqual(rustTable("ALL"), Array.from(newEnv().Glossy.languageCodes));
+});
+
+test("the languages Baidu leaves out are the eight the standard plan refuses", () => {
+  // 有道 and Google both translate all 31, so Baidu alone decides this.
+  const served = rustTable("BAIDU");
+  const left = Array.from(newEnv().Glossy.languageCodes).filter(
+    (code) => served.indexOf(code) === -1
+  );
+  assert.deepEqual(left, ["uk", "tr", "hi", "id", "ms", "he", "no", "sk"]);
+});
+

@@ -202,9 +202,17 @@
     }, 1400);
   }
 
+  /**
+   * Rebuilds the target list from the languages the chosen engine translates,
+   * and answers with the code it settled on: what was wanted while the engine
+   * takes it, and the first language it does take otherwise. A code the shared
+   * list never had is kept, because it did not come from this menu.
+   */
   function fillLanguages(current) {
-    const codes = LANGUAGES.slice();
-    if (current && codes.indexOf(current) === -1) codes.unshift(current);
+    const codes = Glossy.languagesFor(els.service.value);
+    if (current && codes.indexOf(current) === -1 && LANGUAGES.indexOf(current) === -1) {
+      codes.unshift(current);
+    }
     els.targetLang.innerHTML = "";
     codes.forEach((code) => {
       const option = document.createElement("option");
@@ -212,6 +220,7 @@
       option.textContent = Glossy.languageName(code);
       els.targetLang.appendChild(option);
     });
+    return current && codes.indexOf(current) !== -1 ? current : codes[0];
   }
 
   /** Whether the dropdown entry is served by Glossy's own server. */
@@ -732,8 +741,9 @@
     syncDemoLanguage();
     renderHistory();
     if (settings) {
-      fillLanguages(settings.targetLang);
-      els.targetLang.value = settings.targetLang;
+      // A pick that is not saved yet keeps its place; one the engine does not
+      // translate settles on the first language it does.
+      els.targetLang.value = fillLanguages(els.targetLang.value || settings.targetLang);
     }
   }
 
@@ -775,9 +785,10 @@
     els.historyLimit.value = String(pick(HISTORY_LIMITS, next.historyLimit, 50));
     els.checkUpdates.checked = !!next.checkUpdates;
     applyTheme(els.theme.value);
-    fillLanguages(next.targetLang);
-    els.targetLang.value = next.targetLang;
+    // The engine comes first: the two language lists are the languages it
+    // takes, so what they offer depends on it.
     els.service.value = serviceOf(next);
+    els.targetLang.value = fillLanguages(next.targetLang);
     els.uiLang.value = next.uiLang === "zh" || next.uiLang === "en" ? next.uiLang : "system";
     Glossy.i18n.set(els.uiLang.value);
     els.options.dataset.disabled = String(!next.enabled);
@@ -1005,13 +1016,24 @@
   }
 
   /**
-   * Rebuilds one language dropdown. A code outside of the shared list (a
-   * detected language, or the target configured in the settings) is kept as an
-   * extra entry so the current value always has a matching option.
+   * Rebuilds one language dropdown from the languages the chosen engine
+   * translates, and settles on the wanted value while it is one of them: on
+   * "detect it" (the source bar) or on the first language the engine takes (the
+   * target bar) otherwise.
+   *
+   * A code the shared list never had (a language the provider detected) is kept
+   * as an extra entry, because it did not come from the menu.
    */
   function fillLanguageSelect(select, selected, withAuto) {
-    const codes = LANGUAGES.slice();
-    if (selected && selected !== AUTO && codes.indexOf(selected) === -1) codes.unshift(selected);
+    const codes = Glossy.languagesFor(els.service.value);
+    if (
+      selected &&
+      selected !== AUTO &&
+      codes.indexOf(selected) === -1 &&
+      LANGUAGES.indexOf(selected) === -1
+    ) {
+      codes.unshift(selected);
+    }
 
     select.innerHTML = "";
     if (withAuto) {
@@ -1026,7 +1048,8 @@
       option.textContent = Glossy.languageName(code);
       select.appendChild(option);
     });
-    select.value = selected || (withAuto ? AUTO : codes[0]);
+    const wanted = selected && codes.indexOf(selected) !== -1;
+    select.value = wanted ? selected : withAuto ? AUTO : codes[0];
   }
 
   /** Reflects the pair of the current result in the language bar. */
@@ -1045,6 +1068,26 @@
   function resetDemoLanguages() {
     demoPair = { source: AUTO, target: null };
     demoDetected = "";
+  }
+
+  /** Drops the demo languages the chosen engine does not translate, the same
+      way the popup's bar does when the engine is switched under it. */
+  function dropUnservedPair() {
+    const unserved = (code) =>
+      !!code && code !== AUTO && !Glossy.servesLanguage(els.service.value, code);
+    if (unserved(demoPair.source)) demoPair.source = AUTO;
+    if (unserved(demoPair.target)) demoPair.target = null;
+  }
+
+  /**
+   * Remembers the language the card is translated into, so the next selection
+   * starts from it rather than from the target the settings hold.
+   */
+  function rememberTarget(code) {
+    if (!code || code === AUTO) return;
+    Glossy.invoke("set_target_lang", { code }).catch((error) => {
+      console.warn("glossy: could not remember the target language", error);
+    });
   }
 
   /** Reverse-translates the card: the translation becomes the new selection. */
@@ -1155,10 +1198,19 @@
     applyLanguage();
     scheduleSave();
   });
-  els.service.addEventListener("change", () => {
+  els.service.addEventListener("change", async () => {
     syncService();
     syncChannelQuota();
-    scheduleSave();
+    // What the two language lists offer follows the engine, and so does the
+    // answer of the card; the save is awaited because the backend only knows
+    // the new engine once it has landed.
+    els.targetLang.value = fillLanguages(els.targetLang.value);
+    dropUnservedPair();
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    pending = false;
+    await save();
+    refreshDemo();
   });
   els.cloudQuotaRefresh.addEventListener("click", () => refreshCloudQuota());
   els.ignoredRunning.addEventListener("change", () => {
@@ -1297,6 +1349,7 @@
   });
   els.demoTo.addEventListener("change", () => {
     demoPair.target = els.demoTo.value;
+    rememberTarget(demoPair.target);
     runDemo(demoValue);
   });
   els.demoSwap.addEventListener("click", swapDemo);
@@ -1315,6 +1368,32 @@
   // instead of waiting for the next start.
   Glossy.listen("glossy://history", loadHistory);
   Glossy.listen("glossy://flush-settings", flushSave);
+  // The card in the popup switches its own engine and picks its own target
+  // language, and both are stored, so this window follows them — the fields it
+  // does not own are left alone rather than saved back over the card's choice.
+  Glossy.listen("glossy://settings", (event) => {
+    const next = (event && event.payload) || null;
+    if (!next || !settings) return;
+    const service = serviceOf(next);
+    const language = String(next.targetLang || settings.targetLang || "");
+    const switched = els.service.value !== service;
+    settings = {
+      ...settings,
+      targetLang: language,
+      channel: next.channel,
+      cloudProvider: next.cloudProvider,
+      cloudVendor: next.cloudVendor,
+      provider: next.provider,
+    };
+    if (switched) {
+      els.service.value = service;
+      syncService();
+      syncChannelQuota();
+      dropUnservedPair();
+    }
+    if (els.targetLang.value !== language) els.targetLang.value = fillLanguages(language);
+    if (switched) refreshDemo();
+  });
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) flushSave();
   });
@@ -1326,6 +1405,13 @@
     // Resolved before the settings paint the window, so the effect is in place
     // from the first frame on.
     await resolveBackdrop();
+    // Which languages an engine translates is asked for first, so the lists
+    // already leave out what the chosen engine cannot do.
+    try {
+      Glossy.setServiceLanguages(await Glossy.invoke("service_languages"));
+    } catch (error) {
+      console.warn("glossy: cannot read the language tables", error);
+    }
     try {
       apply(await Glossy.readSettings());
     } catch (error) {

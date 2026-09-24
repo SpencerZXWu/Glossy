@@ -511,8 +511,49 @@
       .join(" · ");
   }
 
+  /**
+   * Languages each engine offers, as the backend reported them.
+   *
+   * The tables are read once at start-up (`service_languages`); until they
+   * arrive every list is offered in full, so a backend that cannot answer costs
+   * the filtering and nothing else.
+   */
+  let serviceLanguages = {};
+
+  /** Records the per-engine language tables the backend sent. */
+  function setServiceLanguages(list) {
+    const table = {};
+    (Array.isArray(list) ? list : []).forEach((entry) => {
+      if (!entry || !entry.id) return;
+      const codes = (Array.isArray(entry.languages) ? entry.languages : [])
+        .map((code) => String(code))
+        .filter(Boolean);
+      // An engine the backend knows no language for keeps the full list, which
+      // is the same answer as an engine it never mentioned.
+      if (codes.length) table[String(entry.id)] = codes;
+    });
+    serviceLanguages = table;
+  }
+
+  /** Codes of the shared list the engine offers, in menu order. */
+  function languagesFor(service) {
+    const codes = serviceLanguages[service];
+    if (!codes) return LANGUAGE_CODES.slice();
+    return LANGUAGE_CODES.filter((code) => codes.indexOf(code) !== -1);
+  }
+
+  /** Whether the engine takes one language code; unknown engines take any. */
+  function servesLanguage(service, code) {
+    const codes = serviceLanguages[service];
+    if (!codes) return true;
+    return codes.indexOf(String(code)) !== -1;
+  }
+
   Glossy.languageName = languageName;
   Glossy.languageCodes = LANGUAGE_CODES;
+  Glossy.setServiceLanguages = setServiceLanguages;
+  Glossy.languagesFor = languagesFor;
+  Glossy.servesLanguage = servesLanguage;
   Glossy.errorMessage = function (error) {
     if (typeof error === "string") return error;
     if (error && typeof error.message === "string") return error.message;
