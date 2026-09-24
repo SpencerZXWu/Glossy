@@ -61,8 +61,13 @@ To build from source instead, see [Development](#development).
    turn it on under **Settings → Personalization → Taskbar → Other system tray
    icons**, to keep it visible.
 3. In any application, **drag across text** (or **double click a word**) to select it.
-4. The popup appears below the cursor. Drag its header to move it, use the buttons
-   to copy the result or to close it, or click anywhere else to dismiss it.
+4. Glossy shows a small Glossy icon below the selection. Nothing is translated —
+   and nothing is charged against the day's allowance — until you **click that
+   icon**, so a word you merely swiped over costs nothing. Clicking anywhere else
+   makes the icon disappear.
+5. The card appears below the selection. Drag its header to move it, use the
+   buttons to copy the result or to open the settings, or click anywhere else to
+   dismiss it.
    The row under the header shows the language pair: hover it and pick either side
    from the dropdowns to translate again with that language, or press the `⇄`
    button to translate the result back into the language it came from. The pair
@@ -70,7 +75,7 @@ To build from source instead, see [Development](#development).
    selection; a target you pick by hand is remembered and becomes that configured
    target, so the next selection already starts from it, while the source you
    pick is good for the card on screen only.
-5. Selections shorter than the configured minimum (2 characters by default) are
+6. Selections shorter than the configured minimum (2 characters by default) are
    ignored, and a drag that starts or ends on the popup itself never triggers a
    translation.
 
@@ -99,7 +104,7 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 | Translate a word on double click | Enables the double-click gesture. |
 | Put the clipboard back after reading a selection | Restores your previous clipboard content after Glossy copied the selection. |
 | Show the original text in the popup | Hides the source line in the card when off. A long selection is capped at four lines there and scrolls inside its block, so the translation keeps the room. |
-| Convert units and currency | When the translation still measures something in a unit your target language does not use — feet, pounds, °F, a foreign amount — the card adds the converted value and the rate underneath (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). The numbers are read from the translation, because the translator is what decides whether a symbol is a unit at all and always writes it in a language the tables know; if the translation holds none, the original is read instead. Length, mass, volume, speed, area and temperature convert inside their category, and the target unit is the one a person would write; the target currency follows the target language (`zh-CN` → CNY, `en` → USD). Currency rates come from `open.er-api.com` (ECB as a fallback) and are cached for six hours; everything else is built into the app. Off means no conversion and no rate request. |
+| Convert units and currency | When the translation still measures something in a unit your target language does not use — feet, pounds, °F, a foreign amount — the card adds the converted value and the rate underneath (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). The numbers are read from the translation, because the translator is what decides whether a symbol is a unit at all and always writes it in a language the tables know; if the translation holds none, the original is read instead. Length, mass, volume, speed, area and temperature convert inside their category, and the target unit is the one a person would write; the target currency follows the target language (`zh-CN` → CNY, `en` → USD). Currency rates come through Glossy's own server, which reads `open.er-api.com` and falls back to ECB (`api.frankfurter.app`); the app asks those two directly only when the server cannot answer, and either way a rate is cached for six hours. Everything else is built into the app. Off means no conversion and no rate request. |
 | Show the sentence a word was selected from | The card adds the sentence the selection was taken from, next to a translation of that sentence. Off means the word is translated on its own. |
 | Pair the original and the translation sentence by sentence | A paragraph whose translation divides differently is listed one aligned row at a time instead of as a block. A translation that comes back as a single row is left as the plain paragraph. |
 | Draw a compact card, without the extras | Keeps the translation, the phonetic symbols and the meanings, and leaves out the example, the inflections, the synonyms, the context sentence, the sentence-by-sentence view and the conversions. |
@@ -515,6 +520,23 @@ process. Each release maps to a GitHub milestone of the same name.
 
 [CHANGELOG.md](./CHANGELOG.md) lists what shipped in every released version.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). That is what is meant to sit behind the Windows
+installers of the [releases page](https://github.com/SpencerZXWu/Glossy/releases), so that
+Windows shows a publisher instead of *unknown publisher*. Releases published before that
+arrangement was in place are unsigned; with a certificate of one's own,
+`scripts/release.ps1 -Sign` signs a local build, as [release/README.md](./release/README.md)
+describes.
+
+Roles: [@SpencerZXWu](https://github.com/SpencerZXWu) owns this repository and is its only
+author, reviewer and approver — every commit and every release is reviewed and approved by
+that maintainer, whose GitHub account requires multi-factor authentication. Only artifacts
+built from a commit in this repository are ever signed.
+
+What the app sends where is described in [PRIVACY.md](./PRIVACY.md).
+
 ## License
 
 [MIT](./LICENSE) © 2026 Spencer Wu
@@ -553,8 +575,9 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 1. 启动 Glossy。设置窗口只在首次启动时打开——之后的启动都会安静地在通知区域运行，Glossy 从启动那一刻起就开始监听选区。
 2. 关闭该窗口并不会退出 Glossy——它会在后台继续监听选区。点击通知区域中的 Glossy 图标（或在其菜单中选择**打开 Glossy**）可以把窗口重新调出来，用同一个菜单中的**退出**来结束 Glossy。在已经运行时再次启动 Glossy，只会显示一条简短提示。静默启动会由右下角的一张小卡片告知；它几秒后淡出，点击它会打开设置窗口。Windows 11 会把新的通知区域图标收进溢出菜单（时钟旁的 `^`）——把图标拖到任务栏上，或在**设置 → 个性化 → 任务栏 → 其他系统托盘图标**中打开它，即可让它保持可见。
 3. 在任何应用中，**拖动划过文字**（或**双击一个单词**）即可选中它。
-4. 弹窗出现在光标下方。拖动它的标题栏可以移动它，用按钮复制结果或将它关闭，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*；手动选定的目标语言会被记住并成为已配置的目标语言，所以下一次选区直接以它为译文语言，而手动选定的源语言只对当前这张卡片有效。
-5. 短于所设最小长度的选区（默认 2 个字符）会被忽略，起点或终点落在弹窗本身的拖动永远不会触发翻译。
+4. Glossy 会在选区下方显示一个小图标。在**点击这个图标**之前不会翻译，也不会占用当天的翻译额度，因此只是随手划过的一个词不会有任何消耗。点击其他区域图标就会消失。
+5. 卡片出现在选区下方。拖动它的标题栏可以移动它，用按钮复制结果或打开设置，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*；手动选定的目标语言会被记住并成为已配置的目标语言，所以下一次选区直接以它为译文语言，而手动选定的源语言只对当前这张卡片有效。
+6. 短于所设最小长度的选区（默认 2 个字符）会被忽略，起点或终点落在弹窗本身的拖动永远不会触发翻译。
 
 单词卡片会显示音标、各词性及其释义、一个简单例句，并在同一张卡片里补上这个词的词形变化、意思相近的词、它被选中时所在的句子及该句译文，以及卡片两侧各一个朗读按钮。句子或段落直接显示译文，原文在译文上方（最多四行），段落较长时下方还有逐句对照。
 
@@ -573,7 +596,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 | 双击单词时翻译 | 启用双击手势。 |
 | 读取选区后恢复剪贴板 | 在 Glossy 复制了选区之后，恢复你原先的剪贴板内容。 |
 | 在弹窗中显示原文 | 关闭时隐藏卡片中的原文行。选中的文字较长时原文最多显示四行，多出来的部分只在该区块内滚动，译文因此始终留得住位置。 |
-| 把译文语言不常用的计量与货币换算过来 | 当译文仍用目标语言不使用的单位来计量某样东西时——英尺、磅、°F、外币金额——卡片会在下方补上换算后的数值和换算率（`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`）。数值是从译文中读取的，因为只有翻译服务才能判断一个符号到底是不是单位，而且它总是用单位表所认识的语言书写；如果译文里没有，就改为读取原文。长度、质量、体积、速度、面积和温度都在各自类别内换算，目标单位取人们实际会写的那个；目标货币跟随目标语言（`zh-CN` → CNY，`en` → USD）。货币汇率来自 `open.er-api.com`（备用 ECB），缓存六小时；其余一切都内置于应用中。关闭表示不换算，也不请求汇率。 |
+| 把译文语言不常用的计量与货币换算过来 | 当译文仍用目标语言不使用的单位来计量某样东西时——英尺、磅、°F、外币金额——卡片会在下方补上换算后的数值和换算率（`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`）。数值是从译文中读取的，因为只有翻译服务才能判断一个符号到底是不是单位，而且它总是用单位表所认识的语言书写；如果译文里没有，就改为读取原文。长度、质量、体积、速度、面积和温度都在各自类别内换算，目标单位取人们实际会写的那个；目标货币跟随目标语言（`zh-CN` → CNY，`en` → USD）。货币汇率由 Glossy 的服务端转发（服务端读 `open.er-api.com`，取不到就换欧洲央行的 `api.frankfurter.app`），服务端答不上来时才由客户端直连这两家；不管走哪条路，汇率都缓存六小时。其余一切都内置于应用中。关闭表示不换算，也不请求汇率。 |
 | 显示所查单词所在的句子 | 卡片会补上这个单词被选中时所在的句子，以及该句的译文。关闭时只翻译单词本身。 |
 | 原文与译文逐句对照 | 译文切分方式与原文不同的段落，会按对齐的一行一句列出，而不是整块显示。如果译文只回来一行，就仍然按普通段落显示。 |
 | 精简卡片，不显示附加信息 | 保留译文、音标和释义，省略例句、词形变化、近义词、所在句子、逐句对照和单位换算。 |
@@ -865,6 +888,20 @@ release/
 
 [CHANGELOG.md](./CHANGELOG.md) 列出了每个已发布版本中交付的内容。
 
+## Code signing policy · 代码签名策略
+
+[发布页](https://github.com/SpencerZXWu/Glossy/releases)的 Windows 安装包由
+[SignPath Foundation](https://signpath.org) 提供证书、[SignPath.io](https://about.signpath.io)
+提供免费签名（Free code signing provided by SignPath.io, certificate by SignPath Foundation），
+让 Windows 显示发布者而不是"未知发布者"。在这套办法落地之前发布的版本没有签名；若自己持有证书，
+可用 `scripts/release.ps1 -Sign` 为本地构建签名，见 [release/README.md](./release/README.md)。
+
+角色：[@SpencerZXWu](https://github.com/SpencerZXWu) 拥有本仓库，是唯一的作者、审查者和批准者
+——每个提交、每个版本都由该维护者审查批准，其 GitHub 账号启用了双因素认证。只会签名由本仓库的提交
+构建出的产物。
+
+应用会发送什么、发给谁，见 [PRIVACY.md](./PRIVACY.md)。
+
 ## 许可证
 
 [MIT](./LICENSE) © 2026 Spencer Wu
@@ -930,17 +967,22 @@ fuente, consulta [Desarrollo](#desarrollo).
    tray icons**, para que siga visible.
 3. En cualquier aplicación, **arrastra el ratón sobre el texto** (o **haz doble
    clic en una palabra**) para seleccionarlo.
-4. El emergente aparece debajo del cursor. Arrastra su encabezado para moverlo,
-   usa los botones para copiar el resultado o cerrarlo, o haz clic en cualquier
-   otro sitio para descartarlo. La fila que hay bajo el encabezado muestra el par
-   de idiomas: pasa el cursor por encima y elige cualquiera de los dos lados en
-   los desplegables para volver a traducir con ese idioma, o pulsa el botón `⇄`
-   para traducir el resultado de vuelta al idioma del que procede. El par se
-   restablece a *detectar el idioma de origen y usar el destino configurado* en
-   cada nueva selección; el destino que elijas a mano se recuerda y pasa a ser ese
-   destino configurado, de modo que la siguiente selección ya empieza en él,
-   mientras que el origen elegido solo vale para la tarjeta que tienes delante.
-5. Las selecciones más cortas que el mínimo configurado (2 caracteres por
+4. Glossy muestra un pequeño icono de Glossy bajo la selección. No se traduce
+   nada —y no se consume nada de la cuota del día— hasta que **hagas clic en ese
+   icono**, así que una palabra por la que solo has pasado por encima no cuesta
+   nada. Al hacer clic en cualquier otro sitio el icono desaparece.
+5. La tarjeta aparece debajo de la selección. Arrastra su encabezado para moverla,
+   usa los botones para copiar el resultado o abrir los ajustes, o haz clic en
+   cualquier otro sitio para descartarla. La fila que hay bajo el encabezado
+   muestra el par de idiomas: pasa el cursor por encima y elige cualquiera de los
+   dos lados en los desplegables para volver a traducir con ese idioma, o pulsa el
+   botón `⇄` para traducir el resultado de vuelta al idioma del que procede. El
+   par se restablece a *detectar el idioma de origen y usar el destino
+   configurado* en cada nueva selección; el destino que elijas a mano se recuerda
+   y pasa a ser ese destino configurado, de modo que la siguiente selección ya
+   empieza en él, mientras que el origen elegido solo vale para la tarjeta que
+   tienes delante.
+6. Las selecciones más cortas que el mínimo configurado (2 caracteres por
    defecto) se ignoran, y un arrastre que empieza o termina sobre el propio
    emergente nunca activa una traducción.
 
@@ -971,7 +1013,7 @@ encima de él cuando no hay espacio debajo.
 | Translate a word on double click | Activa el gesto de doble clic. |
 | Put the clipboard back after reading a selection | Restaura el contenido anterior del portapapeles después de que Glossy haya copiado la selección. |
 | Show the original text in the popup | Oculta la línea de origen de la tarjeta cuando está desactivado. Una selección larga se recorta a cuatro líneas y se desplaza dentro de su bloque, así la traducción conserva su espacio. |
-| Convert units and currency | Cuando la traducción sigue midiendo algo en una unidad que tu idioma de destino no usa —pies, libras, °F, una cantidad extranjera—, la tarjeta añade debajo el valor convertido y el factor de conversión (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). Los números se leen de la traducción, porque es el traductor quien decide si un símbolo es una unidad y siempre la escribe en un idioma que las tablas conocen; si la traducción no contiene ninguna, se lee el original. Longitud, masa, volumen, velocidad, superficie y temperatura se convierten dentro de su categoría, y la unidad de destino es la que escribiría una persona; la moneda de destino sigue al idioma de destino (`zh-CN` → CNY, `en` → USD). Los tipos de cambio provienen de `open.er-api.com` (con el BCE como alternativa) y se guardan en caché durante seis horas; todo lo demás está integrado en la aplicación. Desactivado significa que no hay conversión ni petición de tipos de cambio. |
+| Convert units and currency | Cuando la traducción sigue midiendo algo en una unidad que tu idioma de destino no usa —pies, libras, °F, una cantidad extranjera—, la tarjeta añade debajo el valor convertido y el factor de conversión (`12 ft ≈ 3.66 m` / `1 ft = 0.3048 m`). Los números se leen de la traducción, porque es el traductor quien decide si un símbolo es una unidad y siempre la escribe en un idioma que las tablas conocen; si la traducción no contiene ninguna, se lee el original. Longitud, masa, volumen, velocidad, superficie y temperatura se convierten dentro de su categoría, y la unidad de destino es la que escribiría una persona; la moneda de destino sigue al idioma de destino (`zh-CN` → CNY, `en` → USD). Los tipos de cambio los sirve el servidor de Glossy —que lee `open.er-api.com` y, si no responde, recurre al BCE (`api.frankfurter.app`)—; la aplicación pregunta directamente a esos proveedores solo cuando el servidor no puede contestar, y en cualquier caso el tipo de cambio se guarda en caché durante seis horas; todo lo demás está integrado en la aplicación. Desactivado significa que no hay conversión ni petición de tipos de cambio. |
 | Show the sentence a word was selected from | La tarjeta añade la frase de la que se tomó la selección, junto a una traducción de esa frase. Desactivado, la palabra se traduce por sí sola. |
 | Pair the original and the translation sentence by sentence | Un párrafo cuya traducción se divide de otra manera se lista como filas alineadas en lugar de como un bloque. Una traducción que vuelve en una sola fila se deja como párrafo normal. |
 | Draw a compact card, without the extras | Conserva la traducción, los símbolos fonéticos y los significados, y deja fuera el ejemplo, las formas, los sinónimos, la frase de contexto, la vista frase por frase y las conversiones. |
@@ -1420,6 +1462,23 @@ proceso de publicación. Cada publicación se corresponde con un hito de GitHub 
 mismo nombre.
 
 [CHANGELOG.md](./CHANGELOG.md) enumera lo que se incluyó en cada versión publicada.
+
+## Code signing policy · Política de firma de código
+
+Los instaladores de Windows de la [página de publicaciones](https://github.com/SpencerZXWu/Glossy/releases)
+llevan la firma gratuita de [SignPath.io](https://about.signpath.io) y el certificado de la
+[SignPath Foundation](https://signpath.org) (free code signing provided by SignPath.io,
+certificate by SignPath Foundation), de modo que Windows muestra un editor en lugar de
+*editor desconocido*. Las versiones publicadas antes de ese acuerdo no están firmadas; con
+un certificado propio, `scripts/release.ps1 -Sign` firma una compilación local, como describe
+[release/README.md](./release/README.md).
+
+Roles: [@SpencerZXWu](https://github.com/SpencerZXWu) es el propietario de este repositorio y
+su único autor, revisor y aprobador: cada confirmación y cada publicación las revisa y las
+aprueba ese responsable, cuya cuenta de GitHub exige autenticación de dos factores. Solo se
+firman artefactos compilados desde una confirmación de este repositorio.
+
+Lo que la aplicación envía y a dónde se describe en [PRIVACY.md](./PRIVACY.md).
 
 ## Licencia
 

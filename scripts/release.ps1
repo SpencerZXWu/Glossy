@@ -25,6 +25,19 @@
 .PARAMETER SkipBuild
     Skip the build and re-stage whatever is already in src-tauri/target/release/bundle.
 
+.PARAMETER Sign
+    Sign the app binary and both installers, then verify every staged artefact before
+    SHA256SUMS.txt is written. Signing is opt-in and configured entirely through the
+    environment, so no certificate ever reaches the repository:
+
+      GLOSSY_SIGN_COMMAND     a signing command containing %1 for the file to sign
+                              (cloud signing services such as relic, or signtool)
+      GLOSSY_CERT_THUMBPRINT  SHA1 thumbprint of a certificate in Cert:\CurrentUser\My
+      GLOSSY_TIMESTAMP_URL    timestamp server, default http://timestamp.digicert.com
+
+    GLOSSY_SIGN_COMMAND wins when both are set. Without -Sign the build is unchanged
+    and the release is reported as unsigned.
+
 .PARAMETER ForceNotes
     Regenerate RELEASE_NOTES.md from CHANGELOG.md even if the file already exists. The
     translations are reset to their placeholders, so translations already written by
@@ -39,11 +52,14 @@
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild
     powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -SkipBuild -Publish
+    $env:GLOSSY_SIGN_COMMAND='relic sign --file %1 --key azure --config relic.conf'
+    powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Sign
 #>
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
     [switch]$ForceNotes,
+    [switch]$Sign,
     [switch]$Publish
 )
 
@@ -57,6 +73,7 @@ if ($self.Length -lt 3 -or $self[0] -ne 0xEF -or $self[1] -ne 0xBB -or $self[2] 
 }
 
 $root = Split-Path -Parent $PSScriptRoot
+$eol = [Environment]::NewLine
 
 function Get-ChangelogSection {
     param([string]$Version)
@@ -107,9 +124,73 @@ function New-NotesScaffold {
         '',
         '## Español',
         '',
-        $todo
+        $todo,
+        '',
+        '---',
+        '',
+        'Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by ' +
+        '[SignPath Foundation](https://signpath.org) — see the ' +
+        '[code signing policy](https://github.com/SpencerZXWu/Glossy#code-signing-policy). ' +
+        'Privacy: [PRIVACY.md](https://github.com/SpencerZXWu/Glossy/blob/main/PRIVACY.md).'
     )
     return ($parts -join [Environment]::NewLine)
+}
+
+function Find-SignTool {
+    <#
+        signtool.exe is required as soon as signing is on: the most reliable way to tell
+        whether a helper DLL still needs signing is to verify it with signtool, and both
+        installer bundlers stop the build with "SignTool not found" instead of skipping
+        that step. Tauri discovers the tool through TAURI_WINDOWS_SIGNTOOL_PATH or the
+        Windows Kits registry, so the same two places are searched here.
+    #>
+    if ($env:TAURI_WINDOWS_SIGNTOOL_PATH -and (Test-Path -LiteralPath $env:TAURI_WINDOWS_SIGNTOOL_PATH)) {
+        return $env:TAURI_WINDOWS_SIGNTOOL_PATH
+    }
+
+    $onPath = Get-Command signtool.exe -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty Source
+    if ($onPath) { return $onPath }
+
+    foreach ($key in @(
+            'HKLM:\SOFTWARE\Microsoft\Windows Kits\Installed Roots',
+            'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows Kits\Installed Roots')) {
+        $kitRoot = $null
+        try {
+            $kitRoot = (Get-ItemProperty -LiteralPath $key -Name 'KitsRoot10' -ErrorAction Stop).KitsRoot10
+        } catch { }
+        if (-not $kitRoot) { continue }
+
+        $binRoot = Join-Path $kitRoot 'bin'
+        if (-not (Test-Path -LiteralPath $binRoot)) { continue }
+
+        $kitBin = Get-ChildItem -LiteralPath $binRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object -Property Name -Descending |
+            ForEach-Object { Join-Path $_.FullName 'x64\signtool.exe' } |
+            Where-Object { Test-Path -LiteralPath $_ } |
+            Select-Object -First 1
+        if ($kitBin) { return $kitBin }
+    }
+
+    return $null
+}
+
+function Test-Signature {
+    <#
+        Returns $null when the file carries a valid, timestamped Authenticode
+        signature, otherwise a short reason. Tauri is asked to sign the binary and
+        both installers, but its internal coverage differs per bundle type, so every
+        artefact that ships is checked here rather than assumed.
+    #>
+    param([string]$Path)
+
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path
+    if ($signature.Status -ne 'Valid') { return "signature status is $($signature.Status)" }
+    if (-not $signature.SignerCertificate) { return 'no signer certificate' }
+    if (-not $signature.TimeStamperCertificate) {
+        return 'not timestamped, so the signature expires with the certificate'
+    }
+    return $null
 }
 
 function Stop-RunningApp {
@@ -130,16 +211,68 @@ $version = ([string]$version).Trim()
 
 Write-Host "Version: $version" -ForegroundColor Cyan
 
+# Signing settings are read from the environment so that a certificate or cloud
+# signing credential never has to be written into the repository. They become a
+# --config override for the build, which keeps tauri.conf.json free of anything
+# machine specific and leaves unsigned builds byte-for-byte unchanged.
+$timestampUrl = $env:GLOSSY_TIMESTAMP_URL
+if (-not $timestampUrl) { $timestampUrl = 'http://timestamp.digicert.com' }
+$signCommand = $env:GLOSSY_SIGN_COMMAND
+$certThumbprint = $env:GLOSSY_CERT_THUMBPRINT
+
+if ($Sign -and -not $signCommand -and -not $certThumbprint) {
+    throw @'
+-Sign needs a signing credential. Set one of:
+  $env:GLOSSY_SIGN_COMMAND    = '<signing command with %1 for the file to sign>'
+  $env:GLOSSY_CERT_THUMBPRINT = '<SHA1 thumbprint of a certificate in Cert:\CurrentUser\My>'
+'@
+}
+
+if ($Sign) {
+    # Checked before the build rather than after it: Tauri cannot bundle an installer
+    # without signtool once signing is on, and the failure it reports two minutes later
+    # does not say what to install.
+    $signTool = Find-SignTool
+    if (-not $signTool) {
+        throw @'
+-Sign needs signtool.exe on this machine. Tauri's installer bundlers verify and sign
+their own helper DLLs with it even when GLOSSY_SIGN_COMMAND does the signing, and they
+stop the build when it is missing. Install the Windows SDK (the "Windows SDK Signing
+Tools" component) or point TAURI_WINDOWS_SIGNTOOL_PATH at an existing signtool.exe.
+'@
+    }
+    $env:TAURI_WINDOWS_SIGNTOOL_PATH = $signTool
+}
+
 $stage = Join-Path $root ('release\v' + $version)
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 if (-not $SkipBuild) {
     Stop-RunningApp
 
+    $signConfig = $null
+    if ($Sign) {
+        $windows = @{ digestAlgorithm = 'sha256'; timestampUrl = $timestampUrl }
+        if ($signCommand) {
+            $windows.signCommand = $signCommand
+        } else {
+            $windows.certificateThumbprint = $certThumbprint
+        }
+        $signConfig = Join-Path $env:TEMP ('glossy-sign-' + [guid]::NewGuid().ToString('N') + '.json')
+        $json = @{ bundle = @{ windows = $windows } } | ConvertTo-Json -Depth 5
+        [IO.File]::WriteAllText($signConfig, $json, (New-Object Text.UTF8Encoding($false)))
+        Write-Host "Signing with $(if ($signCommand) { 'a custom command' } else { 'certificate ' + $certThumbprint })" -ForegroundColor Cyan
+    }
+
     Write-Host 'Building the release bundle...' -ForegroundColor Cyan
     $build = 'cd /d "' + $root + '" && set PATH=%USERPROFILE%\.cargo\bin;%PATH% && npx tauri build'
-    & $env:ComSpec /c $build
-    if ($LASTEXITCODE -ne 0) { throw "The release build failed with exit code $LASTEXITCODE." }
+    if ($signConfig) { $build += ' --config "' + $signConfig + '"' }
+    try {
+        & $env:ComSpec /c $build
+        if ($LASTEXITCODE -ne 0) { throw "The release build failed with exit code $LASTEXITCODE." }
+    } finally {
+        if ($signConfig) { Remove-Item -LiteralPath $signConfig -Force -ErrorAction SilentlyContinue }
+    }
 }
 
 # The GNU toolchain links WebView2Loader.dll dynamically, so the installer has to
@@ -206,11 +339,45 @@ try {
 $staged += $zip
 Write-Host "Packed $(Split-Path -Leaf $zip)" -ForegroundColor Green
 
+if ($Sign) {
+    Write-Host 'Verifying signatures...' -ForegroundColor Cyan
+    $failures = @()
+
+    foreach ($file in ($staged | Where-Object { $_ -ne $zip })) {
+        $reason = Test-Signature -Path $file
+        if ($reason) { $failures += "$(Split-Path -Leaf $file): $reason" }
+    }
+
+    # The portable package carries its own copy of the binary, and that copy is what
+    # a user double-clicks, so it is checked from inside the zip rather than trusted
+    # to match the build output.
+    $unpacked = Join-Path $env:TEMP ('glossy-verify-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $unpacked -Force | Out-Null
+    try {
+        Expand-Archive -LiteralPath $zip -DestinationPath $unpacked -Force
+        $inner = Join-Path $unpacked 'glossy.exe'
+        if (-not (Test-Path -LiteralPath $inner)) {
+            $failures += "$(Split-Path -Leaf $zip): glossy.exe is missing"
+        } else {
+            $reason = Test-Signature -Path $inner
+            if ($reason) { $failures += "$(Split-Path -Leaf $zip) glossy.exe: $reason" }
+        }
+    } finally {
+        Remove-Item -LiteralPath $unpacked -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($failures.Count -gt 0) {
+        throw ("-Sign was requested but not every artefact is signed:" + $eol + '  ' + ($failures -join ($eol + '  ')))
+    }
+    Write-Host 'Every artefact carries a valid, timestamped signature.' -ForegroundColor Green
+} else {
+    Write-Host 'Unsigned release: Windows will report an unknown publisher on download.' -ForegroundColor Yellow
+}
+
 $sums = foreach ($file in $staged) {
     $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
     "$hash  $(Split-Path -Leaf $file)"
 }
-$eol = [Environment]::NewLine
 [IO.File]::WriteAllText((Join-Path $stage 'SHA256SUMS.txt'), (($sums -join $eol) + $eol), (New-Object Text.UTF8Encoding($false)))
 
 $notesPath = Join-Path $stage 'RELEASE_NOTES.md'

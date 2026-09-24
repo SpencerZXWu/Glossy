@@ -16,7 +16,7 @@ the milestone is closed and the tag is pushed.
 | Size | ~20,300 lines: ~10,800 Rust, ~5,750 frontend (plain HTML/CSS/JS), ~1,400 frontend test lines and ~2,400 in `server/`, comments included |
 | Tests | 192 Rust tests, 181 frontend tests (`node --test`) and 74 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
-| Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. No code signing yet, a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
+| Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. Unsigned by default, with `scripts/release.ps1 -Sign` ready to sign and verify all three once a certificate or cloud signing credential exists; a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
 | Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.2.0` tagged and published with its NSIS installer, and the staged installers kept in `release/vX.Y.Z/` |
 
@@ -153,7 +153,7 @@ Goal: leave Windows behind and stop being flagged by SmartScreen.
 | Content Security Policy | `tauri.conf.json` carried `"csp": null`; replace it with an explicit whitelist | done — `default-src`, `script-src`, `style-src` and `font-src` at `'self'`, images may add `data:`, and `object-src`, `frame-src`, `frame-ancestors`, `base-uri` and `form-action` are closed. The frontend loads nothing remote, so nothing had to be widened; verified in the running app, where a deliberate remote `fetch` is refused and everything the app itself loads is not |
 | macOS | Selection capture through the Accessibility API with a permission onboarding flow; the popup becomes an `NSPanel` that does not take focus; signing and notarisation | deferred — the interface it will be written against is in place, but no macOS code exists, because none of it could be compiled or run here |
 | Linux | X11 first, where the `PRIMARY` selection maps naturally onto select-to-translate. On Wayland the global hook is not available, so it is documented as an unsupported combination rather than silently failing | deferred, at the maintainer's request |
-| Code signing | Azure Trusted Signing or an EV certificate, so a fresh install no longer shows a SmartScreen warning | deferred — the installer and the MSI are still unsigned |
+| Code signing | A certificate behind the installers, so a fresh install no longer shows a SmartScreen warning. Azure Trusted Signing (now Artifact Signing) is the cheapest of them, but it issues Public Trust certificates to organizations in the US, Canada, the EU, the UK, Australia, New Zealand, Japan, South Korea, Singapore, Switzerland, Norway and Israel only, and to individuals in the US and Canada only, which rules it out for a maintainer in China. The route taken instead is the free signing [SignPath Foundation](https://signpath.org) gives open source projects: the certificate is issued to the foundation and the signing runs in their cloud, from CI | in progress — the artefacts are still unsigned, and the local path is finished: `scripts/release.ps1 -Sign` merges a `bundle.windows` signing override (`signCommand`, or `certificateThumbprint`, plus `digestAlgorithm` and `timestampUrl`) from the environment and fails the release when any staged artefact lacks a valid, timestamped signature, so a certificate of one's own is all that path waits for. The conditions the application has to meet are in place too: the **Code signing policy** section of the [README](./README.md#code-signing-policy) names the foundation, the roles and the MFA requirement, and [PRIVACY.md](./PRIVACY.md) says what the app sends where |
 
 What the release leaves behind: the OS-bound modules were moved, not rewritten, so the
 behaviour of a selection is the one it had before, and the split is not finished. The
@@ -206,7 +206,7 @@ rather than investing in it early.
 | --- | --- | --- |
 | The Google endpoint is unofficial | It can start rate-limiting or change protocol at any time, and its terms of use are unclear | A retry across two clients already lives in `google.rs`; provider fallback in v1.1.0 is the real fix |
 | A currency rate service changes shape or goes down | An amount in the card loses its conversion | Two independent sources (exchangerate-api.com, and the ECB through `frankfurter.app`), a six-hour memory and disk cache, a stale table that stays usable for seven days and is labelled as such, and a two-minute quiet period after both fail |
-| Antivirus flags the low-level mouse hook | Installs and runs get blocked | The README's note on the hook says what it does and why it is needed; code signing, which is what actually removes the warning, slipped out of v1.2.0 and is still the mitigation |
+| Antivirus flags the low-level mouse hook | Installs and runs get blocked | The README's note on the hook says what it does and why it is needed; `scripts/release.ps1 -Sign` is the mitigation and only waits for a certificate, since code signing is what actually removes the warning |
 | The portable zip is assembled outside Tauri | Tauri has no zip target, so the archive is packed by script, and an archive that loses `WebView2Loader.dll` unpacks into an app that cannot start | `scripts/release.ps1` stages the release binary and the loader together, puts both at the archive root, and checksums the archive next to the installers |
 | macOS and Linux permission models | The port costs more than expected | The contract is in place: a non-Windows target fails to compile and names the layer, so the port starts from one file. X11 first, Wayland explicitly unsupported |
 | Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
@@ -229,6 +229,17 @@ rather than investing in it early.
    holds the translations as placeholders and the script warns about them; the two
    translations are written by hand (Google Translate is fine as the starting point)
    before the release goes out.
+   Adding `-Sign` signs the binary and both installers and verifies every staged
+   artefact before writing the checksums. The credentials come from the environment,
+   never from the repository: `GLOSSY_SIGN_COMMAND` holds a signing command with `%1`
+   where the file goes (a cloud signing service such as `relic`, or `signtool`),
+   `GLOSSY_CERT_THUMBPRINT` names a certificate in `Cert:\CurrentUser\My` and
+   `GLOSSY_TIMESTAMP_URL` overrides the default timestamp server. The command wins
+   when both are set. The override is passed to the build through `tauri build
+   --config`, so `tauri.conf.json` stays free of anything machine specific and an
+   unsigned run behaves exactly as it did before. A release that asked for signing
+   and did not get a valid, timestamped signature on all three artefacts fails
+   instead of staging itself; a run without `-Sign` says so in one line.
 4. Tag `vX.Y.Z` on `main` and push the tag.
 5. Publish a GitHub release at that tag, titled `Glossy X.Y.Z` — the tag carries the
    `v`, the title does not. Paste `release/vX.Y.Z/RELEASE_NOTES.md` into the
@@ -264,7 +275,7 @@ rather than investing in it early.
 | 规模 | 约 20,300 行：Rust 约 10,800 行，前端约 5,750 行（纯 HTML/CSS/JS），前端测试约 1,400 行，`server/` 约 2,400 行，含注释 |
 | 测试 | Rust 192 个测试、前端 181 个测试（`node --test`）、`server/` 74 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
-| 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。尚无代码签名；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
+| 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。默认不签名，但证书或云签名凭据一到位，`scripts/release.ps1 -Sign` 就能为三者签名并逐一校验；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
 | 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.2.0` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
 
@@ -394,7 +405,7 @@ rather than investing in it early.
 | 内容安全策略 | `tauri.conf.json` 原本是 `"csp": null`，换成显式白名单 | 完成 —— `default-src`、`script-src`、`style-src`、`font-src` 均为 `'self'`，图片可额外用 `data:`，并关闭 `object-src`、`frame-src`、`frame-ancestors`、`base-uri` 和 `form-action`。前端不加载任何远程内容，所以无需放宽；已在运行中的应用里验证：刻意发起的远程 `fetch` 被拒绝，而应用自身加载的东西没有被拒 |
 | macOS | 通过 Accessibility API 捕捉选区，并配一个权限引导流程；弹窗改为不抢焦点的 `NSPanel`；签名与公证 | 推迟 —— 它将要针对的那套接口已经就位，但没有写任何 macOS 代码，因为在这里既编译不了也跑不起来 |
 | Linux | 先做 X11，那里的 `PRIMARY` 选区天然对应“划词翻译”。Wayland 上没有全局钩子，因此明确记为不支持的组合，而不是悄悄失效 | 推迟，按维护者的要求 |
-| 代码签名 | Azure Trusted Signing 或 EV 证书，让全新安装不再弹 SmartScreen 警告 | 推迟 —— 安装包和 MSI 仍未签名 |
+| 代码签名 | 安装包背后要有证书，让全新安装不再弹 SmartScreen 警告。Azure Trusted Signing（现已改名 Artifact Signing）是最便宜的一种，但 Public Trust 证书只签发给美、加、欧盟、英、澳、新西兰、日、韩、新、瑞士、挪、以色列的组织，个人仅限美、加，因此对身在中国大陆的维护者不适用。改走的是 [SignPath Foundation](https://signpath.org) 面向开源项目的免费签名：证书签发给该基金会，签名在它们的云端、由 CI 发起 | 进行中 —— 产物仍未签名；本地那条路已经做完：`scripts/release.ps1 -Sign` 会从环境变量拼出 `bundle.windows` 的签名覆盖项（`signCommand` 或 `certificateThumbprint`，外加 `digestAlgorithm` 与 `timestampUrl`），并在任何产物缺少有效且带时间戳的签名时让发布失败，所以这条路只等一张自己的证书。申请要满足的条件也已就位：[README](./README.md#code-signing-policy) 的 **Code signing policy** 一节写明基金会、角色和双因素认证要求，[PRIVACY.md](./PRIVACY.md) 说明应用会把什么发到哪里 |
 
 这次发布留下的是：与操作系统绑定的模块是被“搬走”而不是重写的，所以划词的行为和
 以前一致，而拆分并没有做完。热键的按键解析、朗读队列、`secrets::is_protected`、
@@ -442,7 +453,7 @@ v1.2.0 的剩余部分**。
 | --- | --- | --- |
 | Google 接口并非官方 | 它随时可能开始限流或改变协议，使用条款也不清晰 | `google.rs` 里已有跨两个客户端的重试；v1.1.0 的服务商回退才是真正的解法 |
 | 汇率服务改结构或宕机 | 卡片里的金额失去换算 | 两个独立来源（exchangerate-api.com，以及通过 `frankfurter.app` 的欧洲央行），六小时的内存与磁盘缓存，过期表在七天内仍可用并明确标注，以及两者都失败后的两分钟静默期 |
-| 杀毒软件拦截底层鼠标钩子 | 安装与运行被阻止 | README 里关于钩子的那节说明了它做什么、为什么需要；真正能消掉警告的代码签名没能进入 v1.2.0，仍然有待完成 |
+| 杀毒软件拦截底层鼠标钩子 | 安装与运行被阻止 | README 里关于钩子的那节说明了它做什么、为什么需要；而真正能消掉警告的代码签名现在只差一张证书，落地入口是 `scripts/release.ps1 -Sign` |
 | 便携 zip 由 Tauri 之外拼装 | Tauri 没有 zip 目标，压缩包由脚本打包；一旦丢掉 `WebView2Loader.dll`，解压出来就是一个起不来的应用 | `scripts/release.ps1` 把发布二进制和这个 DLL 一起暂存、都放在压缩包根目录，并把该压缩包与安装包一起算校验和 |
 | macOS 与 Linux 的权限模型 | 移植成本超出预期 | 约定已经就位：非 Windows 目标会编译失败并点名那一层，移植只需从一个文件开始。先 X11，明确不支持 Wayland |
 | 凭据泄露 | 磁盘上有可读的 API 密钥 | v0.2.0 已修复：密钥用 DPAPI 加密，在输入它们的 Windows 登录之外不可读 |
@@ -462,6 +473,15 @@ v1.2.0 的剩余部分**。
    （`<a id="en">`、`<a id="zh-cn">`、`<a id="es">`），顶部链接跳转到这些锚点，
    因此一个文件服务三种语言。新生成的文件里译文还是占位符，脚本会就此警告；发布前
    需手工写好两份译文（拿 Google Translate 起稿即可）。
+   加上 `-Sign` 会为二进制和两个安装包签名，并在写校验和之前逐一校验所有暂存产物。
+   凭据只从环境变量读取，绝不进仓库：`GLOSSY_SIGN_COMMAND` 放带 `%1` 占位（表示待签
+   文件路径）的签名命令（如云签名服务 `relic`，或 `signtool`），
+   `GLOSSY_CERT_THUMBPRINT` 指定 `Cert:\CurrentUser\My` 里的证书，`GLOSSY_TIMESTAMP_URL`
+   可覆盖默认时间戳服务器；两者同时存在时以命令为准。这些设置通过 `tauri build
+   --config` 作为覆盖项传给构建，因此 `tauri.conf.json` 里不会出现任何与本机绑定的
+   东西，不签名时的行为与以前完全一致。要求签名却没能让三个产物都带上有效且带时间
+   戳的签名时，脚本会直接失败而不是照旧暂存；没传 `-Sign` 时它会用一行说明本次为
+   未签名发布。
 4. 在 `main` 上打 `vX.Y.Z` 标签并推送该标签。
 5. 在该标签处发布 GitHub release，标题为 `Glossy X.Y.Z` —— 标签带 `v`，标题不带。
    把 `release/vX.Y.Z/RELEASE_NOTES.md` 粘进描述 —— 三种语言、锚点一并保留 —— 并

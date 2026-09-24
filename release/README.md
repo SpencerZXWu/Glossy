@@ -43,6 +43,29 @@ installer and the MSI are both mandatory. `RELEASE_NOTES.md` is written in three
 unless the file is already there, so notes written by hand survive; `-ForceNotes`
 regenerates them and resets the translations.
 
+## Signing the release
+
+`-Sign` signs the binary and both installers and checks every staged file before the
+checksums are written. The credentials are read from the environment, so nothing tied to
+this machine or to a certificate ends up in the repository:
+
+```powershell
+# a cloud signing service, a hardware token's CLI, or signtool; %1 is the file to sign
+$env:GLOSSY_SIGN_COMMAND = 'relic sign --file %1 --key azure --config relic.conf'
+# or a certificate that is already importable in the current user's store
+$env:GLOSSY_CERT_THUMBPRINT = '<SHA1 thumbprint>'
+$env:GLOSSY_TIMESTAMP_URL = 'http://timestamp.digicert.com'   # optional, this is the default
+
+powershell -ExecutionPolicy Bypass -File scripts/release.ps1 -Sign
+```
+
+The command wins when both are set, and `-Sign` without either stops with the two names
+it wants. The settings are handed to the build as a `tauri build --config` override of
+`bundle.windows`, which keeps `tauri.conf.json` free of anything machine specific and
+leaves a run without `-Sign` byte-for-byte unchanged. Every artefact — the installer, the
+MSI and the `glossy.exe` unpacked from the portable zip — has to carry a valid,
+timestamped signature, or the script fails instead of staging a half-signed release.
+
 ## Release notes in three languages
 
 One `RELEASE_NOTES.md` carries English, Chinese and Spanish. A link line at the top
