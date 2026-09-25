@@ -57,6 +57,7 @@
     "open_settings",
     "pick_app",
     "popup_close",
+    "popup_painted",
     "popup_present",
     "popup_resize",
     "popup_set_pinned",

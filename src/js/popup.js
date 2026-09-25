@@ -74,6 +74,19 @@
     return Number.isFinite(width) && width > 0 ? width : CARD_WIDTH;
   }
 
+  /**
+   * Resolves once the layout just written has reached the screen.
+   *
+   * Two frames are waited out because the first one only starts the paint the
+   * placement asked for; the second one runs after it, which is what "the popup
+   * is on screen" means to whoever is measuring the road from the selection.
+   */
+  function painted() {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+  }
+
   function measure() {
     // The badge is the whole window while it is up, and it is not the card, so
     // it is measured instead of it.
@@ -328,6 +341,9 @@
     document.body.dataset.state = "badge";
     size = { width: 0, height: 0 };
     await place(true);
+    await painted();
+    // Free unless the run was started with `GLOSSY_TIMING`.
+    Glossy.invoke("popup_painted").catch(() => {});
   }
 
   async function run(selection) {

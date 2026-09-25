@@ -15,6 +15,7 @@ mod settings;
 mod state;
 mod surface;
 mod text;
+mod timing;
 mod translate;
 mod tray;
 mod units;
@@ -302,6 +303,15 @@ fn popup_sync_anchor(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<
 #[tauri::command]
 fn popup_close(app: AppHandle) {
     popup::hide(&app);
+}
+
+/// Reports that a freshly revealed popup has painted.
+///
+/// The other end of the measurement the mouse hook starts; it only writes
+/// anything down when the run was asked for with `GLOSSY_TIMING`.
+#[tauri::command]
+fn popup_painted() {
+    timing::painted();
 }
 
 /// Called when the pin button of the card is used: a pinned card survives the
@@ -632,6 +642,7 @@ pub fn run() {
             cloud_status,
             show_popup,
             popup_present,
+            popup_painted,
             popup_resize,
             popup_sync_anchor,
             popup_close,

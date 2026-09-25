@@ -350,7 +350,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 192 Rust tests
+cargo test --locked                                                  # 207 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -373,6 +373,38 @@ in CI, so a forgotten bump fails the build.
 
 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs all four checks plus
 the frontend test suite on `windows-latest` for every push and pull request.
+
+### Performance
+
+The v1.4.0 budget is a measurement and not an impression: `scripts\latency.ps1`
+injects twelve selection drags into a text box, waits for the popup each time and
+prints the samples the app records itself.
+
+Measured on an Intel Core i9-14900HX, 16 GB of RAM, Windows 11 build 26200,
+2560x1600 at 150 %, release build:
+
+| Number | Budget | Measured |
+| --- | --- | --- |
+| Idle cost, popup closed | below 0.5 % CPU | 0.00 % over 20 s |
+| Idle memory | below 80 MB | 39.4 MB working set (14.0 MB private) |
+| Mouse-up to painted card | below 150 ms | p50 42 ms, p95 53 ms, max 65 ms |
+
+Both timestamps come from the app: the hook marks the mouse-up that ends the drag,
+the popup reports its first frame back through `popup_painted`, and
+`src-tauri/src/timing.rs` prints one line per sample. Neither side does anything
+unless `GLOSSY_TIMING` is set, and a mark older than five seconds is dropped rather
+than paired with the wrong paint.
+
+```powershell
+cargo build --release
+powershell -ExecutionPolicy Bypass -File scripts\latency.ps1
+```
+
+The script needs the release binary to itself — a second instance would install a
+second mouse hook, so it refuses to start while Glossy is up — and it stops the
+instance it started when it is done. The samples go to `GLOSSY_TIMING_LOG` as well
+as to stderr, because Glossy is a GUI-subsystem binary and a console started from a
+script does not stay around to show its stderr.
 
 ### Updates
 
@@ -746,7 +778,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 192 Rust tests
+cargo test --locked                                                  # 207 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -764,6 +796,27 @@ npm test                                                             # 74 server
 `scripts\version.ps1 -Get` 会为 `release.ps1` 之类的脚本打印它，后者在版本号不一致时拒绝构建。同一个检查也在 CI 中运行，所以忘记升版本会让构建失败。
 
 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) 会在每次推送和拉取请求时，于 `windows-latest` 上运行全部四项检查以及前端测试套件。
+
+### 性能
+
+v1.4.0 的预算是测出来的，不是感觉出来的：`scripts\latency.ps1` 会向一个文本框注入十二次划选，每次都等待弹窗，并打印应用自己记录的样本。
+
+在 Intel Core i9-14900HX、16 GB 内存、Windows 11 build 26200、2560x1600 缩放 150 % 上测得，release 构建：
+
+| 数字 | 预算 | 实测 |
+| --- | --- | --- |
+| 空闲开销（弹窗关闭） | CPU 低于 0.5 % | 20 秒内 0.00 % |
+| 空闲内存 | 低于 80 MB | 工作集 39.4 MB（私有 14.0 MB） |
+| 从松开鼠标到卡片画出 | 低于 150 ms | p50 42 ms，p95 53 ms，最大 65 ms |
+
+两个时间戳都来自应用本身：钩子在结束划选的那次松开鼠标处打点，弹窗通过 `popup_painted` 回报第一帧，`src-tauri/src/timing.rs` 每个样本打印一行。除非设置了 `GLOSSY_TIMING`，两边什么都不做；超过五秒的标记会被丢弃，而不会被配到另一次绘制上。
+
+```powershell
+cargo build --release
+powershell -ExecutionPolicy Bypass -File scripts\latency.ps1
+```
+
+脚本需要独占 release 二进制——第二个实例会装上第二个鼠标钩子，所以 Glossy 在运行时它拒绝启动——结束时它会关掉自己启动的那个实例。样本同时写进 `GLOSSY_TIMING_LOG` 和 stderr，因为 Glossy 是 GUI 子系统程序，从脚本启动的控制台不会留下来显示它的 stderr。
 
 ### 更新
 
@@ -1305,7 +1358,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 192 Rust tests
+cargo test --locked                                                  # 207 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1330,6 +1383,38 @@ así que un incremento olvidado hace fallar la compilación.
 [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) ejecuta las cuatro
 comprobaciones más la suite de pruebas del frontend en `windows-latest` en cada
 push y cada pull request.
+
+### Rendimiento
+
+El presupuesto de la v1.4.0 es una medición y no una impresión: `scripts\latency.ps1`
+inyecta doce arrastres de selección en un cuadro de texto, espera al globo cada vez e
+imprime las muestras que registra la propia aplicación.
+
+Medido en un Intel Core i9-14900HX, 16 GB de RAM, Windows 11 build 26200,
+2560x1600 al 150 %, compilación release:
+
+| Número | Presupuesto | Medido |
+| --- | --- | --- |
+| Coste en reposo, globo cerrado | por debajo del 0,5 % de CPU | 0,00 % en 20 s |
+| Memoria en reposo | por debajo de 80 MB | 39,4 MB de conjunto de trabajo (14,0 MB privados) |
+| De soltar el ratón a la tarjeta pintada | por debajo de 150 ms | p50 42 ms, p95 53 ms, máximo 65 ms |
+
+Las dos marcas de tiempo las pone la aplicación: el enganche marca el soltar del ratón
+que cierra el arrastre, el globo informa de su primer fotograma mediante
+`popup_painted` y `src-tauri/src/timing.rs` imprime una línea por muestra. Ninguno de
+los dos lados hace nada salvo que se defina `GLOSSY_TIMING`, y una marca de más de
+cinco segundos se descarta en lugar de emparejarse con el pintado equivocado.
+
+```powershell
+cargo build --release
+powershell -ExecutionPolicy Bypass -File scripts\latency.ps1
+```
+
+El script necesita el binario release para sí solo —una segunda instancia instalaría un
+segundo enganche del ratón, así que se niega a arrancar con Glossy en marcha— y detiene
+la instancia que inició cuando termina. Las muestras van a `GLOSSY_TIMING_LOG` además de
+a stderr, porque Glossy es un binario de subsistema GUI y una consola lanzada desde un
+script no se queda a mostrar su stderr.
 
 ### Actualizaciones
 

@@ -39,6 +39,12 @@ const CF_HDROP: u32 = 15;
 const RESTORE_SETTLE_TRIES: usize = 4;
 const RESTORE_SETTLE_INTERVAL: Duration = Duration::from_millis(20);
 
+/// How long a copy is given to appear on the clipboard, and how often it is
+/// looked at while waiting. The first look happens right away because most
+/// applications are already done by then; the time is a ceiling, not a wait.
+const COPY_SETTLE: Duration = Duration::from_millis(20);
+const COPY_SETTLE_STEP: Duration = Duration::from_millis(4);
+
 /// Upper bound for a single captured format; larger payloads are skipped rather
 /// than copied into memory (a 4K screenshot is well below this).
 const MAX_FORMAT_BYTES: usize = 1 << 26;
@@ -56,10 +62,14 @@ fn note_own_write() {
     OWN_SEQUENCE.store(sequence_number(), Ordering::Relaxed);
 }
 
+fn open() -> bool {
+    unsafe { OpenClipboard(None) }.is_ok()
+}
+
 fn open_retry() -> bool {
     // The clipboard is often briefly locked by the application that just wrote to it.
     for _ in 0..12 {
-        if unsafe { OpenClipboard(None) }.is_ok() {
+        if open() {
             return true;
         }
         std::thread::sleep(Duration::from_millis(10));
@@ -154,15 +164,52 @@ fn read_copied_text() -> Option<String> {
     if !open_retry() {
         return None;
     }
-    let text = if unsafe { GetClipboardData(CF_HDROP) }.is_ok() {
-        None
-    } else {
-        read_text_locked()
-    };
+    let text = read_copied_text_locked();
     unsafe {
         let _ = CloseClipboard();
     }
     text
+}
+
+/// Reads the copied text once, without waiting for the clipboard to open.
+///
+/// Used while a copy is being waited for: a clipboard that a writing
+/// application still holds is worth another look in a few milliseconds rather
+/// than the ten `open_retry` would spend.
+fn read_copied_text_now() -> Option<String> {
+    if !open() {
+        return None;
+    }
+    let text = read_copied_text_locked();
+    unsafe {
+        let _ = CloseClipboard();
+    }
+    text
+}
+
+fn read_copied_text_locked() -> Option<String> {
+    if unsafe { GetClipboardData(CF_HDROP) }.is_ok() {
+        return None;
+    }
+    read_text_locked()
+}
+
+/// Reads the copied text, giving a slow application `COPY_SETTLE` to publish it.
+fn read_copied_text_settled() -> Option<String> {
+    let deadline = Instant::now() + COPY_SETTLE;
+    loop {
+        if let Some(text) = read_copied_text_now().filter(|text| !text.trim().is_empty()) {
+            return Some(text);
+        }
+        if Instant::now() >= deadline {
+            break;
+        }
+        std::thread::sleep(COPY_SETTLE_STEP);
+    }
+    // Nothing readable in that time: this is where a clipboard that is still
+    // held by the writing application is waited out properly, which is what the
+    // fixed sleep before the first read used to do for every copy.
+    read_copied_text()
 }
 
 /// A verbatim copy of everything the clipboard holds.
@@ -299,11 +346,29 @@ pub enum Capture {
     NoResponse,
 }
 
+/// The clipboard content a capture lifted, owed back to the clipboard.
+///
+/// The restore is handed out rather than performed inside the capture because
+/// it waits up to `RESTORE_SETTLE_TRIES * RESTORE_SETTLE_INTERVAL` for the
+/// application that was copied from to stop writing, and the popup has no
+/// reason to wait for that. Dropping it performs the restore, so no path can
+/// skip it — not even the ones that end up showing nothing.
+pub struct Pending {
+    snapshot: Snapshot,
+}
+
+impl Drop for Pending {
+    fn drop(&mut self) {
+        self.snapshot.restore_settled();
+    }
+}
+
 /// Presses Ctrl+C and waits for the clipboard to change.
 ///
-/// With `restore` set, the clipboard is captured beforehand and written back once
-/// the selection has been read out of it.
-pub fn capture_selection(restore: bool) -> Capture {
+/// With `restore` set, the clipboard is captured beforehand and written back
+/// once the selection has been read out of it; the caller owns that restore and
+/// decides when it happens.
+pub fn capture_selection(restore: bool) -> (Capture, Option<Pending>) {
     let snapshot = if restore {
         Snapshot::of_clipboard()
     } else {
@@ -328,12 +393,15 @@ pub fn capture_selection(restore: bool) -> Capture {
     }
 
     if !changed {
-        return Capture::NoResponse;
+        // The clipboard still holds what the snapshot holds, so there is nothing
+        // to put back and nothing is owed.
+        return (Capture::NoResponse, None);
     }
 
-    // The foreground application may still be filling the clipboard.
-    std::thread::sleep(Duration::from_millis(20));
-    let captured = read_copied_text();
+    // The foreground application may still be filling the clipboard, so the
+    // text is waited for rather than read once - but only for as long as it
+    // takes to appear.
+    let captured = read_copied_text_settled();
 
     let result = match captured {
         Some(text) if !text.trim().is_empty() => Capture::Text(text),
@@ -341,11 +409,9 @@ pub fn capture_selection(restore: bool) -> Capture {
     };
 
     // An empty clipboard is left as it is, so the copied selection stays available.
-    if let Some(snapshot) = snapshot.as_ref() {
-        snapshot.restore_settled();
-    }
+    let pending = snapshot.map(|snapshot| Pending { snapshot });
 
-    result
+    (result, pending)
 }
 
 /// Puts `text` on the clipboard, used by the popup copy button.

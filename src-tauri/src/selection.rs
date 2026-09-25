@@ -27,6 +27,7 @@ use crate::popup;
 use crate::settings::{self, Settings};
 use crate::state::AppState;
 use crate::text;
+use crate::timing;
 
 /// Minimum pointer travel (physical px) for a press/drag/release to count.
 const DRAG_MIN_PX: i32 = 5;
@@ -198,6 +199,7 @@ fn handle_click(click: Click) {
                 tracker.last_click = Some((x, y, now_ms()));
             }
             if let Some(trigger) = trigger {
+                timing::mark();
                 send(HookEvent::ButtonUp { x, y, trigger });
             }
         }
@@ -313,8 +315,10 @@ fn settle_click_chain(
             } if same_click_chain((x, y), (next_x, next_y)) => {
                 x = next_x;
                 y = next_y;
-                // A longer chain keeps the wait open for the next click.
+                // A longer chain keeps the wait open for the next click, and the
+                // gesture that is being measured ended with this one.
                 deadline = Instant::now() + Duration::from_millis(CHAIN_SETTLE_MS);
+                timing::mark();
             }
             other => {
                 // Not part of the chain: keep it for the main loop.
@@ -358,7 +362,8 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
         return;
     }
 
-    let Capture::Text(text) = clipboard::capture_selection(settings.restore_clipboard) else {
+    let (capture, pending) = clipboard::capture_selection(settings.restore_clipboard);
+    let Capture::Text(text) = capture else {
         return;
     };
 
@@ -377,6 +382,11 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
 
     let context = enclosing_sentence(&state.settings(), &text);
     popup::reveal(app, state, text, context, (x as f64, y as f64));
+    // Dropped here rather than held to the end of the function so the restore —
+    // which can wait for the application that was copied from — starts after the
+    // popup is on its way to the screen. The type restores on drop, so the paths
+    // that leave earlier still put the clipboard back.
+    drop(pending);
 }
 
 /// The sentence the selection stands in, when that was asked for.
@@ -410,7 +420,7 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
         return;
     }
 
-    let selection = clipboard::capture_selection(settings.restore_clipboard);
+    let (selection, pending) = clipboard::capture_selection(settings.restore_clipboard);
     let Some(text) = preferred_text(selection, clipboard::read_text()) else {
         return;
     };
@@ -426,6 +436,9 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
     let (x, y) = platform::desktop::cursor_pos();
     let context = enclosing_sentence(&settings, &text);
     popup::reveal(app, state, text, context, (x as f64, y as f64));
+    // The restore waits for the application that was copied from, so it happens
+    // once the popup has been told what to show.
+    drop(pending);
 }
 
 /// The text to translate: the selection that was just copied, or the clipboard

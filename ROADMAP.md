@@ -14,7 +14,7 @@ the milestone is closed and the tag is pushed.
 | --- | --- |
 | Version | `1.3.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~23,000 lines: ~12,500 Rust, ~6,700 frontend (plain HTML/CSS/JS), ~1,700 frontend test lines and ~3,100 in `server/`, comments included |
-| Tests | 204 Rust tests, 202 frontend tests (`node --test`) and 86 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Tests | 207 Rust tests, 202 frontend tests (`node --test`) and 86 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
 | Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. Unsigned by default, with `scripts/release.ps1 -Sign` ready to sign and verify all three once a certificate or cloud signing credential exists; a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
@@ -208,10 +208,10 @@ impression.
 
 | Work item | Details | State |
 | --- | --- | --- |
-| Idle cost | Below 0.5% CPU and below 80 MB of memory with the popup closed and the hook listening, measured on a release build — a debug build is not a number anyone runs | planned |
-| Latency | Selection to popup under 150 ms, from the mouse-up that ends the drag to the moment the card is painted | planned |
+| Idle cost | Below 0.5% CPU and below 80 MB of memory with the popup closed and the hook listening, measured on a release build — a debug build is not a number anyone runs | done — `scripts\latency.ps1` |
+| Latency | Selection to popup under 150 ms, from the mouse-up that ends the drag to the moment the card is painted | done — `src-tauri/src/timing.rs`, p50 42 ms |
 | Long-run behaviour | No handle or GDI leak over a day of use; the mouse hook, the clipboard and the speech voice are the three places to watch, and each gets a counter a test can read | planned |
-| The number in the README | What was measured, on what machine and how to repeat it | planned |
+| The number in the README | What was measured, on what machine and how to repeat it | done — README.md, "Performance" |
 
 Estimated effort: 2–3 days.
 
@@ -526,10 +526,10 @@ rather than investing in it early.
 
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
-| 空闲开销 | 弹窗关闭、钩子还在听的情况下，CPU 低于 0.5%、内存低于 80 MB；量在 release 构建上 —— debug 构建的数字没人会真的去跑 | 计划中 |
-| 延迟 | 从选区到弹窗低于 150 ms，起点是结束拖选的鼠标抬起，终点是卡片绘制完成 | 计划中 |
+| 空闲开销 | 弹窗关闭、钩子还在听的情况下，CPU 低于 0.5%、内存低于 80 MB；量在 release 构建上 —— debug 构建的数字没人会真的去跑 | 完成 —— `scripts\latency.ps1` |
+| 延迟 | 从选区到弹窗低于 150 ms，起点是结束拖选的鼠标抬起，终点是卡片绘制完成 | 完成 —— `src-tauri/src/timing.rs`，p50 42 ms |
 | 长时间运行 | 一整天使用不泄漏句柄或 GDI；鼠标钩子、剪贴板和朗读引擎是最需要盯的三处，各配一个测试能读到的计数 | 计划中 |
-| 把数字写进 README | 测了什么、在什么机器上测的、怎么复现 | 计划中 |
+| 把数字写进 README | 测了什么、在什么机器上测的、怎么复现 | 完成 —— README.md「性能」 |
 
 预计工作量：2–3 天。
 
