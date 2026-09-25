@@ -315,6 +315,13 @@ npm.cmd run tauri dev    # dev build with hot reload of src/
 npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
 
+`scripts\dev.cmd` is the dev command in a file that can be double clicked: it checks that
+`cargo` is on `PATH`, installs the Tauri CLI when `node_modules` is missing, refuses to start
+while another Glossy is running — a second one would install a second mouse hook — and keeps
+the console open with the dev log. Running
+`powershell -ExecutionPolicy Bypass -File scripts\make-shortcut.ps1` once puts a shortcut to
+it on the desktop.
+
 `npm.cmd run icon` regenerates `src-tauri/icons` from `assets/`.
 
 `npm.cmd run tauri build` writes the NSIS installer to
@@ -708,6 +715,12 @@ npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
 npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
+
+`scripts\dev.cmd` 把上面那条开发命令包成一个可以双击的文件：它会检查 `cargo` 是否在
+`PATH` 中、在缺少 `node_modules` 时安装 Tauri CLI、发现已有 Glossy 在运行时拒绝启动
+（第二个实例会装上第二个鼠标钩子），并让控制台留着显示开发日志。运行一次
+`powershell -ExecutionPolicy Bypass -File scripts\make-shortcut.ps1` 可以在桌面上生成
+指向它的快捷方式。
 
 `npm.cmd run icon` 会从 `assets/` 重新生成 `src-tauri/icons`。
 
@@ -1252,6 +1265,14 @@ npm.cmd install          # npm.ps1 is blocked by the default execution policy
 npm.cmd run tauri dev    # dev build with hot reload of src/
 npm.cmd run tauri build  # release build (installer + MSI + .exe)
 ```
+
+`scripts\dev.cmd` es ese comando de desarrollo dentro de un archivo que se abre con doble
+clic: comprueba que `cargo` esté en el `PATH`, instala la CLI de Tauri si falta
+`node_modules`, se niega a arrancar mientras haya otro Glossy en ejecución —un segundo
+instalaría un segundo gancho del ratón— y deja la consola abierta con el registro del
+desarrollo. Ejecutar una vez
+`powershell -ExecutionPolicy Bypass -File scripts\make-shortcut.ps1` deja un acceso directo
+en el escritorio.
 
 `npm.cmd run icon` regenera `src-tauri/icons` a partir de `assets/`.
 
