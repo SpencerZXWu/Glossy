@@ -46,41 +46,40 @@ body.dragging {
 
 /* ---------------------------------------------------------------- badge */
 
-/* The window before the card: a small icon under the selection. Nothing is
+/* The window before the card: the icon under the selection. Nothing is
    translated — and nothing is billed — until it is clicked, so it has to look
-   clickable and stay out of the way. */
+   clickable and stay out of the way. The icon needs no surface of its own: the
+   logo already carries the rounded dark square, and a background behind it
+   would only show as a second, grey one around it. */
 .badge {
   display: none;
   width: 44px;
   height: 44px;
   padding: 0;
   place-items: center;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 12px;
-  background: var(--bg);
-  box-shadow: var(--shadow);
+  background: transparent;
   cursor: pointer;
-  transition: background var(--g-dur-fast) var(--g-ease-standard),
-    border-color var(--g-dur-fast) var(--g-ease-standard);
+  transition: filter var(--g-dur-fast) var(--g-ease-standard);
 }
 
 .badge img {
-  width: 26px;
-  height: 26px;
+  width: 100%;
+  height: 100%;
   display: block;
   pointer-events: none;
 }
 
 /* The hover has to leave the box where it is: this is a 44px click target and
-   a moving one is a missed click, so the accent border carries the affordance
-   on its own. */
+   a moving one is a missed click, so brightness carries the affordance on its
+   own. */
 .badge:hover {
-  border-color: var(--accent);
+  filter: brightness(1.12);
 }
 
 .badge:active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  filter: brightness(0.9);
 }
 
 .badge:focus-visible {
