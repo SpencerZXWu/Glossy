@@ -34,6 +34,11 @@ function target() {
   return env.document.createElement("div");
 }
 
+/** The rows of buttons, one per side of the card, in the order they are drawn. */
+function toolsOf(root) {
+  return descendantsOf(root, []).filter((node) => node.className === "tools");
+}
+
 test("the module exports the render helpers the windows rely on", () => {
   assert.equal(typeof Glossy.languageName, "function");
   assert.equal(typeof Glossy.errorMessage, "function");
@@ -210,7 +215,7 @@ test("result skips the phonetic row for a whitespace-only phonetic", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "fox", phonetic: "   " });
   assert.equal(findByClass(node, "phonetic"), null);
-  assert.deepEqual(classesOf(node), ["translation", "foot", "says", "say"]);
+  assert.deepEqual(classesOf(node), ["translation", "tools", "tool", "tool"]);
 });
 
 test("result renders meanings with part of speech and joined definitions", () => {
@@ -486,22 +491,23 @@ test("result localizes the provider footer", () => {
   i18n.set("en");
 });
 
-test("result leaves the footer name off without a provider", () => {
+test("result leaves the footer off without a provider", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "fox", provider: "" });
-  assert.equal(findByClass(node, "foot").textContent, "");
+  assert.equal(findByClass(node, "foot"), null);
   assert.equal(findByClass(node, "engine"), null);
   assert.equal(findByClass(node, "service"), null);
 });
 
-test("result keeps the name of the engine and the buttons on one footer row", () => {
+test("result keeps the name of the engine on a footer row of its own", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
   const foot = findByClass(node, "foot");
   assert.equal(foot.parentNode, node);
   assert.equal(foot.textContent, "Baidu Translate");
-  assert.deepEqual(classesOf(foot), ["engine", "says", "say"]);
-  assert.equal(findByClass(node, "says").parentNode, foot);
+  assert.deepEqual(classesOf(foot), ["engine"]);
+  // The buttons belong to the text they act on, not to the footer.
+  assert.deepEqual(toolsOf(foot), []);
 });
 
 test("result writes translations, definitions and examples as text, not markup", () => {
@@ -525,7 +531,7 @@ test("result clears whatever the target held before", () => {
   const node = target();
   node.appendChild(env.document.createElement("p"));
   Glossy.render.result(node, { kind: "sentence", translation: "Hello" });
-  assert.deepEqual(classesOf(node), ["translation", "foot", "says", "say"]);
+  assert.deepEqual(classesOf(node), ["translation", "tools", "tool", "tool"]);
   assert.equal(node.firstChild.className, "translation");
 });
 
@@ -696,10 +702,10 @@ test("the compact card keeps the translation and drops the extras", () => {
   assert.equal(findByClass(node, "context"), null);
   assert.equal(findByClass(node, "units"), null);
   assert.ok(findByClass(node, "translation"));
-  assert.ok(findByClass(node, "says"));
+  assert.equal(toolsOf(node).length, 1);
 });
 
-test("result draws a pronunciation button for each side of the card", () => {
+test("result draws the buttons of each side under the text they act on", () => {
   const node = target();
   Glossy.render.result(node, {
     kind: "sentence",
@@ -708,40 +714,104 @@ test("result draws a pronunciation button for each side of the card", () => {
     sourceLang: "en",
     targetLang: "zh-CN",
   });
-  const says = findByClass(node, "says");
-  const buttons = says.childNodes;
-  assert.equal(buttons.length, 2);
-  // The buttons are icons, so the label lives on the accessible name instead of
-  // on the face of the button.
-  assert.equal(buttons[0].textContent, "");
-  assert.equal(buttons[0].getAttribute("aria-label"), "Read the original out loud");
-  assert.equal(buttons[0].getAttribute("title"), "Read the original out loud");
-  assert.equal(buttons[0].getAttribute("aria-pressed"), "false");
-  assert.ok(buttons[0].innerHTML.includes("glyph-speak"));
-  assert.ok(buttons[0].innerHTML.includes("glyph-stop"));
-  assert.equal(buttons[0].getAttribute("data-say"), "render.speakOriginal");
-  assert.equal(buttons[1].getAttribute("data-say"), "render.speakTranslation");
-  assert.equal(buttons[1].getAttribute("aria-label"), "Read the translation out loud");
-  assert.equal(buttons[0].type, "button");
+  const rows = toolsOf(node);
+  assert.equal(rows.length, 2);
+
+  // Copy first, then pronunciation, so one row is one side's pair of actions.
+  const original = rows[0].childNodes;
+  assert.equal(original.length, 2);
+  assert.equal(original[0].getAttribute("data-copy"), "render.copyOriginal");
+  assert.equal(original[1].getAttribute("data-say"), "render.speakOriginal");
+
+  const translation = rows[1].childNodes;
+  assert.equal(translation.length, 2);
+  assert.equal(translation[0].getAttribute("data-copy"), "render.copyTranslation");
+  assert.equal(translation[1].getAttribute("data-say"), "render.speakTranslation");
+
+  // Each row stands under the text it acts on, which is the row above it.
+  const classes = classesOf(node);
+  assert.equal(classes[classes.indexOf("original") + 1], "tools");
+  assert.equal(classes[classes.indexOf("translation") + 1], "tools");
 });
 
-test("the pronunciation buttons come after the rest of the card", () => {
+test("the buttons of a side are icons that carry their own accessible name", () => {
   const node = target();
   Glossy.render.result(node, {
     kind: "sentence",
+    sourceText: "Hello there.",
     translation: "你好。",
-    sourceText: "Hello.",
-    provider: "Baidu",
+    sourceLang: "en",
+    targetLang: "zh-CN",
   });
-  const classes = classesOf(node);
-  assert.ok(classes.indexOf("foot") < classes.indexOf("says"));
-  assert.equal(classes[classes.length - 1], "say");
+  const buttons = toolsOf(node)[0].childNodes;
+
+  // The buttons are icons, so the label lives on the accessible name instead of
+  // on the face of the button.
+  assert.equal(buttons[0].textContent, "");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Copy the original");
+  assert.equal(buttons[0].getAttribute("title"), "Copy the original");
+  assert.ok(buttons[0].innerHTML.includes("glyph-copy"));
+  assert.ok(buttons[0].innerHTML.includes("glyph-done"));
+  assert.equal(buttons[0].type, "button");
+
+  assert.equal(buttons[1].textContent, "");
+  assert.equal(buttons[1].getAttribute("aria-label"), "Read the original out loud");
+  assert.equal(buttons[1].getAttribute("title"), "Read the original out loud");
+  assert.equal(buttons[1].getAttribute("aria-pressed"), "false");
+  assert.ok(buttons[1].innerHTML.includes("glyph-speak"));
+  assert.ok(buttons[1].innerHTML.includes("glyph-stop"));
+  assert.equal(buttons[1].type, "button");
 });
 
-test("a card with nothing to read out has no pronunciation buttons", () => {
+test("a word card puts the buttons of the original above the translation", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "word",
+    sourceText: "fox",
+    translation: "狐狸",
+    provider: "baidu",
+  });
+  // The word itself stands in the header, so the row of the original opens the
+  // body of the card, ahead of the translation.
+  assert.deepEqual(classesOf(node), [
+    "tools",
+    "tool",
+    "tool",
+    "translation",
+    "tools",
+    "tool",
+    "tool",
+    "foot",
+    "engine",
+  ]);
+});
+
+test("the buttons of a side keep to their own side of the card", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    sourceText: "Hello.",
+    translation: "你好。",
+    provider: "baidu",
+  });
+  assert.deepEqual(classesOf(node), [
+    "original",
+    "tools",
+    "tool",
+    "tool",
+    "translation",
+    "tools",
+    "tool",
+    "tool",
+    "foot",
+    "engine",
+  ]);
+});
+
+test("a side with nothing to read out has no buttons", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "", sourceText: "" });
-  assert.equal(findByClass(node, "says"), null);
+  assert.deepEqual(toolsOf(node), []);
 });
 
 /** An environment whose backend answers the way the test tells it to. */
@@ -761,7 +831,22 @@ function cardButtons(fresh) {
     sourceLang: "en",
     targetLang: "zh-CN",
   });
-  return findByClass(node, "says").childNodes;
+  // Every row holds the copy button first and the speaker second, so the two
+  // speakers come back in the order the sides sit in.
+  return toolsOf(node).map((row) => row.childNodes[1]);
+}
+
+/** The copy buttons of the same card, in the same order. */
+function cardCopyButtons(fresh) {
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(node, {
+    kind: "sentence",
+    sourceText: "Hello there.",
+    translation: "你好。",
+    sourceLang: "en",
+    targetLang: "zh-CN",
+  });
+  return toolsOf(node).map((row) => row.childNodes[0]);
 }
 
 test("pressing a pronunciation button reads that side out loud", () => {
@@ -867,6 +952,81 @@ test("a card that is replaced stops the reading behind it", () => {
   assert.equal(calls[calls.length - 1], "stop_speaking");
   assert.equal(buttons[0].dataset.state, "off");
   assert.equal(fresh.timers.intervals(), 0);
+});
+
+test("pressing a copy button sends that side of the card to the clipboard", () => {
+  const calls = [];
+  const fresh = backend((command, payload) => {
+    calls.push({ command, payload });
+    return Promise.resolve(true);
+  });
+  const buttons = cardCopyButtons(fresh);
+
+  buttons[0].dispatch("click");
+
+  const copied = calls.filter((call) => call.command === "copy_text");
+  assert.equal(copied.length, 1);
+  assert.equal(copied[0].payload.text, "Hello there.");
+  assert.equal(buttons[0].dataset.state, "copied");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Copied");
+  assert.equal(buttons[1].dataset.state, undefined);
+
+  buttons[1].dispatch("click");
+  assert.equal(calls.filter((call) => call.command === "copy_text")[1].payload.text, "你好。");
+});
+
+test("the tick goes back to the sheets once the moment has passed", async () => {
+  const fresh = backend(() => Promise.resolve(true));
+  const buttons = cardCopyButtons(fresh);
+
+  buttons[0].dispatch("click");
+  assert.equal(buttons[0].dataset.state, "copied");
+
+  await fresh.timers.fireTimeouts();
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Copy the original");
+});
+
+test("only the button that copied last wears the tick", async () => {
+  const fresh = backend(() => Promise.resolve(true));
+  const buttons = cardCopyButtons(fresh);
+
+  buttons[0].dispatch("click");
+  buttons[1].dispatch("click");
+
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[1].dataset.state, "copied");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Copy the original");
+});
+
+test("a copy that reached the clipboard tells the caller which side it was", () => {
+  const sides = [];
+  const fresh = backend(() => Promise.resolve(true));
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(
+    node,
+    { kind: "sentence", sourceText: "Hello there.", translation: "你好。" },
+    { onCopied: (side) => sides.push(side) },
+  );
+  const buttons = toolsOf(node).map((row) => row.childNodes[0]);
+
+  buttons[1].dispatch("click");
+  assert.deepEqual(sides, ["translation"]);
+});
+
+test("a card that is replaced takes the tick with it", () => {
+  const fresh = backend(() => Promise.resolve(true));
+  const buttons = cardCopyButtons(fresh);
+
+  buttons[0].dispatch("click");
+  fresh.Glossy.render.result(fresh.document.createElement("div"), {
+    kind: "sentence",
+    translation: "Hello.",
+  });
+
+  assert.equal(buttons[0].dataset.state, "off");
+  assert.equal(buttons[0].getAttribute("aria-label"), "Copy the original");
+  assert.equal(fresh.timers.timeouts(), 0);
 });
 
 test("result names the service that answered after a fallback", () => {

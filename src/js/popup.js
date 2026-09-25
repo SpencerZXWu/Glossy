@@ -10,7 +10,6 @@
   const langFrom = document.getElementById("langFrom");
   const langTo = document.getElementById("langTo");
   const langSwap = document.getElementById("langSwap");
-  const copyButton = document.getElementById("copy");
   const pinButton = document.getElementById("pin");
   const settingsButton = document.getElementById("settings");
   const badge = document.getElementById("badge");
@@ -18,9 +17,6 @@
   /** Source value that lets the provider detect the language itself. */
   const AUTO = "auto";
 
-  const COPY_ICON = copyButton.innerHTML;
-  const DONE_ICON =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   /** Default `.card` width in CSS pixels, kept in sync with popup.css. */
   const CARD_WIDTH = 356;
   /** Transparent margin the body keeps around the card so its shadow shows. */
@@ -53,7 +49,6 @@
   /** Height cap currently written into the stylesheet. */
   let screenCap = 0;
   let ticket = 0;
-  let copyTimer = 0;
   let closeTimer = 0;
   /** True while the card is pinned: clicks elsewhere leave it alone and the
       "close by itself" countdown stands still. */
@@ -108,7 +103,6 @@
   function applyLanguage() {
     Glossy.i18n.set(preferences.uiLang);
     Glossy.i18n.apply(document);
-    copyButton.setAttribute("aria-label", Glossy.i18n.t("popup.copy"));
     settingsButton.setAttribute("aria-label", Glossy.i18n.t("popup.settings"));
     badge.setAttribute("aria-label", Glossy.i18n.t("popup.translate"));
     pinButton.setAttribute("aria-label", pinLabel());
@@ -426,6 +420,7 @@
       compact: preferences.compactPopup === true,
       pending: true,
       onChooseService: toggleServiceMenu,
+      onCopied: cardCopied,
     });
     await place(false);
 
@@ -469,6 +464,7 @@
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
       onChooseService: toggleServiceMenu,
+      onCopied: cardCopied,
     });
   }
 
@@ -629,21 +625,12 @@
     refine(result, mine);
   }
 
-  async function copyResult() {
-    const value = current && current.translation ? String(current.translation) : "";
-    if (!value) return;
-    await Glossy.invoke("copy_text", { text: value }).catch(() => false);
-    copyButton.innerHTML = DONE_ICON;
-    copyButton.classList.add("done");
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => {
-      copyButton.innerHTML = COPY_ICON;
-      copyButton.classList.remove("done");
-    }, 1100);
-    if (preferences.closeAfterCopy) {
-      clearTimeout(closeTimer);
-      closeTimer = setTimeout(dismiss, 420);
-    }
+  /** Called when one side of the card reaches the clipboard: the preference
+      asks for the card to close itself after a copy. */
+  function cardCopied() {
+    if (!preferences.closeAfterCopy) return;
+    clearTimeout(closeTimer);
+    closeTimer = setTimeout(dismiss, 420);
   }
 
   function dismiss() {
@@ -662,7 +649,6 @@
     Glossy.invoke("popup_close").catch(() => {});
   }
 
-  copyButton.addEventListener("click", copyResult);
   pinButton.addEventListener("click", () => setPinned(!pinned));
   // The badge is the only thing that starts a translation: the selection alone
   // only puts it on screen.
@@ -708,7 +694,13 @@
 
   Glossy.listen("glossy://selection", (event) => {
     resetLanguages();
-    showBadge(event && event.payload ? event.payload.text : "");
+    const payload = (event && event.payload) || {};
+    const value = payload.text;
+    // A selection on its own only puts the badge on screen; the click is what
+    // buys a translation. A card that is pinned, and the shortcut, which the
+    // user presses on purpose, translate straight away.
+    if (payload.immediate === true || pinned) run(value);
+    else showBadge(value);
   });
 
   Glossy.listen("glossy://result", (event) => {

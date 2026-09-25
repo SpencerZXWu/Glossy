@@ -267,8 +267,9 @@ async fn history_reopen(
 fn show_popup(app: AppHandle, state: State<'_, Arc<AppState>>, text: String) {
     let (x, y) = platform::desktop::cursor_pos();
     // The demo pane stands in for a selection, so there is no program in front
-    // to read a sentence out of.
-    popup::reveal(&app, &state, text, None, (x as f64, y as f64));
+    // to read a sentence out of. It stands in for the mouse, too, and so leaves
+    // the click that asks for the translation to be made on the badge.
+    popup::reveal(&app, &state, text, None, (x as f64, y as f64), false);
 }
 
 /// Sizes and shows the popup; returns the usable height of its monitor in CSS

@@ -1023,18 +1023,16 @@ input:focus-visible {
   line-height: 1.5;
 }
 
-/* Pronunciation buttons, one per side of the card. They share the last line with
-   the name of the engine that answered, so they ask for no room above them and
-   take the far end of that line. */
-.says {
+/* The buttons of one side of the card, under the text they act on: the one
+   that copies it first, then the one that reads it out loud. */
+.tools {
   display: flex;
-  justify-content: flex-end;
   gap: 6px;
   flex: none;
-  margin-left: auto;
+  margin-top: 2px;
 }
 
-.say {
+.tool {
   padding: 3px 9px;
   border: 1px solid var(--line);
   border-radius: var(--g-radius-pill);
@@ -1043,21 +1041,38 @@ input:focus-visible {
   font: inherit;
   font-size: 11.5px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.say:hover {
+.tool svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.tool:hover {
   background: var(--g-surface-hover);
   color: var(--fg);
 }
 
-.say:active {
+.tool:active {
   background: var(--g-surface-pressed);
 }
 
-.say[data-state="on"] {
+.tool[data-state="on"],
+.tool[data-state="copied"] {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+/* Only one face of a copy button is shown at a time: the sheets, or the tick
+   that says the text reached the clipboard. */
+.tool .glyph-done,
+.tool[data-state="copied"] .glyph-copy {
+  display: none;
 }
 
 /* Conversion of a unit or an amount of money the reader would not use. */

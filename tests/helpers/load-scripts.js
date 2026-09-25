@@ -43,8 +43,13 @@ function makeTimers() {
       },
     },
     intervals: () => intervals.size,
+    timeouts: () => timeouts.size,
     async fire() {
       for (const fn of Array.from(intervals.values())) await fn();
+    },
+    /** Fires every pending timeout, the way a wait that has run out would. */
+    async fireTimeouts() {
+      for (const fn of Array.from(timeouts.values())) await fn();
     },
   };
 }

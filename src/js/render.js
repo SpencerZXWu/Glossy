@@ -109,8 +109,10 @@
   }
 
   function clear(target) {
-    // A card that is being replaced must not keep talking behind the new one.
+    // A card that is being replaced must not keep talking behind the new one,
+    // and must not leave a tick behind on a button nobody can see.
     if (reading) stopSpeaking();
+    if (copied) resetCopy();
     while (target.firstChild) target.removeChild(target.firstChild);
   }
 
@@ -200,6 +202,7 @@
     clear(target);
 
     const translation = String(data.translation || "").trim();
+    const sourceText = String(data.sourceText || "").trim();
     const isSentence = data.kind === "sentence";
     // An empty answer is a message about the result, not the result: it gets its
     // own styling so it does not sit in the card with the weight of a translation.
@@ -210,14 +213,28 @@
         translation || Glossy.i18n.t("render.empty"),
       );
 
+    // The two sides of the card, each with the text it holds and the language
+    // that text is read out loud in. A word that was looked up stands in the
+    // header above the body, so its buttons are the first thing the body holds.
+    const original = sourceText
+      ? { key: "Original", text: sourceText, language: data.sourceLang }
+      : null;
+    const answerSide = translation
+      ? { key: "Translation", text: translation, language: data.targetLang }
+      : null;
+
     if (isSentence) {
-      if (opts.showOriginal !== false && data.sourceText) {
-        target.appendChild(node("div", "original", data.sourceText));
+      if (original && opts.showOriginal !== false) {
+        target.appendChild(node("div", "original", original.text));
       }
+      if (original) sideTools(target, original, opts);
       target.appendChild(answer());
+      if (answerSide) sideTools(target, answerSide, opts);
       if (extras) pairs(target, data.pairs);
     } else {
+      if (original) sideTools(target, original, opts);
       target.appendChild(answer());
+      if (answerSide) sideTools(target, answerSide, opts);
 
       const phonetic = phoneticText(data.phonetic || "");
       if (phonetic) {
@@ -263,15 +280,10 @@
 
     if (extras) units(target, data.conversions);
 
-    // The bottom line of the card: the name of the engine that answered on the
-    // left, the pronunciation buttons on the right. Both go into the same row,
-    // so neither can push the other onto a line of its own.
+    // The bottom line of the card: the name of the engine that answered, added
+    // only when there is one to name.
     const row = node("div", "foot");
     engineName(row, data.provider, opts);
-
-    // Added last, so the buttons sit in the bottom corner of the card.
-    if (opts.speak !== false) readOut(row, data);
-
     if (row.childNodes.length) target.appendChild(row);
 
     // The card names the service that answered, and says so when that is not the
@@ -362,11 +374,23 @@
   const STOP_GLYPH =
     '<svg class="glyph glyph-stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" /></svg>';
 
+  /**
+   * The two faces of a copy button: the two sheets at rest, and the tick it
+   * wears for a moment after the text reached the clipboard.
+   */
+  const COPY_GLYPH =
+    '<svg class="glyph glyph-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>';
+  const DONE_GLYPH =
+    '<svg class="glyph glyph-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>';
+
   /** How often the card asks whether the voice is still reading. */
   const SPEECH_POLL_MS = 250;
 
   /** How long a reading that failed shows on its button before going back. */
   const FAILED_HOLD_MS = 2600;
+
+  /** How long the tick of a copied text stays on its button. */
+  const COPIED_HOLD_MS = 1100;
 
   /** The button that is currently reading something out loud, if any. */
   let reading = null;
@@ -374,35 +398,71 @@
   /** The timer that waits for the voice to fall silent, while one is reading. */
   let watching = null;
 
-  /** The pronunciation buttons: the original, the translation, or both. */
-  function readOut(target, data) {
-    const rows = [];
-    const original = String(data.sourceText || "").trim();
-    const translation = String(data.translation || "").trim();
-    if (original) {
-      rows.push({ key: "render.speakOriginal", text: original, language: data.sourceLang });
-    }
-    if (translation) {
-      rows.push({
-        key: "render.speakTranslation",
-        text: translation,
-        language: data.targetLang,
-      });
-    }
-    if (!rows.length) return;
+  /** The button that copied last, and the timer that puts it back to rest. */
+  let copied = null;
+  let copiedTimer = null;
 
-    const block = node("div", "says");
-    rows.forEach((row) => {
-      const button = node("button", "say");
-      button.type = "button";
-      button.setAttribute("data-say", row.key);
-      button.setAttribute("aria-pressed", "false");
-      button.innerHTML = `${SPEAK_GLYPH}${STOP_GLYPH}`;
-      name(button, row.key);
-      button.addEventListener("click", () => toggleReading(button, row));
-      block.appendChild(button);
-    });
-    target.appendChild(block);
+  /**
+   * The buttons of one side of the card: the one that copies that text and the
+   * one that reads it out loud. Both sit under the text they act on, so which
+   * side each of them belongs to is never something the reader has to remember.
+   *
+   * `side` is `{ key: "Original" | "Translation", text, language }`; the key
+   * names the two labels of the side in the dictionary.
+   */
+  function sideTools(target, side, options) {
+    const opts = options || {};
+    const row = node("div", "tools");
+
+    const copy = node("button", "tool");
+    copy.type = "button";
+    copy.setAttribute("data-copy", `render.copy${side.key}`);
+    copy.innerHTML = `${COPY_GLYPH}${DONE_GLYPH}`;
+    name(copy, copy.getAttribute("data-copy"));
+    copy.addEventListener("click", () => copySide(copy, side, opts));
+    row.appendChild(copy);
+
+    if (opts.speak !== false) {
+      const say = node("button", "tool");
+      say.type = "button";
+      say.setAttribute("data-say", `render.speak${side.key}`);
+      say.setAttribute("aria-pressed", "false");
+      say.innerHTML = `${SPEAK_GLYPH}${STOP_GLYPH}`;
+      name(say, say.getAttribute("data-say"));
+      say.addEventListener("click", () => toggleReading(say, side));
+      row.appendChild(say);
+    }
+
+    target.appendChild(row);
+  }
+
+  /** Sends one side of the card to the clipboard and says so on its button. */
+  function copySide(button, side, options) {
+    if (typeof Glossy.invoke !== "function") return;
+    Glossy.invoke("copy_text", { text: side.text }).catch(() => false);
+    announceCopy(button);
+    if (typeof options.onCopied === "function") options.onCopied(side.key.toLowerCase());
+  }
+
+  /** Shows the tick on the button that just copied, and takes it back later. */
+  function announceCopy(button) {
+    if (copied && copied !== button) resetCopy();
+    copied = button;
+    button.dataset.state = "copied";
+    name(button, "render.copied");
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(resetCopy, COPIED_HOLD_MS);
+  }
+
+  /** Puts the button that copied back to its resting look. */
+  function resetCopy() {
+    clearTimeout(copiedTimer);
+    copiedTimer = null;
+    if (copied) {
+      copied.dataset.state = "off";
+      name(copied, copied.getAttribute("data-copy"));
+    }
+    copied = null;
   }
 
   /** Names a button after an i18n key, for its tooltip and its screen reader. */

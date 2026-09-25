@@ -382,7 +382,8 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     }
 
     let context = enclosing_sentence(&state.settings(), &text);
-    popup::reveal(app, state, text, context, (x as f64, y as f64));
+    // The mouse only asks for the badge; the click on it asks for the translation.
+    popup::reveal(app, state, text, context, (x as f64, y as f64), false);
     // Dropped here rather than held to the end of the function so the restore —
     // which can wait for the application that was copied from — starts after the
     // popup is on its way to the screen. The type restores on drop, so the paths
@@ -439,7 +440,8 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
 
     let (x, y) = platform::desktop::cursor_pos();
     let context = enclosing_sentence(&settings, &text);
-    popup::reveal(app, state, text, context, (x as f64, y as f64));
+    // The shortcut was pressed on purpose: it asks for the translation itself.
+    popup::reveal(app, state, text, context, (x as f64, y as f64), true);
     // The restore waits for the application that was copied from, so it happens
     // once the popup has been told what to show.
     drop(pending);

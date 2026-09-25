@@ -67,9 +67,12 @@ To build from source instead, see [Development](#development).
    and nothing is charged against the day's allowance — until you **click that
    icon**, so a word you merely swiped over costs nothing. Clicking anywhere else
    makes the icon disappear.
-5. The card appears below the selection. Drag its header to move it, use the
-   buttons to copy the result or to open the settings, or click anywhere else to
-   dismiss it.
+5. The card appears below the selection. Drag its header to move it, press the
+   **pin** button to keep it, open the settings from the header, or click
+   anywhere else to dismiss it. Under each side of the card — the original and
+   the translation — sit that side's own **copy** and **pronunciation** buttons.
+   A pinned card stays on screen until you unpin or dismiss it, and a new
+   selection is translated straight into it instead of opening a second card.
    The row under the header shows the language pair: hover it and pick either side
    from the dropdowns to translate again with that language, or press the `⇄`
    button to translate the result back into the language it came from. The pair
@@ -84,12 +87,15 @@ To build from source instead, see [Development](#development).
 A word card shows the phonetic symbols, the parts of speech with their definitions,
 one simple example, and — in the same card — the inflections of the word, the words
 that mean roughly the same, the sentence it was selected from with a translation of
-that sentence, and a pronunciation button for each side of the card. A sentence or a
+that sentence, and a copy button plus a pronunciation button for each side of the
+card. A sentence or a
 paragraph is shown as the translation itself, with the original above it (capped at
 four lines) and, for a long paragraph, a sentence-by-sentence view underneath.
 
 Press the global hotkey (**Ctrl+Alt+C** by default) to translate the clipboard
-content instead of selecting anything.
+content instead of selecting anything. Unlike a selection, the hotkey translates
+at once — there is no icon to click — into the card on screen, or into the pinned
+card when one is open.
 
 The popup is a non-activating always-on-top window: it never steals the keyboard
 focus from the application you are reading in. It is kept inside the work area of
@@ -638,12 +644,12 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 2. 关闭该窗口并不会退出 Glossy——它会在后台继续监听选区。点击通知区域中的 Glossy 图标（或在其菜单中选择**打开 Glossy**）可以把窗口重新调出来，用同一个菜单中的**退出**来结束 Glossy。在已经运行时再次启动 Glossy，只会显示一条简短提示。静默启动会由右下角的一张小卡片告知；它几秒后淡出，点击它会打开设置窗口。Windows 11 会把新的通知区域图标收进溢出菜单（时钟旁的 `^`）——把图标拖到任务栏上，或在**设置 → 个性化 → 任务栏 → 其他系统托盘图标**中打开它，即可让它保持可见。
 3. 在任何应用中，**拖动划过文字**（或**双击一个单词**）即可选中它。
 4. Glossy 会在选区下方显示一个小图标。在**点击这个图标**之前不会翻译，也不会占用当天的翻译额度，因此只是随手划过的一个词不会有任何消耗。点击其他区域图标就会消失。
-5. 卡片出现在选区下方。拖动它的标题栏可以移动它，用按钮复制结果或打开设置，也可以点击别处让它消失。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*；手动选定的目标语言会被记住并成为已配置的目标语言，所以下一次选区直接以它为译文语言，而手动选定的源语言只对当前这张卡片有效。
+5. 卡片出现在选区下方。拖动它的标题栏可以移动它，按下**固定**按钮让它留在原地，从标题栏打开设置，也可以点击别处让它消失。卡片的两侧——原文和译文——各自下方有该侧的**复制**按钮和**朗读**按钮。固定后的卡片会一直留在屏幕上，直到取消固定或关闭它，此时新的选区会直接翻译进这张卡片，而不会再开一张。标题栏下方的那一行显示语言对：悬停后用下拉框选择任意一侧，即可用该语言重新翻译；按下 `⇄` 按钮则把译文回译成它原本的语言。每次新的选区都会把这个语言对重置为*识别源语言并使用已配置的目标语言*；手动选定的目标语言会被记住并成为已配置的目标语言，所以下一次选区直接以它为译文语言，而手动选定的源语言只对当前这张卡片有效。
 6. 短于所设最小长度的选区（默认 2 个字符）会被忽略，起点或终点落在弹窗本身的拖动永远不会触发翻译。
 
-单词卡片会显示音标、各词性及其释义、一个简单例句，并在同一张卡片里补上这个词的词形变化、意思相近的词、它被选中时所在的句子及该句译文，以及卡片两侧各一个朗读按钮。句子或段落直接显示译文，原文在译文上方（最多四行），段落较长时下方还有逐句对照。
+单词卡片会显示音标、各词性及其释义、一个简单例句，并在同一张卡片里补上这个词的词形变化、意思相近的词、它被选中时所在的句子及该句译文，以及原文与译文下方各一个复制按钮和一个朗读按钮。句子或段落直接显示译文，原文在译文上方（最多四行），段落较长时下方还有逐句对照。
 
-按下全局快捷键（默认 **Ctrl+Alt+C**）可以改为翻译剪贴板内容，而无需选中任何东西。
+按下全局快捷键（默认 **Ctrl+Alt+C**）可以改为翻译剪贴板内容，而无需选中任何东西。与手动选区不同，快捷键会立即翻译——不需要点击图标——并显示在当前卡片中；已经有固定卡片时就翻译进那张固定卡片。
 
 弹窗是一个不抢焦点、始终置顶的窗口：它绝不会从你正在阅读的应用那里抢走键盘焦点。它始终保持在光标所在显示器的工作区之内，下方没有空间时会翻到光标上方。
 
@@ -1065,8 +1071,12 @@ fuente, consulta [Desarrollo](#desarrollo).
    icono**, así que una palabra por la que solo has pasado por encima no cuesta
    nada. Al hacer clic en cualquier otro sitio el icono desaparece.
 5. La tarjeta aparece debajo de la selección. Arrastra su encabezado para moverla,
-   usa los botones para copiar el resultado o abrir los ajustes, o haz clic en
-   cualquier otro sitio para descartarla. La fila que hay bajo el encabezado
+   pulsa el botón **fijar** para retenerla, abre los ajustes desde el encabezado,
+   o haz clic en cualquier otro sitio para descartarla. Bajo cada lado de la
+   tarjeta —el original y la traducción— están sus propios botones de **copiar**
+   y de **pronunciación**. Una tarjeta fijada permanece en pantalla hasta que la
+   desfijes o la descartes, y la siguiente selección se traduce directamente en
+   ella. La fila que hay bajo el encabezado
    muestra el par de idiomas: pasa el cursor por encima y elige cualquiera de los
    dos lados en los desplegables para volver a traducir con ese idioma, o pulsa el
    botón `⇄` para traducir el resultado de vuelta al idioma del que procede. El
@@ -1083,12 +1093,14 @@ La tarjeta de una palabra muestra los símbolos fonéticos, las categorías
 gramaticales con sus definiciones, un ejemplo sencillo y, en la misma tarjeta,
 las formas de la palabra, las palabras que significan más o menos lo mismo, la
 frase de la que se tomó la selección con una traducción de esa frase, y un botón
-de pronunciación para cada lado. Una frase o un párrafo se muestra como la
-traducción misma, con el original encima (hasta cuatro líneas) y, si el párrafo
-es largo, una vista frase por frase debajo.
+de copiar más un botón de pronunciación para cada lado. Una frase o un párrafo se
+muestra como la traducción misma, con el original encima (hasta cuatro líneas) y,
+si el párrafo es largo, una vista frase por frase debajo.
 
 Pulsa el atajo de teclado global (**Ctrl+Alt+C** de forma predeterminada) para
-traducir el contenido del portapapeles en lugar de seleccionar algo.
+traducir el contenido del portapapeles en lugar de seleccionar algo. A diferencia
+de una selección, el atajo traduce al instante —sin icono que pulsar— en la
+tarjeta que ya está en pantalla, o en la tarjeta fijada si hay una abierta.
 
 El emergente es una ventana que no se activa y que está siempre encima: nunca
 roba el foco del teclado a la aplicación en la que estás leyendo. Se mantiene

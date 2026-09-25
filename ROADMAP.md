@@ -74,7 +74,7 @@ Goal: from "it runs" to "I leave it running".
 | Autostart | `tauri-plugin-autostart` backs a settings toggle. The single-instance guard already ships: a second launch says so in the notification area instead of installing a second mouse hook | done, in `src-tauri/src/autostart.rs` |
 | Auto-update skeleton | `tauri-plugin-updater` with a signing key, fed from GitHub releases; can be switched off in the settings | done, in `src-tauri/src/updater.rs`; waiting for a key pair |
 | Translation history | A list in the settings window (in memory, optional persistence, configurable cap) with search, reopen-in-card and copy | done, in `src-tauri/src/history.rs` |
-| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed | done |
+| Pin the popup | A button in the header that keeps the card open through clicks outside and disables auto-close until it is closed; a new selection or the hotkey then translates into the pinned card instead of opening a second one | done |
 | Import and export settings | JSON file out and in, validating through `sanitized()`. Now that credentials are protected, an export has to confirm before it includes them, and an import has to protect what it brings | done, in `export_settings` / `import_settings` |
 | Frontend tests | `node --test` coverage for the logic behind `i18n.js`, `render.js` and the classification in `classify.rs`; at least 25 cases | done, 71 cases in `tests/`, wired into CI |
 | Manual regression list | A pre-release checklist in the README: multiple monitors, 150% scaling, both colour schemes, every provider, the ignore list | done, 17 items in the README |
@@ -401,7 +401,7 @@ rather than investing in it early.
 | 开机自启 | `tauri-plugin-autostart` 支撑一个设置开关。单实例保护已就位：第二次启动只在通知区域提示，不会装上第二个鼠标钩子 | 完成，见 `src-tauri/src/autostart.rs` |
 | 自更新框架 | 带签名密钥的 `tauri-plugin-updater`，由 GitHub release 提供更新；可在设置里关闭 | 完成，见 `src-tauri/src/updater.rs`；等待密钥对 |
 | 翻译历史 | 设置窗口里的一份列表（内存存储、可选持久化、可配置上限），支持搜索、在卡片中重开和复制 | 完成，见 `src-tauri/src/history.rs` |
-| 固定弹窗 | 标题栏上一个按钮，固定后卡片在点击外部时保持打开，直到手动关闭前都不自动关闭 | 完成 |
+| 固定弹窗 | 标题栏上一个按钮，固定后卡片在点击外部时保持打开，直到手动关闭前都不自动关闭；此后的新选区或快捷键会直接翻译进这张固定卡片，而不是再开一张 | 完成 |
 | 设置导入导出 | JSON 文件导出与导入，导入时经 `sanitized()` 校验。既然凭据已被保护，导出时必须先确认才会带上它们，导入时必须保护带进来的内容 | 完成，见 `export_settings` / `import_settings` |
 | 前端测试 | 对 `i18n.js`、`render.js` 背后的逻辑以及 `classify.rs` 的分类做 `node --test` 覆盖；至少 25 个用例 | 完成，`tests/` 里 71 个用例，已接入 CI |
 | 手动回归清单 | README 里的一份发布前清单：多显示器、150% 缩放、两种配色方案、每个服务商、忽略列表 | 完成，README 里 17 项 |

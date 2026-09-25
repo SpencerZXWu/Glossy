@@ -54,7 +54,6 @@
     demoUnits: $("demoUnits"),
     demoCard: $("demoCard"),
     demoHeadword: $("demoHeadword"),
-    demoCopy: $("demoCopy"),
     demoLangbar: $("demoLangbar"),
     demoFrom: $("demoFrom"),
     demoTo: $("demoTo"),
@@ -123,7 +122,6 @@
   let demoPair = { source: AUTO, target: null };
   let demoDetected = "";
   let demoTicket = 0;
-  let demoCopyTimer = 0;
   /** Sample text the card box is filled with until the user types something. */
   let sampleText = "";
   /** Translations the backend remembers, newest first. */
@@ -131,9 +129,8 @@
   /** `"mica"` once the backend reports a backdrop behind the window. */
   let backdrop = "none";
 
-  const COPY_ICON = els.demoCopy.innerHTML;
-  const DONE_ICON =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  const COPY_ICON =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
   const REMOVE_ICON =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"/></svg>';
 
@@ -755,7 +752,6 @@
 
   /** Re-labels the translation card, and rebuilds the language bar with it. */
   function syncDemoLanguage() {
-    els.demoCopy.setAttribute("aria-label", Glossy.i18n.t("popup.copy"));
     els.demoFrom.setAttribute("aria-label", Glossy.i18n.t("popup.sourceLang"));
     els.demoTo.setAttribute("aria-label", Glossy.i18n.t("popup.targetLang"));
     els.demoSwap.setAttribute("aria-label", Glossy.i18n.t("popup.swap"));
@@ -999,19 +995,6 @@
       showOriginal: els.showOriginal.checked,
       compact: els.compactPopup.checked,
     });
-  }
-
-  async function copyDemo() {
-    const value = demoResult && demoResult.translation ? String(demoResult.translation) : "";
-    if (!value) return;
-    await Glossy.invoke("copy_text", { text: value }).catch(() => false);
-    els.demoCopy.innerHTML = DONE_ICON;
-    els.demoCopy.classList.add("done");
-    clearTimeout(demoCopyTimer);
-    demoCopyTimer = setTimeout(() => {
-      els.demoCopy.innerHTML = COPY_ICON;
-      els.demoCopy.classList.remove("done");
-    }, 1100);
   }
 
   /** Label of the entry that hands the source language over to the provider. */
@@ -1359,8 +1342,6 @@
     runDemo(demoValue);
   });
   els.demoSwap.addEventListener("click", swapDemo);
-  els.demoCopy.addEventListener("click", copyDemo);
-
   els.demoPopup.addEventListener("click", () => {
     const value = selection || els.demoText.value.replace(/\s+/g, " ").trim();
     if (value.length < 2) return;

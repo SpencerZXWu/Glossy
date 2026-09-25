@@ -178,6 +178,10 @@ pub struct SelectionPayload {
     /// selection, while that program still has the focus, and travels with the
     /// text so the card can translate it without asking the screen again.
     pub context: Option<String>,
+    /// True when the user did something that asks for a translation by itself,
+    /// which the shortcut does. A selection made with the mouse only asks for
+    /// the badge, and the click on it asks for the translation.
+    pub immediate: bool,
 }
 
 fn popup_window(app: &AppHandle) -> Option<WebviewWindow> {
@@ -254,12 +258,20 @@ pub fn reveal(
     text: String,
     context: Option<String>,
     anchor: (f64, f64),
+    immediate: bool,
 ) {
     let Some(window) = popup_window(app) else {
         return;
     };
     state.set_anchor(anchor);
-    let _ = window.emit("glossy://selection", SelectionPayload { text, context });
+    let _ = window.emit(
+        "glossy://selection",
+        SelectionPayload {
+            text,
+            context,
+            immediate,
+        },
+    );
 }
 
 /// Shows the card for a translation that was already made, which is how the

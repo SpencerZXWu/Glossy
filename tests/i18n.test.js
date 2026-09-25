@@ -282,7 +282,7 @@ function attach(dataset) {
 test("apply fills text, placeholders and titles from the dictionary", () => {
   const text = attach({ i18n: "status.paused" });
   const placeholder = attach({ i18nPlaceholder: "history.search" });
-  const title = attach({ i18nTitle: "popup.copy" });
+  const title = attach({ i18nTitle: "popup.pin" });
   const label = attach({ i18nAriaLabel: "notice.close" });
   const plain = attach({ i18n: "render.retry" });
 
@@ -291,7 +291,7 @@ test("apply fills text, placeholders and titles from the dictionary", () => {
 
   assert.equal(text.textContent, "Paused");
   assert.equal(placeholder.placeholder, "Text or translation");
-  assert.equal(title.title, "Copy translation");
+  assert.equal(title.title, "Pin the card, so it stays open");
   assert.equal(label.getAttribute("aria-label"), "Dismiss");
   assert.equal(plain.placeholder, "");
   assert.equal(plain.title, "");

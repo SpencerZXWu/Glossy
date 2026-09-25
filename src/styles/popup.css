@@ -306,7 +306,7 @@ body.dragging .card::before {
 .lang-select:focus-visible,
 .lang-swap:focus-visible,
 .icon-button:focus-visible,
-.say:focus-visible,
+.tool:focus-visible,
 .ghost-button:focus-visible {
   outline: var(--g-focus-width) solid var(--accent);
   outline-offset: var(--g-focus-offset);
@@ -512,18 +512,17 @@ body.dragging .card::before {
   line-height: 1.5;
 }
 
-/* Pronunciation buttons, one per side of the card, in its bottom corner. */
-.says {
+/* The buttons of one side of the card, under the text they act on: the one
+   that copies it first, then the one that reads it out loud. */
+.tools {
   display: flex;
-  justify-content: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
   flex: none;
-  /* It shares one line with the name of the engine, so it asks for no room of
-     its own above it and pushes itself to the far end of the row. */
-  margin-left: auto;
+  margin-top: 1px;
 }
 
-.say {
+.tool {
   flex: none;
   width: calc(26px * var(--popup-font));
   height: calc(26px * var(--popup-font));
@@ -539,16 +538,16 @@ body.dragging .card::before {
     color var(--g-dur-fast) var(--g-ease-standard);
 }
 
-.say:hover {
+.tool:hover {
   background: var(--bg-soft);
   color: var(--fg);
 }
 
-.say:active {
+.tool:active {
   transform: translateY(1px);
 }
 
-.say svg {
+.tool svg {
   width: calc(15px * var(--popup-font));
   height: calc(15px * var(--popup-font));
   display: block;
@@ -556,22 +555,38 @@ body.dragging .card::before {
 
 /* The stop square takes the speaker's place while its text is being read, so
    which side is playing is never something the reader has to remember. */
-.say .glyph-stop,
-.say[data-state="on"] .glyph-speak {
+.tool .glyph-stop,
+.tool[data-state="on"] .glyph-speak {
   display: none;
 }
 
-.say[data-state="on"] {
+.tool[data-state="on"] {
   background: var(--accent-soft);
   color: var(--accent);
 }
 
-.say[data-state="on"] .glyph-stop {
+.tool[data-state="on"] .glyph-stop {
   display: block;
 }
 
-.say[data-state="failed"] {
+.tool[data-state="failed"] {
   color: var(--g-bad);
+}
+
+/* The tick takes the sheets' place once the text is on the clipboard: the
+   answer to the click is an icon, not a message that has to be read. */
+.tool .glyph-done,
+.tool[data-state="copied"] .glyph-copy {
+  display: none;
+}
+
+.tool[data-state="copied"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tool[data-state="copied"] .glyph-done {
+  display: block;
 }
 
 /* Conversion of a unit or an amount of money the reader would not use. */
@@ -621,8 +636,7 @@ body.dragging .card::before {
   font-variant-numeric: tabular-nums;
 }
 
-/* The bottom line of the card: the name of the engine that answered at one end,
-   the pronunciation buttons at the other. It is a single row that never wraps. */
+/* The bottom line of the card: the name of the engine that answered. */
 .foot {
   display: flex;
   align-items: center;
@@ -635,8 +649,7 @@ body.dragging .card::before {
   font-size: calc(11.5px * var(--popup-font));
 }
 
-/* The name keeps to one line whatever it says: a long one gives way rather than
-   pushing the buttons down onto a line of their own. */
+/* The name keeps to one line whatever it says. */
 .foot .engine,
 .foot .service {
   flex: 0 1 auto;
