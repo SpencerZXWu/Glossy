@@ -58,16 +58,20 @@
 
     "panel.general": "General",
     "panel.shortcuts": "Shortcuts",
-    "shortcuts.builtin": "Built into the window",
+    "shortcuts.builtin": "Only in this window",
+    "shortcuts.local":
+      "The shortcuts below are handled by the window itself: they work only while this window has the keyboard focus, they are not registered with Windows, and the program you are reading in never feels them. To translate from any program, use the global hotkey above.",
     "shortcuts.more": "More shortcuts will be listed here as they are added.",
     "shortcut.escape": "Close the floating popup",
-    "shortcut.enter": "Translate the text typed above",
+    "shortcut.enter": "Translate the whole text of the Translate box, while the cursor is in that box",
     "panel.trigger": "Trigger",
     "field.minLength": "Shortest selection to translate",
     "field.hotkey": "Global hotkey",
-    "hotkey.values": "Translate the clipboard content without selecting anything.",
+    "hotkey.values":
+      "Registered with Windows, so it works in every program: it translates the text you have selected, or the clipboard content when nothing is selected, and it never shows the icon.",
     "hotkey.none": "No global hotkey. Type one such as Ctrl+Alt+C.",
-    "hotkey.active": "Active: {0}. Press it to translate the clipboard content.",
+    "hotkey.active":
+      "Active: {0}. Press it in any program to translate the selected text, or the clipboard when nothing is selected.",
     "field.ignored": "Never translate in these programs",
     "ignored.empty": "Nothing ignored yet — every program triggers a translation.",
     "ignored.count.one": "1 program ignored.",
@@ -313,16 +317,19 @@
 
     "panel.general": "常规",
     "panel.shortcuts": "快捷键",
-    "shortcuts.builtin": "窗口内置",
+    "shortcuts.builtin": "仅本窗口有效",
+    "shortcuts.local":
+      "下面这些快捷键由窗口自己处理：只在窗口拥有键盘焦点时有效，没有向 Windows 注册，你正在阅读的程序也完全感觉不到它们。想在任意程序里翻译，请用上面的全局快捷键。",
     "shortcuts.more": "后续新增的快捷键会继续列在这里。",
     "shortcut.escape": "关闭翻译弹窗",
-    "shortcut.enter": "翻译上方输入的文本",
+    "shortcut.enter": "翻译文本框里的整段文字（光标需在文本框内）",
     "panel.trigger": "触发",
     "field.minLength": "触发翻译的最短长度",
     "field.hotkey": "全局快捷键",
-    "hotkey.values": "不用选中文字，直接翻译剪贴板内容。",
+    "hotkey.values":
+      "向 Windows 注册，任何程序里都有效：翻译你选中的文字，没有选中时翻译剪贴板内容，而且不会显示图标。",
     "hotkey.none": "未设置全局快捷键。可填写 Ctrl+Alt+C。",
-    "hotkey.active": "已生效：{0}。按下即可翻译剪贴板内容。",
+    "hotkey.active": "已生效：{0}。在任何程序里按下即可翻译选中的文字，没有选中时翻译剪贴板内容。",
     "field.ignored": "以下程序中不翻译",
     "ignored.empty": "暂未忽略任何程序，所有程序都会触发翻译。",
     "ignored.count.one": "已忽略 1 个程序。",

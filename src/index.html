@@ -163,10 +163,16 @@
               <input type="text" id="hotkey" spellcheck="false" autocomplete="off" placeholder="Ctrl+Alt+C" />
             </div>
             <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
-            <h3 class="subhead" data-i18n="shortcuts.builtin">Built into the window</h3>
+            <h3 class="subhead" data-i18n="shortcuts.builtin">Only in this window</h3>
+            <p class="hint" data-i18n="shortcuts.local">
+              The shortcuts below are handled by the window itself: they work only
+              while this window has the keyboard focus, they are not registered with
+              Windows, and the program you are reading in never feels them. To
+              translate from any program, use the global hotkey above.
+            </p>
             <ul class="keys">
               <li><span class="key-group"><kbd>Esc</kbd></span><span data-i18n="shortcut.escape">Close the floating popup</span></li>
-              <li><span class="key-group"><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span data-i18n="shortcut.enter">Translate the text typed in the box</span></li>
+              <li><span class="key-group"><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span data-i18n="shortcut.enter">Translate the whole text of the Translate box, while the cursor is in that box</span></li>
             </ul>
             <p class="hint" data-i18n="shortcuts.more">Every shortcut Glossy gains will be listed here.</p>
           </section>

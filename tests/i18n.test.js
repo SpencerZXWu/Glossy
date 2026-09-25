@@ -190,7 +190,7 @@ test("t substitutes positional placeholders", () => {
   assert.equal(i18n.t("ignored.count.other", 3), "3 programs ignored.");
   assert.equal(
     i18n.t("hotkey.active", "Ctrl+Alt+C"),
-    "Active: Ctrl+Alt+C. Press it to translate the clipboard content.",
+    "Active: Ctrl+Alt+C. Press it in any program to translate the selected text, or the clipboard when nothing is selected.",
   );
   assert.equal(i18n.t("ignored.count.other", 0), "0 programs ignored.");
 });
