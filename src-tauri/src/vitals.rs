@@ -97,6 +97,11 @@ impl Snapshot {
 
     /// The first of the three that is out of balance, named so a message can
     /// say which one it is.
+    ///
+    /// The hook and the voice are taken once and live for as long as the
+    /// application does, so their balance only moves when a second one is taken
+    /// without the first being given back; the clipboard is the one that moves
+    /// on every selection.
     pub fn leak(&self) -> Option<&'static str> {
         if self.clipboard_outstanding() > 0 {
             Some("the clipboard")
@@ -125,16 +130,26 @@ pub fn snapshot() -> Snapshot {
 
 /// Says out loud which of the three was not given back, once.
 ///
-/// Called after a selection has been read, which is where a held clipboard or a
-/// second hook would show up; the message is written once because a leak that
-/// stays leaks on every selection.
+/// Called after a selection has been read. One look is not enough to say it: the
+/// hotkey path reads the clipboard on a thread of its own, so a look can catch
+/// the clipboard open for the few microseconds it is held. What gets said is an
+/// imbalance seen again on the next selection, which a transient cannot survive.
 pub fn report_leak() -> Option<&'static str> {
+    static SEEN: AtomicBool = AtomicBool::new(false);
     static REPORTED: AtomicBool = AtomicBool::new(false);
-    let named = snapshot().leak()?;
-    if !REPORTED.swap(true, Ordering::Relaxed) {
+    let named = snapshot().leak();
+    let again = SEEN.swap(named.is_some(), Ordering::Relaxed);
+    let named = named?;
+    if say(again, &REPORTED) {
         eprintln!("glossy: {named} was not given back");
     }
     Some(named)
+}
+
+/// Whether an imbalance that has now been seen `seen_before` times is worth
+/// saying, and has not been said already.
+fn say(seen_before: bool, reported: &AtomicBool) -> bool {
+    seen_before && !reported.swap(true, Ordering::Relaxed)
 }
 
 #[cfg(test)]
@@ -183,6 +198,16 @@ mod tests {
         // wrap around into a huge number that hides a real leak.
         assert_eq!(snapshot_of(1, 2, 1, 2).clipboard_outstanding(), 0);
         assert_eq!(snapshot_of(1, 2, 1, 2).hooks_live(), 0);
+    }
+
+    #[test]
+    fn the_same_imbalance_is_only_said_once() {
+        let reported = AtomicBool::new(false);
+        // A single sighting is as likely to be a clipboard caught open for a
+        // moment as it is to be a leak.
+        assert!(!say(false, &reported));
+        assert!(say(true, &reported));
+        assert!(!say(true, &reported));
     }
 
     #[test]
