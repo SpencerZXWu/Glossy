@@ -15,6 +15,8 @@
     autostart: $("autostart"),
     minSelectionLen: $("minSelectionLen"),
     hotkey: $("hotkey"),
+    hotkeyRecord: $("hotkeyRecord"),
+    hotkeyClear: $("hotkeyClear"),
     hotkeyHint: $("hotkeyHint"),
     ignoredList: $("ignoredList"),
     ignoredRunning: $("ignoredRunning"),
@@ -113,6 +115,11 @@
   /** Number of running programs in the dropdown; -1 while it is being read. */
   let runningApps = -1;
   let lastStatus = null;
+
+  /** The stored hotkey, kept while the field is being recorded into. */
+  let hotkeySaved = "";
+  /** True while the field is listening for a combination instead of showing one. */
+  let hotkeyRecording = false;
 
   /** Text the translation card shows; reused when only the languages change. */
   let demoValue = "";
@@ -740,6 +747,7 @@
     relabelRunningApps();
     syncService();
     showHotkey(lastStatus);
+    syncHotkeyLabels();
     fillSample();
     syncDemoLanguage();
     renderHistory();
@@ -770,6 +778,7 @@
     ignored = normalizeIgnored(next.ignoredApps);
     sourceLangs = normalizeSourceLangs(next.sourceLangs);
     els.hotkey.value = next.hotkey || "";
+    hotkeySaved = els.hotkey.value;
     els.theme.value = themeOr(next.theme);
     els.fontScale.value = String(pick(FONT_SCALES, next.fontScale, 100));
     els.popupWidth.value = String(pick(POPUP_SIZES, next.popupWidth, 356));
@@ -897,16 +906,90 @@
   }
 
   function showHotkey(status) {
+    // A recording owns the line while it is running: the event that ends it
+    // writes the verdict, and the registration behind it follows a moment later.
+    if (hotkeyRecording) return;
     if (status && status.hotkey) {
-      els.hotkeyHint.dataset.tone = "ok";
-      els.hotkeyHint.textContent = Glossy.i18n.t("hotkey.active", status.hotkey);
+      setHotkeyHint("ok", Glossy.i18n.t("hotkey.active", status.hotkey));
     } else if (status && status.hotkeyError) {
-      els.hotkeyHint.dataset.tone = "bad";
-      els.hotkeyHint.textContent = status.hotkeyError;
+      setHotkeyHint("bad", status.hotkeyError);
     } else {
-      delete els.hotkeyHint.dataset.tone;
-      els.hotkeyHint.textContent = Glossy.i18n.t("hotkey.none");
+      setHotkeyHint("", Glossy.i18n.t("hotkey.none"));
     }
+  }
+
+  function setHotkeyHint(tone, text) {
+    if (tone) els.hotkeyHint.dataset.tone = tone;
+    else delete els.hotkeyHint.dataset.tone;
+    els.hotkeyHint.textContent = text;
+  }
+
+  /** Keeps the field's placeholder and the record button in the set language. */
+  function syncHotkeyLabels() {
+    els.hotkey.placeholder = Glossy.i18n.t(hotkeyRecording ? "hotkey.press" : "hotkey.empty");
+    els.hotkeyRecord.textContent = Glossy.i18n.t(hotkeyRecording ? "hotkey.cancel" : "hotkey.record");
+  }
+
+  function startHotkey() {
+    if (hotkeyRecording) return;
+    hotkeyRecording = true;
+    els.hotkey.value = "";
+    els.hotkey.dataset.recording = "true";
+    syncHotkeyLabels();
+    setHotkeyHint("", Glossy.i18n.t("hotkey.press"));
+    els.hotkey.focus();
+  }
+
+  /** Leaves recording mode and puts the stored combination back on screen. */
+  function stopHotkey() {
+    hotkeyRecording = false;
+    delete els.hotkey.dataset.recording;
+    els.hotkey.value = hotkeySaved;
+    syncHotkeyLabels();
+  }
+
+  function cancelHotkey() {
+    stopHotkey();
+    showHotkey(lastStatus);
+  }
+
+  /** Reads a combination off a keypress and hands it to the backend. */
+  function recordHotkey(event) {
+    if (event.key === "Escape" && !event.altKey && !event.metaKey) {
+      event.preventDefault();
+      cancelHotkey();
+      return;
+    }
+
+    event.preventDefault();
+    const read = Glossy.keycombo.capture(event);
+    if (read.problem === "modifiers") {
+      setHotkeyHint("", Glossy.i18n.t("hotkey.press"));
+      return;
+    }
+    if (read.problem === "unknown") {
+      setHotkeyHint("bad", Glossy.i18n.t("hotkey.unsupported", read.key || "?"));
+      return;
+    }
+    if (read.problem === "nomod") {
+      setHotkeyHint("bad", Glossy.i18n.t("hotkey.hold"));
+      return;
+    }
+
+    const clash = Glossy.keycombo.conflict(read.spec);
+    if (clash === "blocked") {
+      stopHotkey();
+      setHotkeyHint("bad", Glossy.i18n.t("hotkey.blocked", read.spec));
+      return;
+    }
+
+    hotkeySaved = read.spec;
+    stopHotkey();
+    setHotkeyHint("", Glossy.i18n.t("hotkey.recorded", read.spec));
+    // The warning outlives the line: the registration that follows replaces it
+    // with the verdict either way.
+    if (clash === "busy") showToast(Glossy.i18n.t("hotkey.busy", read.spec));
+    scheduleSave();
   }
 
   async function runDemo(value) {
@@ -1266,7 +1349,6 @@
     els.showOriginal,
     els.autostart,
     els.minSelectionLen,
-    els.hotkey,
     els.fontScale,
     els.popupWidth,
     els.popupOpacity,
@@ -1292,6 +1374,34 @@
 
   els.historySearch.addEventListener("input", renderHistory);
   els.historyClear.addEventListener("click", clearHistory);
+
+  // The hotkey field records instead of taking typed text: a combination has to
+  // be spelled the way the backend reads it back, and a recorder cannot typo one.
+  els.hotkey.addEventListener("focus", startHotkey);
+  els.hotkey.addEventListener("keydown", (event) => {
+    if (hotkeyRecording) recordHotkey(event);
+    else if (event.key === "Enter" || event.key === " ") startHotkey();
+  });
+  els.hotkey.addEventListener("blur", (event) => {
+    // Clicking the two buttons beside the field is not leaving it.
+    if (event.relatedTarget === els.hotkeyRecord || event.relatedTarget === els.hotkeyClear) return;
+    if (hotkeyRecording) cancelHotkey();
+  });
+  els.hotkeyRecord.addEventListener("click", () => {
+    if (hotkeyRecording) cancelHotkey();
+    else startHotkey();
+  });
+  // Clicking away from the window takes the keyboard with it, and a recording
+  // that cannot see the keys any more would sit there waiting forever.
+  window.addEventListener("blur", () => {
+    if (hotkeyRecording) cancelHotkey();
+  });
+  els.hotkeyClear.addEventListener("click", () => {
+    hotkeySaved = "";
+    stopHotkey();
+    setHotkeyHint("", Glossy.i18n.t("hotkey.none"));
+    scheduleSave();
+  });
 
   els.updateCheck.addEventListener("click", () => checkForUpdate(true));
   els.updateInstall.addEventListener("click", installUpdate);

@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.4.1] - 2026-09-25
+
+The global hotkey stops being a text field. A combination has to be spelled the way the
+backend reads it back, and typing it by hand was the one place a working setup could be
+broken by a typo, so the field now records what is pressed instead of accepting what is
+written.
+
+### Added
+
+- **The hotkey is recorded, not typed.** `src/js/keycombo.js` reads a keyboard event into
+  the spelling `hotkey::parse` accepts: modifiers in a fixed order, letters and digits
+  upper-cased, function keys and the named keys the backend knows. The field opens for
+  recording when it is clicked, `Record` reopens it, `Esc` or clicking away puts the stored
+  combination back, and `Clear` switches the hotkey off. A key Glossy cannot name is
+  reported by name instead of being silently dropped; a stray key without a modifier says
+  which modifier is missing.
+- **Combinations Windows will not hand over are refused before they are saved.**
+  `Ctrl+Alt+Delete`, `Win+L`, `Win+Tab`, `Alt+Tab`, `Alt+Esc`, `Ctrl+Esc` and
+  `Ctrl+Shift+Esc` never reach `RegisterHotKey`, so recording one now says so and keeps the
+  combination that was working. Ones Windows or Explorer usually owns — `Win+D`, `Win+E`,
+  `Win+R`, `Alt+F4` and the like — are recorded with a warning, because only the
+  registration can tell. A test reads the named keys out of `hotkey.rs` and fails if the two
+  tables ever drift apart.
+
 ## [1.4.0] - 2026-09-25
 
 The release where the numbers are measurements. Nothing changes on screen; what changes is

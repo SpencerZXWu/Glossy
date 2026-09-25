@@ -64,7 +64,9 @@ truthfully copy.
   right that fades away. Closing the window does not quit Glossy — **Quit** in
   the tray menu does.
 - The global hotkey (`Ctrl+Alt+C` by default) translates the clipboard instead of
-  a selection.
+  a selection. It is recorded in the settings window by pressing the keys, so the
+  combination is never typed, and combinations Windows keeps for itself are
+  refused before they are saved.
 - A selection shorter than the configured minimum (2 characters by default) is
   ignored; a drag that starts or ends on the popup never triggers a translation;
   a selection ending in sentence punctuation is translated as a sentence however

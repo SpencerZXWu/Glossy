@@ -450,6 +450,28 @@ main::-webkit-scrollbar-thumb {
 
 /* ----------------------------------------------------------- shortcuts */
 
+.recorder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recorder input {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  font-family: var(--g-font-mono);
+}
+
+.recorder input[data-recording] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.recorder .ghost {
+  flex: none;
+}
+
 .subhead {
   margin: 18px 0 2px;
   padding-top: 12px;

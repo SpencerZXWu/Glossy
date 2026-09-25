@@ -69,7 +69,20 @@
     "field.hotkey": "Global hotkey",
     "hotkey.values":
       "Registered with Windows, so it works in every program: it translates the text you have selected, or the clipboard content when nothing is selected, and it never shows the icon.",
-    "hotkey.none": "No global hotkey. Type one such as Ctrl+Alt+C.",
+    "hotkey.howto":
+      "Click the box, then press the combination you want — nothing is typed, so it cannot be misspelled. Glossy registers it with Windows at once and reports whether Windows accepted it.",
+    "hotkey.empty": "Click to record",
+    "hotkey.press": "Press the combination…",
+    "hotkey.record": "Record",
+    "hotkey.cancel": "Cancel",
+    "hotkey.clear": "Clear",
+    "hotkey.hold": "Hold at least one of Ctrl, Alt, Shift or Win.",
+    "hotkey.unsupported": "{0} is not a key Glossy can use.",
+    "hotkey.blocked": "{0} belongs to Windows and can never be taken.",
+    "hotkey.busy":
+      "{0} is usually owned by Windows or another program; if Windows refuses it, the line below will say so.",
+    "hotkey.recorded": "Recorded {0}. Waiting for Windows to confirm…",
+    "hotkey.none": "No global hotkey. Press Record to set one.",
     "hotkey.active":
       "Active: {0}. Press it in any program to translate the selected text, or the clipboard when nothing is selected.",
     "field.ignored": "Never translate in these programs",
@@ -328,7 +341,19 @@
     "field.hotkey": "全局快捷键",
     "hotkey.values":
       "向 Windows 注册，任何程序里都有效：翻译你选中的文字，没有选中时翻译剪贴板内容，而且不会显示图标。",
-    "hotkey.none": "未设置全局快捷键。可填写 Ctrl+Alt+C。",
+    "hotkey.howto":
+      "点击输入框后直接按下组合键即可，不用手打，也就不会打错。Glossy 会立刻向 Windows 注册，并告诉你 Windows 是否接受。",
+    "hotkey.empty": "点击开始录制",
+    "hotkey.press": "请按下组合键…",
+    "hotkey.record": "录制",
+    "hotkey.cancel": "取消",
+    "hotkey.clear": "清除",
+    "hotkey.hold": "至少按住 Ctrl、Alt、Shift 或 Win 中的一个。",
+    "hotkey.unsupported": "{0} 不是 Glossy 能用的按键。",
+    "hotkey.blocked": "{0} 属于 Windows 系统，无法被注册。",
+    "hotkey.busy": "{0} 通常已被 Windows 或其它程序占用；如果 Windows 拒绝，下面的提示会写明。",
+    "hotkey.recorded": "已记录 {0}，正在等待 Windows 确认…",
+    "hotkey.none": "未设置全局快捷键。点击「录制」来设置。",
     "hotkey.active": "已生效：{0}。在任何程序里按下即可翻译选中的文字，没有选中时翻译剪贴板内容。",
     "field.ignored": "以下程序中不翻译",
     "ignored.empty": "暂未忽略任何程序，所有程序都会触发翻译。",

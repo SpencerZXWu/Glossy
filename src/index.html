@@ -160,8 +160,26 @@
             <h2 data-i18n="panel.shortcuts">Shortcuts</h2>
             <div class="field">
               <label for="hotkey" data-i18n="field.hotkey">Global hotkey</label>
-              <input type="text" id="hotkey" spellcheck="false" autocomplete="off" placeholder="Ctrl+Alt+C" />
+              <div class="recorder">
+                <input
+                  type="text"
+                  id="hotkey"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Ctrl+Alt+C"
+                  data-i18n-placeholder="hotkey.empty"
+                  aria-describedby="hotkeyHint"
+                />
+                <button type="button" class="ghost" id="hotkeyRecord" data-i18n="hotkey.record">Record</button>
+                <button type="button" class="ghost" id="hotkeyClear" data-i18n="hotkey.clear">Clear</button>
+              </div>
             </div>
+            <p class="hint" data-i18n="hotkey.howto">
+              Click the box, then press the combination you want — nothing is typed, so it
+              cannot be misspelled. Glossy registers it with Windows at once and reports
+              whether Windows accepted it.
+            </p>
             <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
             <h3 class="subhead" data-i18n="shortcuts.builtin">Only in this window</h3>
             <p class="hint" data-i18n="shortcuts.local">
@@ -408,6 +426,7 @@
 
     <script src="js/bridge.js"></script>
     <script src="js/i18n.js"></script>
+    <script src="js/keycombo.js"></script>
     <script src="js/render.js"></script>
     <script src="js/app.js"></script>
   </body>

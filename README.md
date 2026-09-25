@@ -114,7 +114,9 @@ page — **General**, **Shortcuts**, **Trigger**, **Language**, **Appearance**,
 reopens on the page it was left on. **Shortcuts** holds the global hotkey as well as
 the keys the window itself answers to; the page spells out that the global hotkey is
 registered with Windows and works everywhere, while the keys below it only exist
-while this window has the keyboard focus.
+while this window has the keyboard focus. The hotkey is recorded rather than typed —
+click the box and press the combination — and the field reports at once whether
+Windows took it.
 
 | Option | Meaning |
 | --- | --- |
@@ -131,7 +133,7 @@ while this window has the keyboard focus.
 | Draw a compact card, without the extras | Keeps the translation, the phonetic symbols and the meanings, and leaves out the example, the inflections, the synonyms, the context sentence, the sentence-by-sentence view and the conversions. |
 | Speaking rate | How fast the pronunciation buttons read a text out: `Slow`, `Normal`, `Fast` or `Very fast` (Windows SAPI). The voices are the ones Windows already has, and the language of the text picks the voice. |
 | Shortest selection to translate | Character count below which a selection is ignored (`1`–`40`, default `2`). |
-| Global hotkey | Combination registered with Windows that translates from any program — the selected text, or the clipboard content when nothing is selected — e.g. `Ctrl+Alt+C`. Clear the field to switch it off. The line under the field shows the registered combination or why Windows refused it. |
+| Global hotkey | Combination registered with Windows that translates from any program — the selected text, or the clipboard content when nothing is selected — e.g. `Ctrl+Alt+C`. Click the box and press the combination instead of typing it, so it cannot be misspelled; `Record` reopens the box, `Clear` switches the hotkey off. Glossy registers it immediately and the line under the field shows the registered combination, the clash it found, or why Windows refused it. |
 | Never translate in these programs | A list of process names (`idea64.exe`, `mstsc`) in which selection capture is skipped. Add one by typing it (the `.exe` suffix is optional — the `Add` button normalises it), by choosing it from the dropdown of currently running programs, or by pressing `Pick with the mouse` and clicking the window to ignore. Each entry has an `×` to remove it; duplicates are dropped case-insensitively. |
 | Only translate these source languages | A list of languages, e.g. `English` and `日本語`. Empty means every language triggers a translation. A selection whose language cannot be pinned down — mixed scripts, digits, a word half a dozen languages share — is always let through, so a wrong guess never swallows a selection. The list is stored as a `sourceLangs` array. |
 | Colours | `system` follows the Windows light/dark preference; `light` and `dark` force one scheme in both windows. |
@@ -660,7 +662,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 ### 设置
 
-窗口由左侧菜单和它打开的单个页面组成。**功能**在最前面：弹窗的文本翻译现在就在窗口里，文档与图片文字翻译的入口留给后续版本。**设置**下面的每一项各占一页——**常规**、**快捷键**、**触发方式**、**语言**、**外观**、**阅读**、**单位换算**、**历史记录**、**设置文件**、**更新**——窗口会重新打开在上次停留的那一页。**快捷键**页里既有全局快捷键，也列出窗口自身响应的按键；页面上写明了全局快捷键是向 Windows 注册的、在任何程序里都有效，而下面列出的按键只在本窗口拥有键盘焦点时存在。
+窗口由左侧菜单和它打开的单个页面组成。**功能**在最前面：弹窗的文本翻译现在就在窗口里，文档与图片文字翻译的入口留给后续版本。**设置**下面的每一项各占一页——**常规**、**快捷键**、**触发方式**、**语言**、**外观**、**阅读**、**单位换算**、**历史记录**、**设置文件**、**更新**——窗口会重新打开在上次停留的那一页。**快捷键**页里既有全局快捷键，也列出窗口自身响应的按键；页面上写明了全局快捷键是向 Windows 注册的、在任何程序里都有效，而下面列出的按键只在本窗口拥有键盘焦点时存在。全局快捷键不用手打：点击输入框后直接按下组合键，页面会立刻告诉你 Windows 是否接受。
 
 | 选项 | 含义 |
 | --- | --- |
@@ -677,7 +679,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 | 精简卡片，不显示附加信息 | 保留译文、音标和释义，省略例句、词形变化、近义词、所在句子、逐句对照和单位换算。 |
 | 朗读语速 | 朗读按钮的语速：`慢`、`正常`、`快` 或 `很快`（Windows SAPI）。音色用的是 Windows 已有的语音，音色由文本的语言决定。 |
 | 触发翻译的最短长度 | 低于该字符数的选区会被忽略（`1`–`40`，默认 `2`）。 |
-| 全局快捷键 | 向 Windows 注册的组合键，在任何程序里都能翻译——翻译选中的文字，没有选中时翻译剪贴板内容——例如 `Ctrl+Alt+C`。清空该字段即可关闭它。字段下方的一行显示已注册的组合，或 Windows 拒绝它的原因。 |
+| 全局快捷键 | 向 Windows 注册的组合键，在任何程序里都能翻译——翻译选中的文字，没有选中时翻译剪贴板内容——例如 `Ctrl+Alt+C`。不用手打：点击输入框后直接按下组合键，也就不会打错；「录制」可重新录制，「清除」则关闭它。Glossy 会立刻注册，字段下方的一行显示已注册的组合、检测到的冲突，或 Windows 拒绝它的原因。 |
 | 以下程序中不翻译 | 一份进程名列表（`idea64.exe`、`mstsc`），其中的程序会跳过划词捕获。输入名字即可添加（`.exe` 后缀可选——`添加` 按钮会把它规范化），也可以从当前运行程序的下拉框中选择，或按下 `用鼠标拾取` 后点选要忽略的窗口。每个条目都有一个 `×` 可以删除；重复项按大小写不敏感处理并被丢弃。 |
 | 仅翻译以下原文语言 | 一份语言列表，例如 `英语` 和 `日语`。留空表示任何语言都会触发翻译。无法确定语言的选区——混排文字、数字、多种语言共有的词——一律放行，因此猜错也不会吞掉你的选区。该列表以 `sourceLangs` 数组保存。 |
 | 配色 | `跟随系统` 跟随 Windows 的浅色/深色偏好；`始终浅色` 和 `始终深色` 会在两个窗口中强制使用一种方案。 |
@@ -1127,7 +1129,8 @@ tiene su propia página —**General**, **Shortcuts**, **Trigger**, **Language**
 contiene el atajo global y también las teclas que responde la propia ventana; la
 página deja claro que el atajo global está registrado en Windows y funciona en todas
 partes, mientras que las teclas de abajo solo existen mientras esta ventana tiene el
-foco del teclado.
+foco del teclado. El atajo se graba en lugar de escribirse —haz clic en la caja y
+pulsa la combinación— y el campo dice al momento si Windows la aceptó.
 
 | Opción | Significado |
 | --- | --- |
@@ -1144,7 +1147,7 @@ foco del teclado.
 | Draw a compact card, without the extras | Conserva la traducción, los símbolos fonéticos y los significados, y deja fuera el ejemplo, las formas, los sinónimos, la frase de contexto, la vista frase por frase y las conversiones. |
 | Speaking rate | Velocidad con la que los botones de pronunciación leen un texto: `Slow`, `Normal`, `Fast` o `Very fast` (SAPI de Windows). Las voces son las que ya tiene Windows, y el idioma del texto elige la voz. |
 | Shortest selection to translate | Número de caracteres por debajo del cual se ignora una selección (`1`–`40`, por defecto `2`). |
-| Global hotkey | Combinación registrada en Windows que traduce desde cualquier programa —el texto seleccionado, o el contenido del portapapeles cuando no hay selección—, p. ej. `Ctrl+Alt+C`. Vacía el campo para desactivarla. La línea que hay bajo el campo muestra la combinación registrada o por qué Windows la rechazó. |
+| Global hotkey | Combinación registrada en Windows que traduce desde cualquier programa —el texto seleccionado, o el contenido del portapapeles cuando no hay selección—, p. ej. `Ctrl+Alt+C`. Haz clic en la caja y pulsa la combinación en lugar de escribirla, así no puede quedar mal escrita; `Record` vuelve a abrir la caja y `Clear` desactiva el atajo. Glossy la registra al instante y la línea bajo el campo muestra la combinación registrada, el conflicto que encontró o por qué Windows la rechazó. |
 | Never translate in these programs | Una lista de nombres de proceso (`idea64.exe`, `mstsc`) en los que se omite la captura de selecciones. Añade uno escribiéndolo (el sufijo `.exe` es opcional: el botón `Add` lo normaliza), eligiéndolo en el desplegable de programas en ejecución o pulsando `Pick with the mouse` y haciendo clic en la ventana que quieras ignorar. Cada entrada tiene una `×` para eliminarla; los duplicados se descartan sin distinguir mayúsculas y minúsculas. |
 | Only translate these source languages | Una lista de idiomas, por ejemplo `English` y `日本語`. Vacía significa que cualquier idioma abre una traducción. Una selección cuyo idioma no se puede determinar —texto mezclado, dígitos, una palabra que comparten media docena de idiomas— pasa siempre, así que una suposición equivocada nunca se traga tu selección. La lista se guarda como un array `sourceLangs`. |
 | Colours | `system` sigue la preferencia de Windows para modo claro u oscuro; `light` y `dark` fuerzan un esquema en ambas ventanas. |
