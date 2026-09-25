@@ -28,6 +28,8 @@ use windows::Win32::System::Com::{
     COINIT_APARTMENTTHREADED,
 };
 
+use crate::vitals;
+
 /// How long the interface waits for the worker to report that it has a voice.
 const READY_TIMEOUT: Duration = Duration::from_millis(1500);
 
@@ -191,6 +193,7 @@ fn worker(receiver: Receiver<Command>) {
     let Ok(voice) = voice else {
         return;
     };
+    vitals::voice_created();
     let mut voices: HashMap<String, ISpObjectToken> = HashMap::new();
     // A command that arrived while a reading was being watched, handled by the
     // next turn of this loop.
@@ -231,6 +234,7 @@ fn worker(receiver: Receiver<Command>) {
         }
     }
     unsafe { CoUninitialize() };
+    vitals::voice_released();
 }
 
 /// Watches a reading until the voice falls silent, reporting whether it has. A

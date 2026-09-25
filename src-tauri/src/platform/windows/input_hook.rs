@@ -11,11 +11,12 @@ use std::cell::RefCell;
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExW, MSG, MSLLHOOKSTRUCT, WH_MOUSE_LL,
-    WM_LBUTTONDOWN, WM_LBUTTONUP,
+    CallNextHookEx, GetMessageW, SetWindowsHookExW, UnhookWindowsHookEx, MSG, MSLLHOOKSTRUCT,
+    WH_MOUSE_LL, WM_LBUTTONDOWN, WM_LBUTTONUP,
 };
 
 use super::hotkey;
+use crate::vitals;
 
 /// One left button event, in physical screen pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +41,7 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
     if code >= 0 {
         let message = wparam.0 as u32;
         if message == WM_LBUTTONDOWN || message == WM_LBUTTONUP {
+            vitals::hook_event();
             let info = unsafe { &*(lparam.0 as *const MSLLHOOKSTRUCT) };
             let click = Click {
                 pressed: message == WM_LBUTTONDOWN,
@@ -75,9 +77,12 @@ pub fn run(
     });
 
     unsafe {
-        // The handle is kept alive for the lifetime of the message loop.
-        let _hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), None, 0)
+        // The handle is kept alive for the lifetime of the message loop, and
+        // given back when the loop ends: a hook left installed would keep this
+        // module on the stack of every click of the desktop.
+        let hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), None, 0)
             .map_err(|error| format!("could not install the mouse hook: {error}"))?;
+        vitals::hook_installed();
 
         hotkey::register_loop_thread();
         with_handlers(|handlers| (handlers.reload)());
@@ -92,6 +97,9 @@ pub fn run(
                 with_handlers(|handlers| (handlers.fire)());
             }
         }
+
+        let _ = UnhookWindowsHookEx(hook);
+        vitals::hook_uninstalled();
     }
 
     Ok(())

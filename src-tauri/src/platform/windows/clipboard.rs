@@ -13,6 +13,8 @@ use windows::Win32::System::Memory::{
     GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock, GMEM_MOVEABLE,
 };
 
+use crate::vitals;
+
 /// `CF_UNICODETEXT`; declared locally so no extra Win32 feature is required.
 const CF_UNICODETEXT: u32 = 13;
 
@@ -63,7 +65,20 @@ fn note_own_write() {
 }
 
 fn open() -> bool {
-    unsafe { OpenClipboard(None) }.is_ok()
+    let opened = unsafe { OpenClipboard(None) }.is_ok();
+    if opened {
+        vitals::clipboard_opened();
+    }
+    opened
+}
+
+/// Gives the clipboard back. Every open in this module goes through `open` or
+/// `open_retry` and has to come back here, which is what the counters watch.
+fn close() {
+    unsafe {
+        let _ = CloseClipboard();
+    }
+    vitals::clipboard_closed();
 }
 
 fn open_retry() -> bool {
@@ -83,9 +98,7 @@ pub fn read_text() -> Option<String> {
         return None;
     }
     let text = read_text_locked();
-    unsafe {
-        let _ = CloseClipboard();
-    }
+    close();
     text
 }
 
@@ -140,7 +153,7 @@ pub fn write_text(text: &str) -> bool {
         let _ = EmptyClipboard();
         // Ownership of the block transfers to the clipboard on success.
         let stored = SetClipboardData(CF_UNICODETEXT, Some(HANDLE(block.0))).is_ok();
-        let _ = CloseClipboard();
+        close();
         if !stored {
             let _ = GlobalFree(Some(block));
         }
@@ -165,9 +178,7 @@ fn read_copied_text() -> Option<String> {
         return None;
     }
     let text = read_copied_text_locked();
-    unsafe {
-        let _ = CloseClipboard();
-    }
+    close();
     text
 }
 
@@ -181,9 +192,7 @@ fn read_copied_text_now() -> Option<String> {
         return None;
     }
     let text = read_copied_text_locked();
-    unsafe {
-        let _ = CloseClipboard();
-    }
+    close();
     text
 }
 
@@ -227,9 +236,7 @@ impl Snapshot {
             return None;
         }
         let entries = unsafe { collect_formats() };
-        unsafe {
-            let _ = CloseClipboard();
-        }
+        close();
         if entries.is_empty() {
             None
         } else {
@@ -247,7 +254,7 @@ impl Snapshot {
             for (format, bytes) in &self.entries {
                 put_format(*format, bytes);
             }
-            let _ = CloseClipboard();
+            close();
         }
         note_own_write();
     }
@@ -425,6 +432,16 @@ pub fn copy_to_clipboard(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reading_the_clipboard_gives_it_back() {
+        // Whatever is on the clipboard, the open this takes has to be closed
+        // again: the counter is what says so, and a run that leaks locks the
+        // clipboard for every other application.
+        let _ = read_text();
+        let _ = Snapshot::of_clipboard();
+        assert_eq!(vitals::snapshot().clipboard_outstanding(), 0);
+    }
 
     #[test]
     fn skips_the_formats_that_are_gdi_handles() {

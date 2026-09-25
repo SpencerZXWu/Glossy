@@ -20,6 +20,7 @@ mod translate;
 mod tray;
 mod units;
 mod updater;
+mod vitals;
 
 use std::sync::Arc;
 

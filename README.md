@@ -350,7 +350,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 207 Rust tests
+cargo test --locked                                                  # 213 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -394,6 +394,11 @@ the popup reports its first frame back through `popup_painted`, and
 `src-tauri/src/timing.rs` prints one line per sample. Neither side does anything
 unless `GLOSSY_TIMING` is set, and a mark older than five seconds is dropped rather
 than paired with the wrong paint.
+
+Long-run balance is counted rather than guessed: `src-tauri/src/vitals.rs` keeps seven
+counters for the three places that could be held for a day — the mouse hook, the
+clipboard and the speech voice — and derives from them what is still live, which a test
+reads directly. If one of the three is not given back, the app says so once on stderr.
 
 ```powershell
 cargo build --release
@@ -482,7 +487,7 @@ no Visual Studio installation, but there are two quirks:
 
 ```powershell
 cd src-tauri
-cargo test   # 204 tests; see "Checks" above for lint and format runs
+cargo test   # 213 tests; see "Checks" above for lint and format runs
 ```
 
 ### Content Security Policy
@@ -778,7 +783,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 207 Rust tests
+cargo test --locked                                                  # 213 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -811,6 +816,7 @@ v1.4.0 的预算是测出来的，不是感觉出来的：`scripts\latency.ps1` 
 
 两个时间戳都来自应用本身：钩子在结束划选的那次松开鼠标处打点，弹窗通过 `popup_painted` 回报第一帧，`src-tauri/src/timing.rs` 每个样本打印一行。除非设置了 `GLOSSY_TIMING`，两边什么都不做；超过五秒的标记会被丢弃，而不会被配到另一次绘制上。
 
+长时间运行的收支是数出来的，不是猜出来的：`src-tauri/src/vitals.rs` 给一天里可能被一直占着的地方各留了计数——鼠标钩子、剪贴板、朗读引擎，共七个——并据此算出还有几个没还，测试直接读这些计数。三者中有谁没还回去，应用会在 stderr 上说明一次。
 ```powershell
 cargo build --release
 powershell -ExecutionPolicy Bypass -File scripts\latency.ps1
@@ -883,7 +889,7 @@ Visual Studio，但有三个小怪癖：
 
 ```powershell
 cd src-tauri
-cargo test   # 204 tests; see "Checks" above for lint and format runs
+cargo test   # 213 tests; see "Checks" above for lint and format runs
 ```
 
 ### 内容安全策略
@@ -1358,7 +1364,7 @@ node --test                                                          # 202 front
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets --locked -- -D warnings
-cargo test --locked                                                  # 207 Rust tests
+cargo test --locked                                                  # 213 Rust tests
 cd ..\server
 npm test                                                             # 74 server tests
 ```
@@ -1404,6 +1410,12 @@ que cierra el arrastre, el globo informa de su primer fotograma mediante
 `popup_painted` y `src-tauri/src/timing.rs` imprime una línea por muestra. Ninguno de
 los dos lados hace nada salvo que se defina `GLOSSY_TIMING`, y una marca de más de
 cinco segundos se descarta en lugar de emparejarse con el pintado equivocado.
+
+El equilibrio a largo plazo se cuenta y no se supone: `src-tauri/src/vitals.rs` lleva
+siete contadores para los tres sitios que podrían quedar retenidos durante un día —el
+enganche del ratón, el portapapeles y la voz— y de ellos deduce qué sigue vivo, cosa que
+una prueba lee directamente. Si uno de los tres no se devuelve, la aplicación lo dice una
+vez por stderr.
 
 ```powershell
 cargo build --release
@@ -1497,7 +1509,7 @@ necesita una instalación de Visual Studio, pero hay tres peculiaridades:
 
 ```powershell
 cd src-tauri
-cargo test   # 204 tests; see "Checks" above for lint and format runs
+cargo test   # 213 tests; see "Checks" above for lint and format runs
 ```
 
 ### Política de seguridad de contenido

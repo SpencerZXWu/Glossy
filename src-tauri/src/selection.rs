@@ -28,6 +28,7 @@ use crate::settings::{self, Settings};
 use crate::state::AppState;
 use crate::text;
 use crate::timing;
+use crate::vitals;
 
 /// Minimum pointer travel (physical px) for a press/drag/release to count.
 const DRAG_MIN_PX: i32 = 5;
@@ -387,6 +388,9 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     // popup is on its way to the screen. The type restores on drop, so the paths
     // that leave earlier still put the clipboard back.
     drop(pending);
+    // The hook, the clipboard and the voice were given back on the way here; the
+    // counters are what says so, and what a run of a day is read by.
+    vitals::report_leak();
 }
 
 /// The sentence the selection stands in, when that was asked for.
@@ -439,6 +443,7 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
     // The restore waits for the application that was copied from, so it happens
     // once the popup has been told what to show.
     drop(pending);
+    vitals::report_leak();
 }
 
 /// The text to translate: the selection that was just copied, or the clipboard
