@@ -32,293 +32,374 @@
         </div>
       </header>
 
+      <nav class="sidebar" id="sidebar" aria-label="Sections" data-i18n-aria-label="nav.label">
+        <p class="nav-group" data-i18n="nav.group.features">Features</p>
+        <button type="button" class="nav-item" data-page="translate" aria-current="page">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h9M8.5 5v2c0 3.4-2 6.2-5 7.8" /><path d="M6 9.6c1.5 2.6 4 4.2 7 5" /><path d="M13 20l3.6-9 3.6 9M14.4 17.4h4.4" /></svg>
+          <span data-i18n="nav.translate">Translate text</span>
+        </button>
+        <button type="button" class="nav-item" data-page="document" disabled data-i18n-title="nav.soonTitle" title="Coming in a later version">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4" /><path d="M10 12.5h5M10 16h3.5" /></svg>
+          <span data-i18n="nav.document">Document translation</span>
+          <span class="soon" data-i18n="nav.soon">Soon</span>
+        </button>
+        <button type="button" class="nav-item" data-page="ocr" disabled data-i18n-title="nav.soonTitle" title="Coming in a later version">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5V5h3.5M20 8.5V5h-3.5M4 15.5V19h3.5M20 15.5V19h-3.5" /><path d="M7.5 12h9" /></svg>
+          <span data-i18n="nav.ocr">OCR translation</span>
+          <span class="soon" data-i18n="nav.soon">Soon</span>
+        </button>
+        <p class="nav-group" data-i18n="nav.group.settings">Settings</p>
+        <button type="button" class="nav-item" data-page="general">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5h7.5M17 7.5h3M4 16.5h4M13 16.5h7" /><circle cx="14.2" cy="7.5" r="2.2" /><circle cx="10.2" cy="16.5" r="2.2" /></svg>
+          <span data-i18n="nav.general">General</span>
+        </button>
+        <button type="button" class="nav-item" data-page="shortcuts">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5" /><path d="M7 10h1M11 10h1M15 10h1M8 14h8" /></svg>
+          <span data-i18n="nav.shortcuts">Shortcuts</span>
+        </button>
+        <button type="button" class="nav-item" data-page="trigger">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="5" /><path d="M12 6.5v3.5" /></svg>
+          <span data-i18n="nav.trigger">Trigger</span>
+        </button>
+        <button type="button" class="nav-item" data-page="language">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17" /><path d="M12 3.5c2.3 2.5 3.5 5.4 3.5 8.5s-1.2 6-3.5 8.5c-2.3-2.5-3.5-5.4-3.5-8.5S9.7 6 12 3.5z" /></svg>
+          <span data-i18n="nav.language">Language</span>
+        </button>
+        <button type="button" class="nav-item" data-page="appearance">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5a8.5 8.5 0 100 17c1.3 0 2-.8 2-1.7 0-1.7-1.7-1.7-1.7-3.1 0-1.2.9-2.1 2.2-2.1h1.6c1.9 0 3.1-1.3 3.1-3.1A8.3 8.3 0 0012 3.5z" /><circle cx="8.6" cy="10.2" r="1" /><circle cx="12" cy="7.6" r="1" /><circle cx="15.4" cy="9.6" r="1" /></svg>
+          <span data-i18n="nav.appearance">Appearance</span>
+        </button>
+        <button type="button" class="nav-item" data-page="reading">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.6c-1.6-1.4-3.9-2-7.5-2v13c3.6 0 5.9.6 7.5 2 1.6-1.4 3.9-2 7.5-2v-13c-3.6 0-5.9.6-7.5 2z" /><path d="M12 6.6v13" /></svg>
+          <span data-i18n="nav.reading">Reading</span>
+        </button>
+        <button type="button" class="nav-item" data-page="units">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="2" /><path d="M7 8v3M11 8v4M15 8v3M19 8v4" /></svg>
+          <span data-i18n="nav.units">Units</span>
+        </button>
+        <button type="button" class="nav-item" data-page="history">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+          <span data-i18n="nav.history">History</span>
+        </button>
+        <button type="button" class="nav-item" data-page="backup">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2 2 0 016 5.5h3l2 2.5h7a2 2 0 012 2V17a2 2 0 01-2 2H6a2 2 0 01-2-2z" /></svg>
+          <span data-i18n="nav.backup">Settings file</span>
+        </button>
+        <button type="button" class="nav-item" data-page="updates">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v7M9 12.5l3 3 3-3" /></svg>
+          <span data-i18n="nav.updates">Updates</span>
+        </button>
+      </nav>
+
       <main>
-        <section class="panel">
-          <div class="panel-head">
-            <h2 data-i18n="panel.demo">Translate</h2>
-            <label class="unit-toggle">
-              <input type="checkbox" id="demoUnits" class="switch" />
-              <span data-i18n="demo.units">Convert units</span>
-            </label>
-          </div>
-          <p class="hint" data-i18n="demo.hint">
-            Type or paste a text, then select a word, a phrase or a sentence — or press
-            Translate — to see the result right here, in the same card as the popup.
-          </p>
-          <textarea id="demoText" class="demo-input" rows="5" spellcheck="false" data-i18n-placeholder="demo.placeholder"></textarea>
-          <div class="demo-actions">
-            <button type="button" id="demoRun" class="ghost" data-i18n="demo.run">Translate</button>
-            <button type="button" id="demoPaste" class="ghost" data-i18n="demo.paste">Paste</button>
-            <button type="button" id="demoClear" class="ghost" data-i18n="demo.clear">Clear</button>
-            <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
-            <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
-          </div>
-          <div class="card" id="demoCard" hidden>
-            <header class="bar">
-              <div class="grip">
-                <span class="headword" id="demoHeadword"></span>
-              </div>
-              <button class="icon-button" id="demoCopy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="9" y="9" width="12" height="12" rx="2.5" />
-                  <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
-                </svg>
-              </button>
-            </header>
-            <div class="langbar" id="demoLangbar" hidden>
-              <select class="lang-select" id="demoFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
-              <button class="lang-swap" id="demoSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 8h13M14 5l3 3-3 3" />
-                  <path d="M20 16H7M10 13l-3 3 3 3" />
-                </svg>
-              </button>
-              <select class="lang-select" id="demoTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+        <section class="page" id="page-translate">
+          <section class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="panel.demo">Translate</h2>
+              <label class="unit-toggle">
+                <input type="checkbox" id="demoUnits" class="switch" />
+                <span data-i18n="demo.units">Convert units</span>
+              </label>
             </div>
-            <div class="content" id="demoResult"></div>
-          </div>
+            <p class="hint" data-i18n="demo.hint">
+              Type or paste a text, then select a word, a phrase or a sentence — or press
+              Translate — to see the result right here, in the same card as the popup.
+            </p>
+            <textarea id="demoText" class="demo-input" rows="5" spellcheck="false" data-i18n-placeholder="demo.placeholder"></textarea>
+            <div class="demo-actions">
+              <button type="button" id="demoRun" class="ghost" data-i18n="demo.run">Translate</button>
+              <button type="button" id="demoPaste" class="ghost" data-i18n="demo.paste">Paste</button>
+              <button type="button" id="demoClear" class="ghost" data-i18n="demo.clear">Clear</button>
+              <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
+              <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
+            </div>
+            <div class="card" id="demoCard" hidden>
+              <header class="bar">
+                <div class="grip">
+                  <span class="headword" id="demoHeadword"></span>
+                </div>
+                <button class="icon-button" id="demoCopy" type="button" data-i18n-title="popup.copy" title="Copy translation" aria-label="Copy translation">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="12" height="12" rx="2.5" />
+                    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+                  </svg>
+                </button>
+              </header>
+              <div class="langbar" id="demoLangbar" hidden>
+                <select class="lang-select" id="demoFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
+                <button class="lang-swap" id="demoSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 8h13M14 5l3 3-3 3" />
+                    <path d="M20 16H7M10 13l-3 3 3 3" />
+                  </svg>
+                </button>
+                <select class="lang-select" id="demoTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+              </div>
+              <div class="content" id="demoResult"></div>
+            </div>
+          </section>
         </section>
+        <section class="page" id="page-general" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.general">General</h2>
+            <label class="row master" for="enabled">
+              <span class="row-text">
+                <strong data-i18n="master.title">Enable text selection translation</strong>
+                <span class="hint" data-i18n="master.hint">A selection shows the Glossy icon; click it to translate.</span>
+              </span>
+              <input type="checkbox" id="enabled" class="switch" />
+            </label>
 
-        <section class="panel">
-          <label class="row master" for="enabled">
-            <span class="row-text">
-              <strong data-i18n="master.title">Enable text selection translation</strong>
-              <span class="hint" data-i18n="master.hint">A selection shows the Glossy icon; click it to translate.</span>
-            </span>
-            <input type="checkbox" id="enabled" class="switch" />
-          </label>
+            <div class="options" id="options">
+              <label class="check"><input type="checkbox" id="triggerOnDrag" /><span data-i18n="option.drag">Translate when the mouse drags across text</span></label>
+              <label class="check"><input type="checkbox" id="triggerOnDoubleClick" /><span data-i18n="option.doubleClick">Translate a word on double click</span></label>
+              <label class="check"><input type="checkbox" id="restoreClipboard" /><span data-i18n="option.restoreClipboard">Put the clipboard back after reading a selection</span></label>
+            </div>
 
-          <div class="options" id="options">
-            <label class="check"><input type="checkbox" id="triggerOnDrag" /><span data-i18n="option.drag">Translate when the mouse drags across text</span></label>
-            <label class="check"><input type="checkbox" id="triggerOnDoubleClick" /><span data-i18n="option.doubleClick">Translate a word on double click</span></label>
-            <label class="check"><input type="checkbox" id="restoreClipboard" /><span data-i18n="option.restoreClipboard">Put the clipboard back after reading a selection</span></label>
-          </div>
-
-          <div class="options" id="startup">
-            <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
-          </div>
+            <div class="options" id="startup">
+              <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
+            </div>
+          </section>
         </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.trigger">Trigger</h2>
-          <div class="grid">
+        <section class="page" id="page-shortcuts" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.shortcuts">Shortcuts</h2>
+            <div class="field">
+              <label for="hotkey" data-i18n="field.hotkey">Global hotkey</label>
+              <input type="text" id="hotkey" spellcheck="false" autocomplete="off" placeholder="Ctrl+Alt+C" />
+            </div>
+            <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
+            <h3 class="subhead" data-i18n="shortcuts.builtin">Built into the window</h3>
+            <ul class="keys">
+              <li><span class="key-group"><kbd>Esc</kbd></span><span data-i18n="shortcut.escape">Close the floating popup</span></li>
+              <li><span class="key-group"><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span data-i18n="shortcut.enter">Translate the text typed in the box</span></li>
+            </ul>
+            <p class="hint" data-i18n="shortcuts.more">Every shortcut Glossy gains will be listed here.</p>
+          </section>
+        </section>
+        <section class="page" id="page-trigger" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.trigger">Trigger</h2>
             <div class="field">
               <label for="minSelectionLen" data-i18n="field.minLength">Shortest selection to translate</label>
               <input type="number" id="minSelectionLen" min="1" max="40" step="1" />
             </div>
             <div class="field">
-              <label for="hotkey" data-i18n="field.hotkey">Global hotkey</label>
-              <input type="text" id="hotkey" spellcheck="false" autocomplete="off" placeholder="Ctrl+Alt+C" />
+              <label for="ignoredInput" data-i18n="field.ignored">Never translate in these programs</label>
+              <div class="chips" id="ignoredList" role="list"></div>
+              <div class="picker">
+                <select id="ignoredRunning" title="Pick from running programs…"></select>
+                <input type="text" id="ignoredInput" spellcheck="false" autocomplete="off" placeholder="Type a program name" />
+                <button type="button" class="ghost" id="ignoredAdd" data-i18n="ignored.add">Add</button>
+                <button type="button" class="ghost" id="ignoredPick" data-i18n="ignored.pick">Pick with the mouse</button>
+              </div>
             </div>
-          </div>
-          <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
+            <p class="hint" id="ignoredHint"></p>
 
-          <div class="field">
-            <label for="ignoredInput" data-i18n="field.ignored">Never translate in these programs</label>
-            <div class="chips" id="ignoredList" role="list"></div>
-            <div class="picker">
-              <select id="ignoredRunning" title="Pick from running programs…"></select>
-              <input type="text" id="ignoredInput" spellcheck="false" autocomplete="off" placeholder="Type a program name" />
-              <button type="button" class="ghost" id="ignoredAdd" data-i18n="ignored.add">Add</button>
-              <button type="button" class="ghost" id="ignoredPick" data-i18n="ignored.pick">Pick with the mouse</button>
+            <div class="field">
+              <label for="sourceLangsAdd" data-i18n="field.sourceLangs">Only translate these source languages</label>
+              <div class="chips" id="sourceLangsList" role="list"></div>
+              <div class="picker">
+                <select id="sourceLangsAdd" title="Add a language…"></select>
+                <button type="button" class="ghost" id="sourceLangsClear" data-i18n="source.clear">Any language</button>
+              </div>
             </div>
-          </div>
-          <p class="hint" id="ignoredHint"></p>
-
-          <div class="field">
-            <label for="sourceLangsAdd" data-i18n="field.sourceLangs">Only translate these source languages</label>
-            <div class="chips" id="sourceLangsList" role="list"></div>
-            <div class="picker">
-              <select id="sourceLangsAdd" title="Add a language…"></select>
-              <button type="button" class="ghost" id="sourceLangsClear" data-i18n="source.clear">Any language</button>
-            </div>
-          </div>
-          <p class="hint" id="sourceLangsHint"></p>
+            <p class="hint" id="sourceLangsHint"></p>
+          </section>
         </section>
+        <section class="page" id="page-language" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.language">Language</h2>
+            <div class="grid">
+              <div class="field">
+                <label for="targetLang" data-i18n="field.targetLang">Translate into</label>
+                <select id="targetLang"></select>
+              </div>
+              <div class="field">
+                <label for="service" data-i18n="field.service">Translation service</label>
+                <select id="service">
+                  <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
+                  <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
+                  <option value="google" data-i18n="service.google">Google</option>
+                </select>
+              </div>
+            </div>
 
-        <section class="panel">
-          <h2 data-i18n="panel.language">Language</h2>
-          <div class="grid">
-            <div class="field">
-              <label for="targetLang" data-i18n="field.targetLang">Translate into</label>
-              <select id="targetLang"></select>
+            <div id="cloudBlock">
+              <div class="demo-actions">
+                <p class="hint" id="cloudQuota"></p>
+                <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2 data-i18n="panel.fallback">Fallback</h2>
+            <div class="options">
+              <label class="check"><input type="checkbox" id="fallbackEnabled" /><span data-i18n="option.fallback">Ask another service when the chosen one fails</span></label>
+            </div>
+            <p class="hint" data-i18n="fallback.hint">
+              The service picked above is always tried first. The entries below are asked in this
+              order when it fails, rate-limits or answers with nothing.
+            </p>
+            <ul class="order" id="fallbackList" role="list"></ul>
+          </section>
+        </section>
+        <section class="page" id="page-appearance" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.popup">Popup</h2>
+            <div class="grid">
+              <div class="field">
+                <label for="theme" data-i18n="field.theme">Colours</label>
+                <select id="theme">
+                  <option value="system" data-i18n="theme.system">Follow Windows</option>
+                  <option value="light" data-i18n="theme.light">Always light</option>
+                  <option value="dark" data-i18n="theme.dark">Always dark</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="fontScale" data-i18n="field.fontScale">Text size</label>
+                <select id="fontScale">
+                  <option value="90" data-i18n="font.90">90 %</option>
+                  <option value="100" data-i18n="font.100">100 % · default</option>
+                  <option value="115" data-i18n="font.115">115 %</option>
+                  <option value="130" data-i18n="font.130">130 %</option>
+                  <option value="150" data-i18n="font.150">150 %</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="popupWidth" data-i18n="field.width">Width</label>
+                <select id="popupWidth">
+                  <option value="300" data-i18n="width.300">Compact · 300 px</option>
+                  <option value="356" data-i18n="width.356">Default · 356 px</option>
+                  <option value="400" data-i18n="width.400">Wide · 400 px</option>
+                  <option value="460" data-i18n="width.460">Wider · 460 px</option>
+                  <option value="520" data-i18n="width.520">Extra wide · 520 px</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="popupOpacity" data-i18n="field.opacity">Opacity</label>
+                <select id="popupOpacity">
+                  <option value="100" data-i18n="opacity.100">100 % · solid</option>
+                  <option value="95" data-i18n="opacity.95">95 %</option>
+                  <option value="90" data-i18n="opacity.90">90 %</option>
+                  <option value="80" data-i18n="opacity.80">80 %</option>
+                  <option value="70" data-i18n="opacity.70">70 %</option>
+                  <option value="60" data-i18n="opacity.60">60 %</option>
+                  <option value="50" data-i18n="opacity.50">50 % · see-through</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="autoCloseSecs" data-i18n="field.autoClose">Close by itself</label>
+                <select id="autoCloseSecs">
+                  <option value="0" data-i18n="autoClose.0">Never</option>
+                  <option value="3" data-i18n="autoClose.3">After 3 seconds</option>
+                  <option value="5" data-i18n="autoClose.5">After 5 seconds</option>
+                  <option value="10" data-i18n="autoClose.10">After 10 seconds</option>
+                  <option value="20" data-i18n="autoClose.20">After 20 seconds</option>
+                  <option value="30" data-i18n="autoClose.30">After 30 seconds</option>
+                </select>
+              </div>
+            </div>
+            <div class="options">
+              <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
+              <label class="check"><input type="checkbox" id="compactPopup" /><span data-i18n="option.compactPopup">Draw a compact card, without the extras</span></label>
+              <label class="check"><input type="checkbox" id="closeAfterCopy" /><span data-i18n="option.closeAfterCopy">Close the popup right after the translation is copied</span></label>
+            </div>
+          </section>
+        </section>
+        <section class="page" id="page-reading" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.reading">Reading</h2>
+            <div class="options">
+              <label class="check"><input type="checkbox" id="wordSentence" /><span data-i18n="option.wordSentence">Show the sentence a word was selected from</span></label>
+              <label class="check"><input type="checkbox" id="sentencePairs" /><span data-i18n="option.sentencePairs">Pair the original and the translation sentence by sentence</span></label>
             </div>
             <div class="field">
-              <label for="service" data-i18n="field.service">Translation service</label>
-              <select id="service">
-                <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
-                <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
-                <option value="google" data-i18n="service.google">Google</option>
+              <label for="speechRate" data-i18n="field.speechRate">Speaking rate</label>
+              <select id="speechRate">
+                <option value="-4" data-i18n="speech.slow">Slow</option>
+                <option value="0" data-i18n="speech.normal">Normal</option>
+                <option value="4" data-i18n="speech.fast">Fast</option>
+                <option value="8" data-i18n="speech.fastest">Very fast</option>
               </select>
             </div>
-          </div>
-
-          <div id="cloudBlock">
+            <p class="hint" data-i18n="reading.hint">
+              Pronunciation uses the voices Windows already has; the language of a text picks the
+              voice. A word is only looked up in its sentence when the program in front lets
+              Glossy read it.
+            </p>
+          </section>
+        </section>
+        <section class="page" id="page-units" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.units">Units</h2>
+            <div class="options">
+              <label class="check"><input type="checkbox" id="unitsEnabled" /><span data-i18n="option.units">Convert measurements and money the target language does not use</span></label>
+            </div>
+            <p class="hint" data-i18n="units.hint">
+              A measurement or an amount of money that reads the way the source language writes it
+              is shown again the way the target language writes it, with the conversion rate.
+              Currency rates are looked up live.
+            </p>
+          </section>
+        </section>
+        <section class="page" id="page-history" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.history">History</h2>
+            <div class="grid">
+              <div class="field">
+                <label for="historyLimit" data-i18n="field.historyLimit">Keep</label>
+                <select id="historyLimit">
+                  <option value="0" data-i18n="history.limit.off">Off</option>
+                  <option value="20" data-i18n="history.limit.20">The last 20</option>
+                  <option value="50" data-i18n="history.limit.50">The last 50</option>
+                  <option value="100" data-i18n="history.limit.100">The last 100</option>
+                  <option value="200" data-i18n="history.limit.200">The last 200</option>
+                  <option value="500" data-i18n="history.limit.500">The last 500</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="historySearch" data-i18n="field.historySearch">Search</label>
+                <input type="search" id="historySearch" spellcheck="false" autocomplete="off" data-i18n-placeholder="history.search" placeholder="Text or translation" />
+              </div>
+            </div>
+            <p class="hint" data-i18n="history.hint">Click an entry to show it in the floating card again.</p>
+            <ul class="history" id="historyList"></ul>
             <div class="demo-actions">
-              <p class="hint" id="cloudQuota"></p>
-              <button type="button" class="ghost" id="cloudQuotaRefresh" data-i18n="cloud.quota.retry">Check again</button>
+              <button type="button" id="historyClear" class="ghost" data-i18n="history.clear">Forget everything</button>
+              <span class="hint" id="historyCount"></span>
             </div>
-          </div>
+          </section>
         </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.fallback">Fallback</h2>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="fallbackEnabled" /><span data-i18n="option.fallback">Ask another service when the chosen one fails</span></label>
-          </div>
-          <p class="hint" data-i18n="fallback.hint">
-            The service picked above is always tried first. The entries below are asked in this
-            order when it fails, rate-limits or answers with nothing.
-          </p>
-          <ul class="order" id="fallbackList" role="list"></ul>
+        <section class="page" id="page-backup" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.backup">Settings file</h2>
+            <p class="hint" data-i18n="backup.hint">
+              Export writes Documents\glossy-settings.json. Import reads back a file you pick.
+            </p>
+            <div class="demo-actions">
+              <button type="button" id="settingsExport" class="ghost" data-i18n="backup.export">Export…</button>
+              <button type="button" id="settingsImport" class="ghost" data-i18n="backup.import">Import…</button>
+            </div>
+            <input type="file" id="settingsFile" accept=".json,application/json" hidden />
+          </section>
         </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.popup">Popup</h2>
-          <div class="grid">
-            <div class="field">
-              <label for="theme" data-i18n="field.theme">Colours</label>
-              <select id="theme">
-                <option value="system" data-i18n="theme.system">Follow Windows</option>
-                <option value="light" data-i18n="theme.light">Always light</option>
-                <option value="dark" data-i18n="theme.dark">Always dark</option>
-              </select>
+        <section class="page" id="page-updates" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.updates">Updates</h2>
+            <p class="hint warn" id="updateUnavailable" data-i18n="update.unavailable" hidden>
+              This build carries no update signing key, so it cannot update itself yet.
+            </p>
+            <div class="options">
+              <label class="check"><input type="checkbox" id="checkUpdates" /><span data-i18n="option.checkUpdates">Check for a new version when Glossy starts</span></label>
             </div>
-            <div class="field">
-              <label for="fontScale" data-i18n="field.fontScale">Text size</label>
-              <select id="fontScale">
-                <option value="90" data-i18n="font.90">90 %</option>
-                <option value="100" data-i18n="font.100">100 % · default</option>
-                <option value="115" data-i18n="font.115">115 %</option>
-                <option value="130" data-i18n="font.130">130 %</option>
-                <option value="150" data-i18n="font.150">150 %</option>
-              </select>
+            <div class="demo-actions">
+              <button type="button" id="updateCheck" class="ghost" data-i18n="update.check">Check now</button>
+              <button type="button" id="updateInstall" class="ghost" data-i18n="update.install" hidden>Download and restart</button>
+              <span class="hint" id="updateStatus"></span>
             </div>
-            <div class="field">
-              <label for="popupWidth" data-i18n="field.width">Width</label>
-              <select id="popupWidth">
-                <option value="300" data-i18n="width.300">Compact · 300 px</option>
-                <option value="356" data-i18n="width.356">Default · 356 px</option>
-                <option value="400" data-i18n="width.400">Wide · 400 px</option>
-                <option value="460" data-i18n="width.460">Wider · 460 px</option>
-                <option value="520" data-i18n="width.520">Extra wide · 520 px</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="popupOpacity" data-i18n="field.opacity">Opacity</label>
-              <select id="popupOpacity">
-                <option value="100" data-i18n="opacity.100">100 % · solid</option>
-                <option value="95" data-i18n="opacity.95">95 %</option>
-                <option value="90" data-i18n="opacity.90">90 %</option>
-                <option value="80" data-i18n="opacity.80">80 %</option>
-                <option value="70" data-i18n="opacity.70">70 %</option>
-                <option value="60" data-i18n="opacity.60">60 %</option>
-                <option value="50" data-i18n="opacity.50">50 % · see-through</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="autoCloseSecs" data-i18n="field.autoClose">Close by itself</label>
-              <select id="autoCloseSecs">
-                <option value="0" data-i18n="autoClose.0">Never</option>
-                <option value="3" data-i18n="autoClose.3">After 3 seconds</option>
-                <option value="5" data-i18n="autoClose.5">After 5 seconds</option>
-                <option value="10" data-i18n="autoClose.10">After 10 seconds</option>
-                <option value="20" data-i18n="autoClose.20">After 20 seconds</option>
-                <option value="30" data-i18n="autoClose.30">After 30 seconds</option>
-              </select>
-            </div>
-          </div>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="showOriginal" /><span data-i18n="option.showOriginal">Show the original text in the popup</span></label>
-            <label class="check"><input type="checkbox" id="compactPopup" /><span data-i18n="option.compactPopup">Draw a compact card, without the extras</span></label>
-            <label class="check"><input type="checkbox" id="closeAfterCopy" /><span data-i18n="option.closeAfterCopy">Close the popup right after the translation is copied</span></label>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.reading">Reading</h2>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="wordSentence" /><span data-i18n="option.wordSentence">Show the sentence a word was selected from</span></label>
-            <label class="check"><input type="checkbox" id="sentencePairs" /><span data-i18n="option.sentencePairs">Pair the original and the translation sentence by sentence</span></label>
-          </div>
-          <div class="field">
-            <label for="speechRate" data-i18n="field.speechRate">Speaking rate</label>
-            <select id="speechRate">
-              <option value="-4" data-i18n="speech.slow">Slow</option>
-              <option value="0" data-i18n="speech.normal">Normal</option>
-              <option value="4" data-i18n="speech.fast">Fast</option>
-              <option value="8" data-i18n="speech.fastest">Very fast</option>
-            </select>
-          </div>
-          <p class="hint" data-i18n="reading.hint">
-            Pronunciation uses the voices Windows already has; the language of a text picks the
-            voice. A word is only looked up in its sentence when the program in front lets
-            Glossy read it.
-          </p>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.units">Units</h2>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="unitsEnabled" /><span data-i18n="option.units">Convert measurements and money the target language does not use</span></label>
-          </div>
-          <p class="hint" data-i18n="units.hint">
-            A measurement or an amount of money that reads the way the source language writes it
-            is shown again the way the target language writes it, with the conversion rate.
-            Currency rates are looked up live.
-          </p>
-        </section>
-
-        <section class="panel">
-          <h2 data-i18n="panel.history">History</h2>
-          <div class="grid">
-            <div class="field">
-              <label for="historyLimit" data-i18n="field.historyLimit">Keep</label>
-              <select id="historyLimit">
-                <option value="0" data-i18n="history.limit.off">Off</option>
-                <option value="20" data-i18n="history.limit.20">The last 20</option>
-                <option value="50" data-i18n="history.limit.50">The last 50</option>
-                <option value="100" data-i18n="history.limit.100">The last 100</option>
-                <option value="200" data-i18n="history.limit.200">The last 200</option>
-                <option value="500" data-i18n="history.limit.500">The last 500</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="historySearch" data-i18n="field.historySearch">Search</label>
-              <input type="search" id="historySearch" spellcheck="false" autocomplete="off" data-i18n-placeholder="history.search" placeholder="Text or translation" />
-            </div>
-          </div>
-          <p class="hint" data-i18n="history.hint">Click an entry to show it in the floating card again.</p>
-          <ul class="history" id="historyList"></ul>
-          <div class="demo-actions">
-            <button type="button" id="historyClear" class="ghost" data-i18n="history.clear">Forget everything</button>
-            <span class="hint" id="historyCount"></span>
-          </div>
-        </section>
-        <section class="panel">
-          <h2 data-i18n="panel.backup">Settings file</h2>
-          <p class="hint" data-i18n="backup.hint">
-            Export writes Documents\glossy-settings.json. Import reads back a file you pick.
-          </p>
-          <div class="demo-actions">
-            <button type="button" id="settingsExport" class="ghost" data-i18n="backup.export">Export…</button>
-            <button type="button" id="settingsImport" class="ghost" data-i18n="backup.import">Import…</button>
-          </div>
-          <input type="file" id="settingsFile" accept=".json,application/json" hidden />
-        </section>
-        <section class="panel">
-          <h2 data-i18n="panel.updates">Updates</h2>
-          <p class="hint warn" id="updateUnavailable" data-i18n="update.unavailable" hidden>
-            This build carries no update signing key, so it cannot update itself yet.
-          </p>
-          <div class="options">
-            <label class="check"><input type="checkbox" id="checkUpdates" /><span data-i18n="option.checkUpdates">Check for a new version when Glossy starts</span></label>
-          </div>
-          <div class="demo-actions">
-            <button type="button" id="updateCheck" class="ghost" data-i18n="update.check">Check now</button>
-            <button type="button" id="updateInstall" class="ghost" data-i18n="update.install" hidden>Download and restart</button>
-            <span class="hint" id="updateStatus"></span>
-          </div>
+          </section>
         </section>
       </main>
     </div>

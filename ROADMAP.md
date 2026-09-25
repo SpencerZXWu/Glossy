@@ -131,7 +131,7 @@ Goal: make the reading use case actually good.
 
 | Work item | Details | State |
 | --- | --- | --- |
-| Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | planned |
+| Settings window rework | A left navigation rail in place of one long scroll, a search box that filters the options, and grouped panels with the WinUI control look | partly done — the rail, its *Features* and *Settings* groups, the one-page-per-group layout, the memo of the last page and the **Shortcuts** page are in `src/index.html`, `src/styles/app.css` and `src/js/app.js`; the search box is still to come |
 | Translation service: one list | Four entries only: our own server with Baidu (`cloud-baidu`) or with Youdao (`cloud-youdao`), a model running on this machine over any OpenAI-compatible endpoint, and the free public Google endpoint. Nothing in the window asks for a key any more. Underneath, the stored shape stayed `channel` + `provider` (plus `cloudVendor` for the server-backed entries), so a file written earlier keeps working — a provider this build no longer offers reads as the built-in Baidu entry — and a new one starts on `cloud-baidu` | done, in `settings.rs`, `translate/local.rs` and `server/src/llm.js` |
 | Named vendor channels | Baidu and Youdao appear in the same dropdown as channels that need nothing set up, because they are our server with a vendor attached: the app sends `cloudVendor`, the server tries that upstream first and falls back to the others, and the card names the one that answered | done, in `server/src/upstream.js`, `server/src/youdao.js` and `src-tauri/src/translate/cloud.rs` |
 | Server address is no longer a field | The one service that needs nothing set up should not come with a box that lets people break it, so the address travels with the build: the `DEFAULT_ENDPOINT` the app was compiled with wins, a leftover address in an older settings file is ignored, and the window keeps only the allowance line and its `Check again` button. Pointing the app at your own deployment means editing that one line in `src-tauri/src/translate/cloud.rs`; a build made without an address still reads the setting | done, in `src-tauri/src/translate/cloud.rs` |
@@ -454,7 +454,7 @@ rather than investing in it early.
 
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
-| 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 计划中 |
+| 设置窗口重做 | 用左侧导航栏取代一整条长滚动、一个能筛选选项的搜索框，以及符合 WinUI 控件观感的分组面板 | 部分完成 —— 导航栏、它的「功能」与「设置」两组、一组一页的布局、上次停留页面的记忆以及**快捷键**页都已落在 `src/index.html`、`src/styles/app.css` 与 `src/js/app.js` 里；搜索框仍未做 |
 | 翻译渠道：一个列表 | 下拉框里只留四项：我们自己的服务器配百度（`cloud-baidu`）或有道（`cloud-youdao`）、通过任意 OpenAI 兼容接口跑在本机上的模型，以及免费的公开 Google 接口。窗口里再也没有任何地方要求填密钥。底层保存格式仍然是 `channel` + `provider`（走服务器的两个渠道另有 `cloudVendor`），因此旧文件照常可用——这个构建不再提供的 `provider` 会读作内置的百度渠道——新文件默认走 `cloud-baidu` | 已完成，见 `settings.rs`、`translate/local.rs` 与 `server/src/llm.js` |
 | 点名上游的渠道 | 「百度翻译」和「有道翻译」并列在同一个下拉框里，同样是「无需配置」——因为它们就是我们自己的服务器，只是指定了用哪家上游：应用发送 `cloudVendor`，服务器先试点名的那个，答不上来再按顺序兜底，卡片页脚会注明这次是谁译的 | 已完成，见 `server/src/upstream.js`、`server/src/youdao.js` 与 `src-tauri/src/translate/cloud.rs` |
 | 服务器地址不再是一个输入框 | 唯一一个「无需配置」的服务不该给用户留下把它填坏的机会，所以地址改为跟着构建走：构建时的 `DEFAULT_ENDPOINT` 优先，旧设置文件里残留的地址被忽略，窗口只保留额度提示行与「重新检查」。想用自己的部署就改 `src-tauri/src/translate/cloud.rs` 里的那一行；不带地址的构建仍然读设置文件 | 已完成，见 `src-tauri/src/translate/cloud.rs` |

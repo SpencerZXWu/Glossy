@@ -95,6 +95,14 @@ the monitor the cursor is on, and flips above the cursor when there is no room b
 
 ### Settings
 
+The window is a sidebar plus the one page it opens. **Features** comes first: the
+text translation of the popup, right here in the window, and the document and OCR
+entries that later versions will fill in. Under **Settings** every group has its own
+page — **General**, **Shortcuts**, **Trigger**, **Language**, **Appearance**,
+**Reading**, **Units**, **History**, **Settings file**, **Updates** — and the window
+reopens on the page it was left on. **Shortcuts** holds the global hotkey as well as
+the keys the window itself answers to.
+
 | Option | Meaning |
 | --- | --- |
 | Interface language | `Follow Windows`, `简体中文` or `English`. Switches the settings window and the popup immediately. |
@@ -233,15 +241,15 @@ built-in Baidu entry and is replaced the next time the file is written.
 
 ### Translate inside the app
 
-The top of the settings window holds the same translation feature as the popup: a
-text box for typing or pasting text. Select a word, a phrase or a sentence in that
+The first entry of the sidebar — **Translate text**, under *Features* — holds the
+same translation feature as the popup: a text box for typing or pasting text. Select a word, a phrase or a sentence in that
 box — or press **Translate** (Ctrl+Enter) to use the whole text — and the result
 appears right below, in a card identical to the popup one: the source/target
 language bar with its swap button, the copy button and the same word/sentence
 rendering. A pasted text is translated as soon as it lands, whether it arrives
 through **Paste** or through Ctrl+V; **Clear** empties the box and takes the card
 away. The switch on the heading turns unit conversion on and off for the whole
-app: it is the same setting as the one in **Units** further down, and it is the
+app: it is the same setting as the one in the **Units** page, and it is the
 one place where the conversions of a card can be flipped on the spot. The
 language bar follows the popup rules, so the source starts on *Detect language*,
 the target follows the configured language, and a new selection resets the pair
@@ -639,6 +647,8 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 ### 设置
 
+窗口由左侧菜单和它打开的单个页面组成。**功能**在最前面：弹窗的文本翻译现在就在窗口里，文档与图片文字翻译的入口留给后续版本。**设置**下面的每一项各占一页——**常规**、**快捷键**、**触发方式**、**语言**、**外观**、**阅读**、**单位换算**、**历史记录**、**设置文件**、**更新**——窗口会重新打开在上次停留的那一页。**快捷键**页里既有全局快捷键，也列出窗口自身响应的按键。
+
 | 选项 | 含义 |
 | --- | --- |
 | 界面语言 | `跟随系统`、`简体中文` 或 `English`。会立即切换设置窗口和弹窗。 |
@@ -719,7 +729,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 ### 在应用内翻译
 
-设置窗口顶部是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与下方**单位换算**面板里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（源语言的临时选择不会被保存，目标语言则会被保存下来并成为已配置的语言）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
+左侧菜单的第一项——**功能**下的**文本翻译**——是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与**单位换算**页里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（源语言的临时选择不会被保存，目标语言则会被保存下来并成为已配置的语言）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
 
 ### 常见问题
 
@@ -1085,6 +1095,14 @@ encima de él cuando no hay espacio debajo.
 
 ### Ajustes
 
+La ventana es una barra lateral más la página que abre. **Features** va primero: la
+traducción de texto del emergente, aquí mismo en la ventana, y las entradas de
+documentos y OCR que llenarán versiones posteriores. Bajo **Settings** cada grupo
+tiene su propia página —**General**, **Shortcuts**, **Trigger**, **Language**,
+**Appearance**, **Reading**, **Units**, **History**, **Settings file**,
+**Updates**— y la ventana se reabre en la página donde se dejó. **Shortcuts**
+contiene el atajo global y también las teclas que responde la propia ventana.
+
 | Opción | Significado |
 | --- | --- |
 | Interface language | `Follow Windows`, `简体中文` o `English`. Cambia al instante la ventana de ajustes y el emergente. |
@@ -1235,8 +1253,9 @@ escriba el archivo.
 
 ### Traducir dentro de la aplicación
 
-La parte superior de la ventana de ajustes contiene la misma función de traducción
-que el emergente: un cuadro de texto para escribir o pegar texto. Selecciona una
+La primera entrada de la barra lateral —**Translate text**, dentro de *Features*—
+contiene la misma función de traducción que el emergente: un cuadro de texto para
+escribir o pegar texto. Selecciona una
 palabra, una frase o una oración en ese cuadro —o pulsa **Translate** (Ctrl+Enter)
 para usar todo el texto— y el resultado aparece justo debajo, en una tarjeta
 idéntica a la del emergente: la barra de idioma de origen y destino con su botón de
@@ -1244,7 +1263,7 @@ intercambio, el botón de copiar y la misma representación de palabra u oració
 texto pegado se traduce en cuanto llega, ya sea mediante **Paste** o con Ctrl+V;
 **Clear** vacía el cuadro y retira la tarjeta. El interruptor que hay en el
 encabezado activa o desactiva la conversión de unidades para toda la aplicación: es
-el mismo ajuste que el del panel **Units** de más abajo, y es el único sitio donde
+el mismo ajuste que el de la página **Units**, y es el único sitio donde
 las conversiones de una tarjeta se pueden cambiar al momento. La barra de idioma
 sigue las reglas del emergente, así que el origen empieza en *Detect language*, el
 destino sigue al idioma configurado y una nueva selección restablece el par (el

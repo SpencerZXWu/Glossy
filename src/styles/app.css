@@ -14,6 +14,8 @@
   --bad: var(--g-bad);
   --radius: var(--g-radius-lg);
   --shadow: var(--g-shadow-card);
+  /* Width of the section sidebar; the shell grid reads it. */
+  --nav-width: 196px;
 }
 
 /* On a Mica backdrop the window belongs to the system, so the page stops
@@ -52,15 +54,19 @@ body {
   overflow: hidden;
 }
 
+/* The window is a sidebar and the page it drives, under one bar. */
 .shell {
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--nav-width) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 /* --------------------------------------------------------------- topbar */
 
 .topbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
   flex: none;
   display: flex;
   align-items: center;
@@ -141,12 +147,108 @@ body {
   color: var(--fg-soft);
 }
 
+/* -------------------------------------------------------------- sidebar */
+
+.sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  padding: 4px 12px 18px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 6px;
+}
+
+.nav-group {
+  margin: 14px 8px 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nav-group:first-child {
+  margin-top: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--g-radius-lg);
+  background: transparent;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-item:hover:not(:disabled) {
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.nav-item[aria-current="page"],
+.nav-item[aria-current="page"]:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: var(--g-fw-semibold);
+}
+
+.nav-item:disabled {
+  cursor: default;
+  color: var(--g-text-disabled);
+}
+
+.nav-item:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+.nav-icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.nav-item .soon {
+  margin-left: auto;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-pill);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: var(--g-fw-regular);
+}
+
 /* ----------------------------------------------------------------- main */
 
 main {
-  flex: 1 1 auto;
+  grid-column: 2;
+  grid-row: 2;
   overflow-y: auto;
-  padding: 4px 22px 22px;
+  padding: 4px 22px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.page {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -344,6 +446,54 @@ main::-webkit-scrollbar-thumb {
   color: var(--fg-soft);
   font-size: 12px;
   font-weight: 550;
+}
+
+/* ----------------------------------------------------------- shortcuts */
+
+.subhead {
+  margin: 18px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.keys {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.keys li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--fg-soft);
+  font-size: 13px;
+}
+
+.key-group {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  /* Keeps the labels in one column however wide the keys are. */
+  width: 88px;
+}
+
+.keys kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: var(--g-radius-sm);
+  background: var(--bg-soft);
+  color: var(--fg-soft);
+  font-family: var(--g-font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------- ignored programs */

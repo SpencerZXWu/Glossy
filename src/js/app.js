@@ -80,6 +80,12 @@
 
   const LANGUAGES = Glossy.languageCodes;
 
+  /** The sidebar entries, in the order the sidebar lists them. */
+  const NAV_ITEMS = Array.from(document.querySelectorAll(".nav-item[data-page]"));
+  const PAGES = Array.from(document.querySelectorAll("main .page"));
+  /** Which page the window was left on, so it reopens where it was. */
+  const PAGE_KEY = "glossy.page";
+
   /** The dropdown entries that go through one particular online engine. */
   const CLOUD_VENDORS = { "cloud-baidu": "baidu", "cloud-youdao": "youdao" };
 
@@ -1400,6 +1406,37 @@
   window.addEventListener("blur", flushSave);
   window.addEventListener("pagehide", flushSave);
   window.addEventListener("beforeunload", flushSave);
+
+  /** The page this window was left on, or an empty string the first time. */
+  function rememberedPage() {
+    try {
+      return localStorage.getItem(PAGE_KEY) || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  /** Shows one page of the sidebar, marks it current, and remembers it. */
+  function showPage(name) {
+    const wanted = document.getElementById("page-" + name) ? name : NAV_ITEMS[0].dataset.page;
+    PAGES.forEach((page) => {
+      page.hidden = page.id !== "page-" + wanted;
+    });
+    NAV_ITEMS.forEach((item) => {
+      if (item.dataset.page === wanted) item.setAttribute("aria-current", "page");
+      else item.removeAttribute("aria-current");
+    });
+    try {
+      localStorage.setItem(PAGE_KEY, wanted);
+    } catch (error) {
+      // Without storage the pages still switch, the window just does not recall.
+    }
+  }
+
+  NAV_ITEMS.forEach((item) => {
+    item.addEventListener("click", () => showPage(item.dataset.page));
+  });
+  showPage(rememberedPage());
 
   (async function start() {
     // Resolved before the settings paint the window, so the effect is in place
