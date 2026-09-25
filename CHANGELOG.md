@@ -6,6 +6,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [1.4.0] - 2026-09-25
+
+The release where the numbers are measurements. Nothing changes on screen; what changes is
+that the wait between letting go of a selection and the card appearing is timed by the
+application itself, the cost of doing nothing is written down with the machine it was
+measured on, and the three things that could be held for a day of use are counted instead
+of assumed.
+
+Measured on an Intel Core i9-14900HX, 16 GB of RAM, Windows 11 build 26200, 2560x1600 at
+150 %, release build: 0.00 % of CPU over 20 s and 39.4 MB of working set while idle, and
+42 ms at p50 between the mouse-up and the painted card, against a budget of 150 ms.
+
+### Added
+
+- **The selection-to-popup path is timed, and the timing is repeatable.** `src-tauri/src/timing.rs`
+  stamps the mouse-up that ends a drag, the popup reports its first frame back through the
+  new `popup_painted` command, and one line per sample goes to stderr and to
+  `GLOSSY_TIMING_LOG`. Both sides stay silent unless `GLOSSY_TIMING` is set, and a mark
+  older than five seconds is dropped rather than paired with the wrong paint.
+  `scripts/latency.ps1` is the procedure: it samples the idle cost, injects twelve
+  selections, discards a warm-up drag and prints the samples with p50, p95 and the maximum.
+- **Counters for the three things a long run could hold.** `src-tauri/src/vitals.rs` keeps
+  the balance of the mouse hook, the clipboard and the speech voice, and a test reads it:
+  the hook now gives its handle back instead of leaving it to process exit, every clipboard
+  open goes through one `close()`, and a voice is counted where it is created and released.
+  An imbalance seen on two selections in a row is said once on stderr.
+
+### Changed
+
+- **The clipboard is given back after the card is on its way, not before it appears.** The
+  restore waits up to 80 ms for the application that was copied from to stop writing, and
+  that wait used to happen before the popup was revealed. It now happens afterwards, from
+  the same owner, so the paths that show nothing still put the clipboard back.
+- **A copy is no longer given a fixed 20 ms to appear.** The first look at the clipboard
+  happens immediately — most applications are already done by then — and the 20 ms is a
+  ceiling rather than a wait, retried every 4 ms.
+
 ## [1.3.0] - 2026-09-25
 
 The settings file and the command names stop moving. Nothing changes on screen; what this

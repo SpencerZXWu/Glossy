@@ -12,7 +12,7 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.3.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Version | `1.4.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
 | Size | ~23,000 lines: ~12,500 Rust, ~6,700 frontend (plain HTML/CSS/JS), ~1,700 frontend test lines and ~3,100 in `server/`, comments included |
 | Tests | 214 Rust tests, 202 frontend tests (`node --test`) and 86 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
@@ -343,7 +343,7 @@ rather than investing in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.3.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 版本 | `1.4.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
 | 规模 | 约 23,000 行：Rust 约 12,500 行，前端约 6,700 行（纯 HTML/CSS/JS），前端测试约 1,700 行，`server/` 约 3,100 行，含注释 |
 | 测试 | Rust 214 个测试、前端 202 个测试（`node --test`）、`server/` 86 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
