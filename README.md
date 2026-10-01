@@ -2,6 +2,8 @@
   <img src="assets/icon.png" width="112" height="112" alt="Glossy">
 </p>
 
+![Total Downloads](https://shield.bupt.fun/github/downloads/SpencerZXWu/Glossy/total?style=for-the-badge)
+
 [English](#en) · [中文](#zh-cn) · [Español](#es)
 
 <a id="en"></a>
