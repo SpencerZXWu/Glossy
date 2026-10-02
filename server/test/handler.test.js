@@ -6,14 +6,19 @@ import { isLanguageTag } from "../src/upstream.js";
 
 const NOW = Date.parse("2025-09-01T10:00:00Z");
 
+/** Stands in for a screenshot; only its length matters here. */
+const PNG = Buffer.from("not really a png, but base64-clean").toString("base64");
+
 function memoryStore() {
   const usage = new Map();
   const minutes = new Map();
+  const readings = new Map();
   const key = (...parts) => parts.join("|");
   const read = (scope, id) => usage.get(key(scope, id)) ?? 0;
 
   return {
-    calls: { reserve: 0, refund: 0 },
+    readings,
+    calls: { reserve: 0, refund: 0, reserveOcr: 0, refundOcr: 0 },
     async reserve(day, { clientId, ipHash, chars, limits, now, minute }) {
       this.calls.reserve += 1;
       const bucket = key(ipHash, minute);
@@ -49,16 +54,42 @@ function memoryStore() {
         total: read("total", "all"),
       };
     },
+    async reserveOcr(month, { clientId, limit }) {
+      this.calls.reserveOcr += 1;
+      const readings = this.readings;
+      const used = readings.get(clientId) ?? 0;
+      if (limit > 0 && used >= limit) {
+        return {
+          ok: false,
+          code: "ocr_month_quota_exceeded",
+          message: "no readings left",
+          limit,
+          remaining: 0,
+        };
+      }
+      readings.set(clientId, used + 1);
+      return { ok: true, used: used + 1, remaining: limit > 0 ? Math.max(0, limit - used - 1) : null };
+    },
+    async refundOcr(month, { clientId }) {
+      this.calls.refundOcr += 1;
+      const readings = this.readings;
+      readings.set(clientId, Math.max(0, (readings.get(clientId) ?? 0) - 1));
+    },
+    async peekOcr(month, { clientId }) {
+      return { requests: this.readings.get(clientId) ?? 0 };
+    },
   };
 }
 
-function setup({ translateImpl, ratesImpl, env = {}, configured = true } = {}) {
+function setup({ translateImpl, ratesImpl, ocrImpl, env = {}, configured = true, ocrConfigured = true } = {}) {
   const store = memoryStore();
   const calls = [];
   const rateCalls = [];
+  const ocrCalls = [];
   const upstream = {
     isLanguageTag,
     configured,
+    ocrConfigured,
     rates: async (input) => {
       rateCalls.push(input);
       return ratesImpl
@@ -68,6 +99,10 @@ function setup({ translateImpl, ratesImpl, env = {}, configured = true } = {}) {
     translate: async (input) => {
       calls.push(input);
       return translateImpl ? translateImpl(input) : { ok: true, from: "en", to: "zh", translation: "你好" };
+    },
+    ocr: async (input) => {
+      ocrCalls.push(input);
+      return ocrImpl ? ocrImpl(input) : { ok: true, text: "recognized", language: "CHN_ENG" };
     },
   };
   const config = {
@@ -81,7 +116,7 @@ function setup({ translateImpl, ratesImpl, env = {}, configured = true } = {}) {
     MAX_REQUESTS_PER_MINUTE: "3",
     ...env,
   };
-  const handler = createHandler({ store, upstream, config, now: () => NOW });
+  const handler = createHandler({ store, ocrStore: store, upstream, config, now: () => NOW });
   const call = (path, init = {}) =>
     handler(
       new Request(`https://glossy.example${path}`, {
@@ -95,7 +130,8 @@ function setup({ translateImpl, ratesImpl, env = {}, configured = true } = {}) {
     );
   const translate = (body) =>
     call("/v1/translate", { method: "POST", body: JSON.stringify({ clientId: "install-0001", ...body }) });
-  return { store, calls, rateCalls, call, translate, upstream };
+  const ocr = (body) => call("/v1/ocr", { method: "POST", body: JSON.stringify({ clientId: "install-0001", image: PNG, ...body }) });
+  return { store, calls, rateCalls, ocrCalls, call, translate, ocr, upstream };
 }
 
 test("health reports whether the upstream has credentials", async () => {
@@ -129,6 +165,29 @@ test("counts characters, not bytes", async () => {
   const { translate } = setup();
   const body = await (await translate({ text: "你好世界", to: "en" })).json();
   assert.equal(body.chars, 4);
+});
+
+test("says which vendors the answer was not from", async () => {
+  const { translate } = setup({
+    translateImpl: async () => ({
+      ok: true,
+      from: "en2zh-CHS",
+      to: "zh-CHS",
+      translation: "你好",
+      vendor: "youdao",
+      attempts: [{ vendor: "baidu", code: "upstream_limit" }],
+    }),
+  });
+  const body = await (await translate({ text: "hello", to: "zh-CN", vendor: "baidu" })).json();
+
+  assert.equal(body.vendor, "youdao");
+  assert.deepEqual(body.attempts, [{ vendor: "baidu", code: "upstream_limit" }]);
+
+  // A deployment whose translator says nothing about it answers with an empty
+  // list rather than leaving the field out: the App reads both the same way.
+  const plain = setup();
+  const other = await (await plain.translate({ text: "hello", to: "zh-CN" })).json();
+  assert.deepEqual(other.attempts, []);
 });
 
 test("quota endpoint mirrors the counters", async () => {
@@ -285,4 +344,179 @@ test("rate limits rate requests as well", async () => {
   const response = await call("/v1/rates?client=install-0001&base=USD");
   assert.equal(response.status, 429);
   assert.equal((await response.json()).code, "rate_limited");
+});
+
+test("health says whether the server can read pictures", async () => {
+  assert.equal((await (await setup().call("/v1/health")).json()).ocr, true);
+  assert.equal((await (await setup({ ocrConfigured: false }).call("/v1/health")).json()).ocr, false);
+});
+
+test("reads a screenshot and books the fixed fee", async () => {
+  const { ocr, ocrCalls } = setup({ env: { OCR_CHARS_PER_REQUEST: "5" } });
+  const response = await ocr({ language: "en" });
+  assert.equal(response.status, 200);
+
+  const body = await response.json();
+  assert.equal(body.text, "recognized");
+  assert.equal(body.language, "CHN_ENG");
+  assert.equal(body.chars, 5);
+  assert.equal(body.usage.client, 5);
+  assert.deepEqual(ocrCalls, [{ image: PNG, language: "en" }]);
+});
+
+test("strips a data url before handing the picture on", async () => {
+  const { ocr, ocrCalls } = setup({ env: { OCR_CHARS_PER_REQUEST: "5" } });
+  const response = await ocr({ image: `data:image/png;base64,${PNG}\n` });
+  assert.equal(response.status, 200);
+  assert.equal(ocrCalls[0].image, PNG);
+});
+
+test("refuses a request without a usable picture", async () => {
+  const { ocr, store } = setup();
+  assert.equal((await ocr({ image: "" })).status, 400);
+  assert.equal((await ocr({ image: "data:image/png;base64," })).status, 400);
+  assert.equal((await ocr({ image: "not base64 !!" })).status, 400);
+  assert.equal((await ocr({ clientId: "short" })).status, 400);
+  assert.equal(store.calls.reserve, 0);
+});
+
+test("refuses a picture that is larger than the limit", async () => {
+  const { ocr, store } = setup({ env: { MAX_IMAGE_BYTES: "8" } });
+  const response = await ocr({});
+  assert.equal(response.status, 413);
+  const body = await response.json();
+  assert.equal(body.code, "too_long");
+  assert.equal(body.limit, 8);
+  assert.equal(store.calls.reserve, 0);
+});
+
+test("only accepts POST", async () => {
+  const { call } = setup();
+  assert.equal((await call("/v1/ocr")).status, 405);
+});
+
+test("says so when the server has no picture reader", async () => {
+  const { ocr, ocrCalls, store } = setup({ ocrConfigured: false });
+  const response = await ocr({});
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, "not_configured");
+  assert.equal(store.calls.reserve, 0, "没配密钥就不该记额度");
+  assert.equal(ocrCalls.length, 0);
+});
+
+test("hands the fee back when the picture holds no text", async () => {
+  const { ocr, store } = setup({
+    env: { OCR_CHARS_PER_REQUEST: "5" },
+    ocrImpl: async () => ({ ok: false, code: "no_text", message: "没有文字" }),
+  });
+  const response = await ocr({});
+  assert.equal(response.status, 422);
+  assert.equal((await response.json()).code, "no_text");
+  assert.equal(store.calls.refund, 1);
+});
+
+test("hands the fee back when the reader is out of quota", async () => {
+  const { ocr, store } = setup({
+    env: { OCR_CHARS_PER_REQUEST: "5" },
+    ocrImpl: async () => ({ ok: false, code: "upstream_limit", message: "额度用完了" }),
+  });
+  const response = await ocr({});
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).code, "upstream_limit");
+  assert.equal(store.calls.refund, 1);
+});
+
+test("says which vendor code the refusal came from", async () => {
+  const { ocr } = setup({
+    ocrImpl: async () => ({
+      ok: false,
+      code: "upstream_limit",
+      message: "额度用完了",
+      upstream: "ResourceUnavailable.NotExist",
+    }),
+  });
+  const body = await (await ocr({})).json();
+  assert.equal(body.upstream, "ResourceUnavailable.NotExist");
+});
+
+test("spends one flat fee per screenshot out of the daily allowance", async () => {
+  const { ocr } = setup({ env: { OCR_CHARS_PER_REQUEST: "60" } });
+  assert.equal((await ocr({})).status, 200);
+
+  const response = await ocr({});
+  assert.equal(response.status, 429);
+  const body = await response.json();
+  assert.equal(body.code, "client_quota_exceeded");
+  assert.equal(body.limit, 100);
+});
+
+test("counts the readings of the month and stops at the limit", async () => {
+  const { ocr, store, ocrCalls } = setup({ env: { OCR_PER_CLIENT_MONTH: "2", OCR_CHARS_PER_REQUEST: "1" } });
+
+  assert.equal((await ocr({})).status, 200);
+  assert.equal((await ocr({})).status, 200);
+
+  const response = await ocr({});
+  assert.equal(response.status, 429);
+  const body = await response.json();
+  assert.equal(body.code, "ocr_month_quota_exceeded");
+  assert.equal(body.limit, 2);
+  assert.equal(body.remaining, 0);
+  // 被拦下的这一次既没有发给上游，也没有记账。
+  assert.equal(ocrCalls.length, 2);
+  assert.equal(store.calls.reserveOcr, 3);
+  assert.equal(store.calls.reserve, 2);
+});
+
+test("a month limit of zero leaves the readings uncounted", async () => {
+  const { ocr, store } = setup({ env: { OCR_PER_CLIENT_MONTH: "0", OCR_CHARS_PER_REQUEST: "1" } });
+  for (let i = 0; i < 3; i += 1) assert.equal((await ocr({})).status, 200);
+
+  assert.equal(store.calls.reserveOcr, 3);
+  assert.equal(store.readings.get("install-0001"), 3);
+});
+
+test("hands the reading back when the day has no characters left", async () => {
+  // 日额度先耗尽时，月度次数不该被记上。
+  const { ocr, store } = setup({ env: { OCR_PER_CLIENT_MONTH: "2", OCR_CHARS_PER_REQUEST: "60" } });
+  assert.equal((await ocr({})).status, 200);
+
+  const response = await ocr({});
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).code, "client_quota_exceeded");
+  assert.equal(store.calls.refundOcr, 1);
+  assert.equal(store.readings.get("install-0001"), 1);
+});
+
+test("hands the reading back when the picture was never read", async () => {
+  const { ocr, store, ocrCalls } = setup({
+    env: { OCR_PER_CLIENT_MONTH: "1", OCR_CHARS_PER_REQUEST: "5" },
+    ocrImpl: async () => ({ ok: false, code: "no_text", message: "没有文字" }),
+  });
+  assert.equal((await ocr({})).status, 422);
+  assert.equal(store.calls.refundOcr, 1);
+  assert.equal(store.readings.get("install-0001"), 0);
+
+  // 读不到文字的这一次不算数，用户还能再截一次，而不是等一个月。
+  assert.equal((await ocr({})).status, 422);
+  assert.equal(ocrCalls.length, 2);
+});
+
+test("reports the month's readings and the day's characters apart", async () => {
+  const { call, ocr } = setup({ env: { OCR_PER_CLIENT_MONTH: "5", OCR_CHARS_PER_REQUEST: "5" } });
+  await ocr({});
+
+  const body = await (await call("/v1/quota?client=install-0001")).json();
+  assert.equal(body.month, "2025-09");
+  assert.equal(body.limits.ocrPerClientMonth, 5);
+  assert.equal(body.usage.ocrMonth, 1);
+  assert.equal(body.usage.client, 5);
+  assert.equal(body.remainingOcrMonth, 4);
+});
+
+test("a quota report without a month limit has nothing left to report", async () => {
+  const { call } = setup({ env: { OCR_PER_CLIENT_MONTH: "0" } });
+  const body = await (await call("/v1/quota?client=install-0001")).json();
+  assert.equal(body.remainingOcrMonth, null);
+  assert.equal(body.usage.ocrMonth, 0);
 });

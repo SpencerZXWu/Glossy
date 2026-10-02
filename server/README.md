@@ -15,6 +15,23 @@
 另外这台服务器还给客户端转发**货币汇率**（`GET /v1/rates`）：上游是 `open.er-api.com`，取不到就换欧洲央行的
 `api.frankfurter.app`，两家都不需要密钥，返回的汇率不占翻译额度。
 
+还有**截图取字**（`POST /v1/ocr`）：客户端把框选的屏幕区域截成图发过来，服务端调云端 OCR
+认出文字再返回，App 拿到的文字就跟普通选中文本一样翻译。OCR 是另一个产品，密钥也是另一对：
+腾讯云「通用印刷体识别」（`TENCENT_SECRET_ID` + `TENCENT_SECRET_KEY`，每月 1 号自动发 1000 次免费额度）优先，
+百度智能云「通用文字识别」（`BAIDU_OCR_API_KEY` + `BAIDU_OCR_SECRET_KEY`）留着当兜底
+（百度这个接口现在要付费开通，没开通会报 `error_code 6`）。两对都没配的话 `/v1/health` 里
+`ocr` 是 `false`，App 会提示「服务端没有开识图」。
+
+腾讯那份免费额度是**每个月 1 号重新发、只在当月有效、不会攒下来**的共享资源包，一个月里用完就
+不再免费：除非在控制台的计费设置里开了后付费（按量约 0.12 元/次）或买了资源包，用完之后这个月
+剩下的调用会直接被拒绝——那时 `/v1/ocr` 会回 `upstream_limit`，兜底的百度就会接手。
+**图片只在内存里过一趟就转发给上游，服务端不落盘、不记录、不留存。**
+
+除了上面那份**上游**的免费额度，服务端自己还按**每台设备每月 100 次**限制截图取字
+（`OCR_PER_CLIENT_MONTH`）。这是为了保护大家共用的那点免费次数：安装 ID 就是设备，同一个月里
+第 101 次会被拒，回 `ocr_month_quota_exceeded`，下个月 1 号（UTC）重新从 0 开始。
+普通文本翻译不受这个限制，仍旧只受每日字符额度管。
+
 客户端可以在请求里带 `"vendor": "baidu"` 或 `"youdao"` 点名要用哪个上游（就是渠道列表里的
 「百度翻译」「有道翻译」）：点名的那个排到最前面先试，失败仍会按顺序兜底，全都不行才报错。
 不带 `vendor`（或写了不认识的名字）就从默认顺序开始。`GET /v1/health` 里的 `vendors`
@@ -109,6 +126,11 @@ exec /var/lang/node18/bin/node index.mjs
 | --- | --- |
 | `BAIDU_APP_ID` | 你的百度 APP ID |
 | `BAIDU_KEY` | 你的百度密钥 |
+| `TENCENT_SECRET_ID` | 腾讯云访问管理的 SecretId（截图取字，和百度那一对任选其一） |
+| `TENCENT_SECRET_KEY` | 腾讯云访问管理的 SecretKey（同上） |
+| `TENCENT_OCR_REGION` | 截图取字的地域（可选，默认 `ap-guangzhou`） |
+| `BAIDU_OCR_API_KEY` | 百度智能云文字识别的 API Key（可选，兜底用；百度这个接口现在要付费开通） |
+| `BAIDU_OCR_SECRET_KEY` | 百度智能云文字识别的 Secret Key（同上） |
 | `YOUDAO_APP_KEY` | 你的有道应用 ID（可选，客户端点名「有道翻译」时需要） |
 | `YOUDAO_APP_SECRET` | 你的有道应用密钥（同上） |
 | `LLM_API_KEY` | 大模型的 API Key（可选，配了就优先用它） |
@@ -120,7 +142,8 @@ exec /var/lang/node18/bin/node index.mjs
 | `RATES_TIMEOUT_MS` | 取汇率超时毫秒数（可选，默认 6000） |
 
 额度参数也可以在同一个地方配（不配就是用下面的默认值）：`DAILY_CHARS_PER_CLIENT`、
-`DAILY_CHARS_PER_IP`、`DAILY_CHARS_TOTAL`、`MAX_CHARS_PER_REQUEST`、`MAX_REQUESTS_PER_MINUTE`。
+`DAILY_CHARS_PER_IP`、`DAILY_CHARS_TOTAL`、`MAX_CHARS_PER_REQUEST`、`MAX_REQUESTS_PER_MINUTE`、
+`OCR_CHARS_PER_REQUEST`、`OCR_PER_CLIENT_MONTH`、`MAX_IMAGE_BYTES`、`OCR_MAX_BODY`。
 
 ### 5. 配触发器，拿到地址
 
@@ -131,10 +154,10 @@ exec /var/lang/node18/bin/node index.mjs
 
 ```bash
 curl https://<控制台给的地址>/v1/health
-# {"ok":true,"service":"glossy-cloud","day":"2026-09-20","configured":true}
+# {"ok":true,"service":"glossy-cloud","day":"2026-09-20","configured":true,"ocr":true,"ocrVendor":"tencent","vendors":["baidu"]}
 ```
 
-`configured: true` 就说明密钥配好了。
+`configured: true` 就说明密钥配好了，`ocr: true` 说明还能截图取字。
 
 然后把这个地址写进客户端源码里的 `DEFAULT_ENDPOINT`（`src-tauri/src/translate/cloud.rs`），重新构建即可，**只填到域名，不要带 `/v1/translate`**。
 
@@ -216,6 +239,21 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 | `DAILY_CHARS_TOTAL` | 30000 | **全局每天上限**，真正的保险丝（≈ 百度认证版 100 万字符/月 的日均值）|
 | `MAX_CHARS_PER_REQUEST` | 2000 | 单次请求字符上限 |
 | `MAX_REQUESTS_PER_MINUTE` | 30 | 同一 IP 每分钟请求数上限 |
+| `OCR_CHARS_PER_REQUEST` | 100 | 每次截图取字**记多少字符**（见下），不是识别上限 |
+| `OCR_PER_CLIENT_MONTH` | 100 | 单个安装每月最多截图取字多少次（`0` = 不限） |
+| `MAX_IMAGE_BYTES` | 3145728 | 允许上传的截图大小（3 MB，base64 解码后） |
+| `OCR_MAX_BODY` | 4194304 | `/v1/ocr` 的请求体上限（4 MB，只在这一条路由上放宽） |
+
+截图取字按**固定 100 字符**记账：识别一张图对上游来说就是一次调用，跟图上有多少字没关系，
+所以服务端在调用前按固定值预扣、上游失败就退还。这样 OCR 也被同一套每日额度管着，
+不会变成绕开限额去烧百度额度的口子。不够用就把 `OCR_CHARS_PER_REQUEST` 调大一点。
+
+`OCR_PER_CLIENT_MONTH` 是**另一本账**，按安装 ID 记在月度的桶里（键是 `YYYY-MM`），
+跟每天重新开始的字符额度互不影响：截图取字先检查本月次数，通过了再扣当天的字符。
+被这条规则拒掉的那次**不扣字符**，上游失败时这一次也会退回，不算用户头上。
+Cloudflare 上是 `QUOTA` 命名空间里对象名带 `month-` 前缀的那一份，
+腾讯云 SCF 上是状态文件旁边的 `<STATE_FILE>.month`；两边的键都只在当月有效，
+新的一个月自然从 0 开始。
 
 全局上限怎么定：**上游的月度字符额度 ÷ 30**，这样就算每天把额度用满，也刚好撑一个月而不会提前烧完（百度认证版 100 万字符/月 → `30000`）。额度更小就按比例往下压。换成按量计费的大模型时，这个上限直接等于**每天最多花多少钱**，定之前先算一下单价。
 
@@ -232,15 +270,18 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 ### `GET /v1/health`
 
 ```json
-{ "ok": true, "service": "glossy-cloud", "day": "2025-09-01", "configured": true, "vendors": ["llm", "baidu", "youdao"] }
+{ "ok": true, "service": "glossy-cloud", "day": "2025-09-01", "configured": true, "ocr": true, "ocrVendor": "tencent", "vendors": ["llm", "baidu", "youdao"] }
 ```
 
 `configured: false` 说明一个上游密钥都没配好。`vendors` 是这套部署实际能用的上游，按默认尝试顺序排列
-（`llm` / `baidu` / `youdao`）。
+（`llm` / `baidu` / `youdao`）。`ocr` 说明这台服务器能不能做截图取字，`false` 时客户端不会上传图片；
+`ocrVendor` 是截图取字实际先试的那家（`tencent` 或 `baidu`，没配就是 `null`）。
 
 ### `GET /v1/quota?client=<安装ID>`
 
-返回今天这个客户端的用量、剩余字符和各项上限。
+返回今天这个客户端的用量、剩余字符和各项上限。`month` 是当前的记账月份（`YYYY-MM`），
+`usage.ocrMonth` 是这个安装本月已经截图取字了多少次，`remainingOcrMonth` 是本月还剩多少次
+（`OCR_PER_CLIENT_MONTH` 设成 `0` 时是 `null`，表示不限制）。
 
 ### `GET /v1/rates?client=<安装ID>&base=<三位货币代码>`
 
@@ -276,12 +317,21 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
   "to": "zh",
   "translation": "你好",
   "vendor": "youdao",
+  "attempts": [{ "vendor": "baidu", "code": "upstream_limit" }],
   "chars": 5,
   "usage": { "client": 5, "remaining": 19995 }
 }
 ```
 
-`vendor` 是这次实际回答的上游，客户端用它标注结果来自哪家。
+`vendor` 是这次实际回答的上游，客户端用它标注结果来自哪家。`attempts` 列出这次被跳过的上游，
+按尝试顺序排列，每项带上它自己的错误码（`upstream_credentials`、`upstream_limit`、`upstream_timeout`
+……）——客户端据此说明「所选服务失败，由 有道翻译 回答（额度已用尽）」，而不是让用户以为渠道自己变了。
+一个上游都跳过时这项是空数组。被跳过的上游同时会写进服务端自己的日志（`console.warn`），
+那是有权限修密钥或额度的人唯一能看到它的地方。
+
+`from` 始终只是**源语言**一个标签，不是语言对：有道把「源语言2目标语言」整串放在 `l` 里
+（`en2zh-CHS`），这里取 `2` 左边那一半再换回 App 的标签，否则客户端会把 `en2zh-CHS` 原样显示成
+「自动检测 · EN2ZH-CHS」。
 
 失败统一是 `{ "ok": false, "code": "...", "message": "..." }`，HTTP 状态码配合：
 
@@ -300,6 +350,43 @@ Cloudflare 上在 `wrangler.toml` 的 `[vars]` 里改（改完重新 `npx wrangl
 | `upstream_credentials` | 502 | 上游认证失败（密钥不对） |
 
 翻译失败时**占用的字符会退还**，不计入额度。
+
+### `POST /v1/ocr`
+
+```json
+{ "clientId": "8-64位字母数字_-", "image": "iVBORw0KGgo...", "language": "en" }
+```
+
+`image` 是截图的 base64（**不带** `data:image/png;base64,` 前缀；带了服务端也会自动去掉），
+`language` 是提示识别用的语言标签（可省略，省略就按中英混排识别）。上限见
+`MAX_IMAGE_BYTES`（默认 3 MB）。
+
+成功：
+
+```json
+{
+  "ok": true,
+  "text": "识别出来的文字",
+  "language": "CHN_ENG",
+  "chars": 100,
+  "usage": { "client": 100, "remaining": 19900, "ocrMonth": 7, "remainingOcrMonth": 93 }
+}
+```
+
+`usage.ocrMonth` / `usage.remainingOcrMonth` 是**本月**这个安装已经用过、还剩多少次截图取字。
+
+`text` 是按行拼好的结果，识别不出文字时返回 `no_text`（422）并把预扣的字符退还；
+`upstream_limit`（429）表示识图那家的额度用完了，`ocr_month_quota_exceeded`（429）表示
+**这个安装本月的次数用完了**（`OCR_PER_CLIENT_MONTH`，默认 100 次，下个月 1 号重新开始）。
+被拒或失败时预扣的那 100 字符都会退还，本月那次次数也一并退回，不占额度。`language` 是这次实际用的识别语言，
+两家的写法不一样（百度是 `CHN_ENG` 这类，腾讯是 `auto` / `en` 这类）。记在 `chars` 上的
+是固定费用，不随图上文字多少变化。
+
+配了两对识图密钥时先试腾讯，腾讯不可用才交给百度；`no_text` 不会去问第二家，
+因为同一张图换一家也只是多花一次调用。
+
+失败时响应里还会带上上游自己的错误码 `upstream`（如 `ResourceUnavailable.NotExist`），
+排查账号配置问题时照这个码去查上游文档最快。
 
 ## 六、本地调试
 
@@ -321,7 +408,7 @@ npm run dev:node        # 默认 http://0.0.0.0:9000，等价于 `node src/node.
 | --- | --- | --- |
 | `PORT` | 9000 | 监听端口，SCF 必须是 9000 |
 | `HOST` | 0.0.0.0 | 监听地址，SCF 必须是 0.0.0.0 |
-| `STATE_FILE` | `%TEMP%\glossy-cloud-quota.json` | 计数文件；设成空串则不落盘 |
+| `STATE_FILE` | `%TEMP%\glossy-cloud-quota.json` | 计数文件；设成空串则不落盘。每月的截图取字次数记在旁边的 `<它>.month` 里 |
 | `CLIENT_IP_HEADERS` | `x-forwarded-for,x-real-ip,cf-connecting-ip` | 按顺序找客户端地址，取每个头里**倒数第三段**（末尾两段是网关追加的） |
 
 ### 打 SCF 的包
@@ -338,14 +425,19 @@ cp .dev.vars.example .dev.vars   # Windows: Copy-Item .dev.vars.example .dev.var
 npx wrangler dev                 # 默认 http://127.0.0.1:8787
 ```
 
-`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`YOUDAO_ENDPOINT`、`LLM_ENDPOINT`、`RATES_ENDPOINT`、
-`RATES_FALLBACK_ENDPOINT`（例如指向本地假接口），只影响本机调试，线上不设就用官方地址。
+`.dev.vars` 里还可以设 `BAIDU_ENDPOINT`、`TENCENT_OCR_ENDPOINT`、`TENCENT_OCR_REGION`、
+`BAIDU_OCR_ENDPOINT`、`BAIDU_OCR_TOKEN_ENDPOINT`、`YOUDAO_ENDPOINT`、`LLM_ENDPOINT`、
+`RATES_ENDPOINT`、`RATES_FALLBACK_ENDPOINT`（例如指向本地假接口），
+只影响本机调试，线上不设就用官方地址。
 
 ```bash
 curl http://127.0.0.1:9000/v1/health
 curl -X POST http://127.0.0.1:9000/v1/translate \
   -H 'Content-Type: application/json' \
   -d '{"clientId":"install-0001","text":"hello","to":"zh"}'
+curl -X POST http://127.0.0.1:9000/v1/ocr \
+  -H 'Content-Type: application/json' \
+  -d '{"clientId":"install-0001","image":"aW1n"}'
 ```
 
 ## 七、看日志 / 排错
@@ -356,6 +448,8 @@ Cloudflare：`npx wrangler tail`；腾讯云 SCF：控制台「日志查询」�
 
 - `upstream_credentials`：上游认证失败。百度是 APP ID 或密钥错了，或百度的「个人认证」没通过（个人认证才有免费额度）；有道是应用 ID/密钥错了或没开通文本翻译；大模型是 Key 失效或没权限。
 - `upstream_limit`：上游额度用尽或被限流。所有配好的上游都用尽了才会出现这个。
+- `ocr_month_quota_exceeded`：**这台设备本月的截图取字次数用完了**（默认 100 次）。要么等下个月 1 号，
+  要么把 `OCR_PER_CLIENT_MONTH` 调大（`0` 是不限），这跟上游的额度没关系。
 - SCF 上报 `PortBindingFailed` / 函数启动失败：启动命令没填对。检查是不是监听 `0.0.0.0:9000`、
   `scf_bootstrap` 内容是否 LF 换行、`index.mjs` 与启动命令是否在同一个目录。
 - SCF 上调用超时：把函数**超时时间调到 10 秒**。

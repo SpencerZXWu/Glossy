@@ -11,6 +11,7 @@
 const TOTAL_SCOPE = "total";
 const TOTAL_ID = "all";
 const OVERFLOW_ID = "*";
+const MONTH_SCOPE = "client";
 
 export function createState() {
   return { usage: new Map(), minutes: new Map() };
@@ -116,6 +117,50 @@ export function refund(state, { clientId, ipHash, chars }) {
     const row = state.usage.get(usageKey(scope, id));
     if (row) row.chars = Math.max(0, row.chars - chars);
   }
+}
+
+/**
+ * Books one screenshot reading against the counters of a month.
+ *
+ * A picture costs the operator one call of a monthly vendor allowance whatever
+ * is on it, so what is counted is the number of readings and not the
+ * characters: the daily allowance alone would let a handful of users spend the
+ * whole month of a shared account between them in one afternoon.
+ *
+ * The state this is handed is the month's own. The daily counters are thrown
+ * away at midnight, so the host keeps the readings in a store of their own,
+ * keyed by the month and not by the day.
+ */
+export function reserveOcr(state, { clientId, limit, maxBuckets }) {
+  const used = readUsage(state, MONTH_SCOPE, clientId).requests;
+  if (limit > 0 && used >= limit) {
+    return {
+      ok: false,
+      code: "ocr_month_quota_exceeded",
+      message: `每月的截图翻译额度用完了（每月 ${limit} 次），下个月 1 号重新计算。`,
+      limit,
+      used,
+      remaining: 0,
+    };
+  }
+
+  add(state, MONTH_SCOPE, clientId, 0, maxBuckets ?? 5000);
+  return {
+    ok: true,
+    used: used + 1,
+    remaining: limit > 0 ? Math.max(0, limit - used - 1) : null,
+  };
+}
+
+/** Gives a reading back when the picture was never read. */
+export function refundOcr(state, { clientId }) {
+  const row = state.usage.get(usageKey(MONTH_SCOPE, clientId));
+  if (row) row.requests = Math.max(0, row.requests - 1);
+}
+
+/** How many readings this month has cost, for the settings window. */
+export function peekOcr(state, { clientId }) {
+  return { requests: readUsage(state, MONTH_SCOPE, clientId).requests };
 }
 
 /** Minute buckets are only needed for the current and previous minute. */

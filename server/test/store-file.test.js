@@ -72,6 +72,43 @@ test("a new UTC day starts from zero", (t) => {
   assert.equal(book(store, { chars: 10 }).ok, true);
 });
 
+test("remembers the readings of a month across the days inside it", (t) => {
+  const file = join(tempDir(t), "quota-month.json");
+  const month = "2025-09";
+  const reading = (store) => store.reserveOcr(month, { clientId: "client-a", limit: 3 });
+
+  const first = createFileStore({ file });
+  assert.equal(reading(first).used, 1);
+
+  // 实例被冻结再唤醒、或者换了一天，月度次数都还得在。
+  const second = createFileStore({ file });
+  assert.equal(second.peekOcr(month, { clientId: "client-a" }).requests, 1);
+  assert.equal(reading(second).used, 2);
+
+  const third = createFileStore({ file });
+  assert.equal(reading(third).used, 3);
+  assert.equal(reading(third).ok, false);
+  assert.equal(third.peekOcr(month, { clientId: "client-a" }).requests, 3);
+});
+
+test("a new month starts the readings from zero", (t) => {
+  const file = join(tempDir(t), "quota-month.json");
+  const store = createFileStore({ file });
+  store.reserveOcr("2025-09", { clientId: "client-a", limit: 1 });
+
+  assert.equal(store.peekOcr("2025-10", { clientId: "client-a" }).requests, 0);
+  assert.equal(store.reserveOcr("2025-10", { clientId: "client-a", limit: 1 }).ok, true);
+});
+
+test("a reading that failed is written back as well", (t) => {
+  const file = join(tempDir(t), "quota-month.json");
+  const store = createFileStore({ file });
+  store.reserveOcr("2025-09", { clientId: "client-a", limit: 1 });
+  store.refundOcr("2025-09", { clientId: "client-a" });
+
+  assert.equal(createFileStore({ file }).peekOcr("2025-09", { clientId: "client-a" }).requests, 0);
+});
+
 test("starts empty when the counter file is unreadable or corrupt", (t) => {
   const dir = tempDir(t);
   const file = join(dir, "quota.json");

@@ -84,6 +84,27 @@ test("reports the detected source language as an app tag", async () => {
   assert.equal(result.to, "en");
 });
 
+test("reads the pair youdao answered with as its source half", async () => {
+  // `l` is the pair it translated, not the source alone: `en2zh-CHS` used to
+  // reach the popup as it stood, and the card showed a code where a language
+  // name belongs.
+  const detect = (l) =>
+    translateWithYoudao({
+      fetchImpl: jsonFetch({ errorCode: "0", translation: ["你好"], l }),
+      appKey: "app-key",
+      secret: "app-secret",
+      text: "hello",
+      from: "auto",
+      to: "zh-CN",
+    });
+
+  assert.equal((await detect("en2zh-CHS")).from, "en");
+  assert.equal((await detect("zh-CHS2en")).from, "zh-CN");
+  assert.equal((await detect("ja2zh-CHT")).from, "ja");
+  assert.equal((await detect("fr")).from, "fr");
+  assert.equal((await detect("")).from, "auto");
+});
+
 test("maps youdao error codes onto app codes", async () => {
   const call = (errorCode) =>
     translateWithYoudao({

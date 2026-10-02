@@ -1,5 +1,6 @@
 /**
- * Daily character counters, one Durable Object per UTC day.
+ * Daily character counters and monthly reading counters, one Durable Object per
+ * key: one UTC day for the characters, one month for the readings.
  *
  * The rules themselves live in `policy.js` and are shared with the Node store.
  * Everything inside a single object runs single threaded, so loading the state,
@@ -13,8 +14,11 @@ import { DurableObject } from "cloudflare:workers";
 import {
   createState,
   peek as policyPeek,
+  peekOcr as policyPeekOcr,
   refund as policyRefund,
+  refundOcr as policyRefundOcr,
   reserve as policyReserve,
+  reserveOcr as policyReserveOcr,
   usageKey,
 } from "./policy.js";
 
@@ -65,6 +69,22 @@ export class QuotaCounter extends DurableObject {
   refund(input) {
     policyRefund(this.state, input);
     this.#flush();
+  }
+
+  /** The monthly readings, in an object of their own, one per month. */
+  reserveOcr(input) {
+    const result = policyReserveOcr(this.state, input);
+    if (result.ok) this.#flush();
+    return result;
+  }
+
+  refundOcr(input) {
+    policyRefundOcr(this.state, input);
+    this.#flush();
+  }
+
+  peekOcr(input) {
+    return policyPeekOcr(this.state, input);
   }
 
   #flush() {

@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createState, peek, pruneMinutes, refund, reserve, usageKey } from "../src/policy.js";
+import {
+  createState,
+  peek,
+  peekOcr,
+  pruneMinutes,
+  refund,
+  refundOcr,
+  reserve,
+  reserveOcr,
+  usageKey,
+} from "../src/policy.js";
 
 const LIMITS = {
   charsPerClient: 100,
@@ -142,4 +152,61 @@ test("forgets minute buckets that are already over", () => {
 
   book(state, { minute: MINUTE + 1 });
   assert.equal(state.minutes.size, 1);
+});
+
+test("counts the readings of a month and stops at the limit", () => {
+  const state = createState();
+  const reading = (over = {}) => reserveOcr(state, { clientId: "client-a", limit: 2, ...over });
+
+  assert.equal(reading().used, 1);
+  assert.equal(reading().used, 2);
+  assert.equal(reading().remaining, 0);
+
+  const refused = reading();
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, "ocr_month_quota_exceeded");
+  assert.equal(refused.limit, 2);
+  assert.equal(peekOcr(state, { clientId: "client-a" }).requests, 2);
+});
+
+test("a reading is counted whether or not the day has characters left", () => {
+  // 截图次数和字符额度是两套账：这里只记账，不碰字符。
+  const state = createState();
+  reserveOcr(state, { clientId: "client-a", limit: 5 });
+
+  assert.equal(peek(state, { clientId: "client-a", ipHash: "ip-a" }).client, 0);
+  assert.equal(peekOcr(state, { clientId: "client-a" }).requests, 1);
+});
+
+test("gives a reading back when the picture was never read", () => {
+  const state = createState();
+  reserveOcr(state, { clientId: "client-a", limit: 1 });
+  assert.equal(reserveOcr(state, { clientId: "client-a", limit: 1 }).ok, false);
+
+  refundOcr(state, { clientId: "client-a" });
+  assert.equal(peekOcr(state, { clientId: "client-a" }).requests, 0);
+  assert.equal(reserveOcr(state, { clientId: "client-a", limit: 1 }).ok, true);
+});
+
+test("never refunds a reading below zero", () => {
+  const state = createState();
+  refundOcr(state, { clientId: "client-a" });
+
+  assert.equal(peekOcr(state, { clientId: "client-a" }).requests, 0);
+});
+
+test("a month limit of zero switches the count off", () => {
+  const state = createState();
+  for (let i = 0; i < 5; i += 1) {
+    assert.equal(reserveOcr(state, { clientId: "client-a", limit: 0 }).remaining, null);
+  }
+  assert.equal(peekOcr(state, { clientId: "client-a" }).requests, 5);
+});
+
+test("keeps the readings of one install apart from another", () => {
+  const state = createState();
+  reserveOcr(state, { clientId: "client-a", limit: 1 });
+
+  assert.equal(peekOcr(state, { clientId: "client-b" }).requests, 0);
+  assert.equal(reserveOcr(state, { clientId: "client-b", limit: 1 }).ok, true);
 });

@@ -5,11 +5,23 @@
  *
  * Cloud functions freeze an idle instance instead of killing it, so the file is
  * what makes the counters survive a cold start. Only `/tmp` is writable on SCF.
+ *
+ * One instance counts one key: the host gives the day counters a file of their
+ * own and the monthly readings another, so the two do not take each other's
+ * counters away when their key moves on.
  */
 
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
-import { createState, peek as policyPeek, refund as policyRefund, reserve as policyReserve } from "./policy.js";
+import {
+  createState,
+  peek as policyPeek,
+  peekOcr as policyPeekOcr,
+  refund as policyRefund,
+  refundOcr as policyRefundOcr,
+  reserve as policyReserve,
+  reserveOcr as policyReserveOcr,
+} from "./policy.js";
 
 function hydrate(raw) {
   const state = createState();
@@ -59,7 +71,7 @@ export function createFileStore({ file = "" } = {}) {
     }
   }
 
-  /** Counters belong to one UTC day, the same as the Durable Object per day. */
+  /** Counters belong to one key — one UTC day, or one month — the same as the Durable Object. */
   function sync(nextDay) {
     if (nextDay !== day) {
       day = nextDay;
@@ -82,6 +94,21 @@ export function createFileStore({ file = "" } = {}) {
     peek(nextDay, input) {
       sync(nextDay);
       return policyPeek(state, input);
+    },
+    reserveOcr(nextDay, input) {
+      sync(nextDay);
+      const result = policyReserveOcr(state, input);
+      if (result.ok) save();
+      return result;
+    },
+    refundOcr(nextDay, input) {
+      sync(nextDay);
+      policyRefundOcr(state, input);
+      save();
+    },
+    peekOcr(nextDay, input) {
+      sync(nextDay);
+      return policyPeekOcr(state, input);
     },
   };
 }

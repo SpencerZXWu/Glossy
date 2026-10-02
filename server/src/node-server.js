@@ -3,7 +3,7 @@
  * the handler speaks, so the same rules run on SCF, on a container and locally.
  */
 
-const DEFAULT_MAX_BODY = 64 * 1024;
+export const DEFAULT_MAX_BODY = 64 * 1024;
 
 /** Node's own headers must not be copied onto a `Request`; undici rejects some. */
 const SKIP_HEADERS = new Set([
@@ -19,6 +19,10 @@ const SKIP_HEADERS = new Set([
   "upgrade",
 ]);
 
+/**
+ * `maxBody` is a byte count, or a function of the request path for the routes
+ * that carry a screenshot rather than a sentence.
+ */
 export function createRequestListener({
   handler,
   clientIpHeaders = ["x-forwarded-for", "x-real-ip", "cf-connecting-ip"],
@@ -27,7 +31,7 @@ export function createRequestListener({
 }) {
   let ipReported = false;
 
-  function readBody(request) {
+  function readBody(request, limit) {
     return new Promise((resolve, reject) => {
       const chunks = [];
       let size = 0;
@@ -42,10 +46,10 @@ export function createRequestListener({
 
       request.on("data", (chunk) => {
         size += chunk.length;
-        if (size > maxBody) {
+        if (size > limit) {
           // 继续读下去只是把数据丢掉，连接保持健康，客户端能收到干净的 413。
           // 只有明显在灌数据的时候才直接掐断连接。
-          if (size > maxBody * 4) {
+          if (size > limit * 4) {
             done(reject, tooLongError());
             request.destroy();
             return;
@@ -84,7 +88,7 @@ export function createRequestListener({
 
       const hasBody = request.method !== "GET" && request.method !== "HEAD";
       let body;
-      if (hasBody) body = await readBody(request);
+      if (hasBody) body = await readBody(request, typeof maxBody === "function" ? maxBody(url.pathname) : maxBody);
 
       const result = await handler(
         new Request(url, {

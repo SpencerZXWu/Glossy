@@ -10,7 +10,9 @@
 
 import { translateWithLlm } from "./llm.js";
 import { md5 } from "./md5.js";
+import { recognizeWithBaidu } from "./ocr.js";
 import { fetchRates } from "./rates.js";
+import { recognizeWithTencent } from "./tencent-ocr.js";
 import { translateWithYoudao } from "./youdao.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
@@ -181,6 +183,88 @@ export function upstreamConfigured(config) {
 }
 
 /**
+ * Whether this deployment can read text off a picture.
+ *
+ * Reading a screenshot is a separate product with its own keys on both clouds,
+ * so a deployment that only translates simply has no OCR to offer, and the App
+ * says so instead of uploading. Either key pair is enough.
+ */
+export function ocrConfigured(config) {
+  return Boolean(
+    (config.TENCENT_SECRET_ID && config.TENCENT_SECRET_KEY) ||
+      (config.BAIDU_OCR_API_KEY && config.BAIDU_OCR_SECRET_KEY),
+  );
+}
+
+/** The OCR vendors this deployment holds keys for, in the order they are tried. */
+function ocrBackends(config, fetchImpl) {
+  const backends = [];
+
+  if (config.TENCENT_SECRET_ID && config.TENCENT_SECRET_KEY) {
+    backends.push({
+      name: "tencent",
+      call: (input) =>
+        recognizeWithTencent({
+          fetchImpl,
+          secretId: config.TENCENT_SECRET_ID,
+          secretKey: config.TENCENT_SECRET_KEY,
+          endpoint: config.TENCENT_OCR_ENDPOINT,
+          region: config.TENCENT_OCR_REGION,
+          ...input,
+        }),
+    });
+  }
+
+  if (config.BAIDU_OCR_API_KEY && config.BAIDU_OCR_SECRET_KEY) {
+    backends.push({
+      name: "baidu",
+      call: (input) =>
+        recognizeWithBaidu({
+          fetchImpl,
+          apiKey: config.BAIDU_OCR_API_KEY,
+          secretKey: config.BAIDU_OCR_SECRET_KEY,
+          endpoint: config.BAIDU_OCR_ENDPOINT,
+          tokenEndpoint: config.BAIDU_OCR_TOKEN_ENDPOINT,
+          ...input,
+        }),
+    });
+  }
+
+  return backends;
+}
+
+/**
+ * Failures worth asking the other vendor about. `no_text` is not one of them:
+ * both vendors read the same picture, so a second opinion would cost a call and
+ * say the same thing.
+ */
+const OCR_HAND_OVER = new Set([
+  "upstream_credentials",
+  "upstream_unreachable",
+  "upstream_error",
+  "upstream_limit",
+]);
+
+/**
+ * Reads one screenshot with the first vendor that answers, so a deployment
+ * holding both key pairs keeps working when one of them runs out of quota.
+ *
+ * The failure reported back is the last one, matching how translation reports a
+ * fallback that ran out of options.
+ */
+async function readWithBackends(backends, input) {
+  if (!backends.length) return { ok: false, code: "not_configured", message: "服务端还没有配置识图密钥。" };
+
+  let last;
+  for (const backend of backends) {
+    last = { ...(await backend.call(input)), vendor: backend.name };
+    if (last.ok) return last;
+    if (!OCR_HAND_OVER.has(last.code)) return last;
+  }
+  return last;
+}
+
+/**
  * Builds the upstream the handler talks to.
  *
  * Every configured backend is kept and tried in order, LLM first because it
@@ -195,6 +279,7 @@ export function upstreamConfigured(config) {
 export function createUpstream(config) {
   const fetchImpl = (...args) => fetch(...args);
   const backends = [];
+  const ocr = ocrBackends(config, fetchImpl);
 
   if (config.LLM_API_KEY) {
     backends.push({
@@ -241,6 +326,9 @@ export function createUpstream(config) {
   return {
     isLanguageTag,
     configured: upstreamConfigured(config),
+    ocrConfigured: ocrConfigured(config),
+    /** Name of the OCR vendor this deployment reads pictures with, if any. */
+    ocrVendor: ocr.length ? ocr[0].name : null,
     /** Names of the vendors this deployment can serve, in the order it tries them. */
     vendors: backends.map((backend) => backend.name),
     /**
@@ -256,6 +344,8 @@ export function createUpstream(config) {
         timeoutMs: Number.parseInt(config.RATES_TIMEOUT_MS ?? "", 10) || undefined,
         ...input,
       }),
+    /** Reads the text off one screenshot. Answers `not_configured` without keys. */
+    ocr: (input = {}) => readWithBackends(ocr, input),
     async translate(input = {}) {
       if (!backends.length) {
         return { ok: false, code: "not_configured", message: "服务端还没有配置翻译密钥。" };
@@ -269,9 +359,23 @@ export function createUpstream(config) {
         : backends;
 
       let last;
+      // The vendors walked past, with the code each one refused with. A vendor
+      // that is down, throttled or out of quota is invisible to the user: the
+      // answer comes from the next one and looks like an answer from the one they
+      // picked. Saying which ones were skipped — and why, as far as the vendor's
+      // own code tells it — is what lets the App explain itself instead of
+      // appearing to have changed the setting on its own.
+      const attempts = [];
       for (const backend of order) {
         last = { ...(await backend.call(input)), vendor: backend.name };
-        if (last.ok) return last;
+        if (last.ok) return attempts.length ? { ...last, attempts } : last;
+        const code = last.code || "upstream_error";
+        attempts.push({ vendor: backend.name, code });
+        // The deployment's own log: whoever runs it is the only one who can fix
+        // a vendor whose credentials or quota ran out.
+        console.warn(
+          `glossy-cloud: ${backend.name} 未能应答（${code}），改用下一个：${last.message || ""}`,
+        );
       }
       return last;
     },

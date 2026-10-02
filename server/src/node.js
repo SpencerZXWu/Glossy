@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createHandler } from "./handler.js";
-import { createRequestListener } from "./node-server.js";
+import { createRequestListener, DEFAULT_MAX_BODY } from "./node-server.js";
 import { createFileStore } from "./store-file.js";
 import { createUpstream } from "./upstream.js";
 
@@ -34,14 +34,20 @@ const upstream = createUpstream(process.env);
 
 const handler = createHandler({
   store: createFileStore({ file: stateFile }),
+  // 截图次数按自然月统计：日度计数每天清零，所以月度计数要另存一个文件。
+  ocrStore: createFileStore({ file: stateFile ? `${stateFile}.month` : "" }),
   upstream,
   config: process.env,
 });
+
+// 截图走 /v1/ocr，正文比其他接口大得多，所以只给这一条路由放宽限制。
+const ocrMaxBody = Number.parseInt(process.env.OCR_MAX_BODY ?? "", 10) || 4 * 1024 * 1024;
 
 const server = createServer(
   createRequestListener({
     handler,
     clientIpHeaders: clientIpHeaders.length ? clientIpHeaders : DEFAULT_IP_HEADERS,
+    maxBody: (path) => (path === "/v1/ocr" ? ocrMaxBody : DEFAULT_MAX_BODY),
   }),
 );
 

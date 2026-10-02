@@ -20,19 +20,27 @@ async function serve(t, { handler, maxBody } = {}) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-async function startGlossy(t) {
+async function startGlossy(t, { maxBody } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "glossy-cloud-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
   const calls = [];
+  const ocrCalls = [];
   const handler = createHandler({
     store: createFileStore({ file: join(dir, "quota.json") }),
+    ocrStore: createFileStore({ file: join(dir, "quota-month.json") }),
     upstream: {
       isLanguageTag,
       configured: true,
+      ocrConfigured: true,
+      ocrVendor: "baidu",
       translate: async (input) => {
         calls.push(input);
         return { ok: true, from: "en", to: "zh", translation: "你好" };
+      },
+      ocr: async (input) => {
+        ocrCalls.push(input);
+        return { ok: true, text: "recognized", language: "CHN_ENG" };
       },
     },
     config: {
@@ -48,7 +56,7 @@ async function startGlossy(t) {
     now: () => NOW,
   });
 
-  return { base: await serve(t, { handler }), calls };
+  return { base: await serve(t, { handler, maxBody }), calls, ocrCalls };
 }
 
 test("answers /v1/health over real HTTP", async (t) => {
@@ -61,8 +69,34 @@ test("answers /v1/health over real HTTP", async (t) => {
     service: "glossy-cloud",
     day: "2025-09-01",
     configured: true,
+    ocr: true,
+    ocrVendor: "baidu",
     vendors: [],
   });
+});
+
+test("carries a screenshot that is much bigger than a sentence", async (t) => {
+  const image = Buffer.alloc(150 * 1024, 7).toString("base64");
+  const { base, ocrCalls } = await startGlossy(t, {
+    maxBody: (path) => (path === "/v1/ocr" ? 4 * 1024 * 1024 : 64 * 1024),
+  });
+
+  const response = await fetch(`${base}/v1/ocr`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId: "install-0001", image }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).text, "recognized");
+  assert.equal(ocrCalls[0].image, image);
+
+  const plain = await fetch(`${base}/v1/translate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ clientId: "install-0001", text: "a".repeat(70 * 1024), to: "zh" }),
+  });
+  assert.equal(plain.status, 413, "其他接口仍然只收小请求");
 });
 
 test("translates through the whole stack and reports the usage", async (t) => {

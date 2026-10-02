@@ -4,6 +4,9 @@
 # 三个上游都配了就都留着：大模型先试，失败了自动交回机器翻译；
 # 客户端可以点名要用哪一个（`vendor`），点名的排到最前面，仍然带兜底。
 # 至少配一个，否则 /v1/translate 会返回 not_configured。
+#
+# 截图取字（OCR）是另一回事：腾讯云 / 百度智能云任配一对即可，都没配就只是
+# /v1/health 里 ocr 为 false，App 不会上传截图。
 
 # 大模型上游（OpenAI 兼容接口），翻译质量比机器翻译好，按量计费。
 # LLM_API_KEY = "你的大模型密钥"
@@ -28,3 +31,25 @@ IP_SALT = "换成一串随机字符"
 # RATES_FALLBACK_ENDPOINT = "https://api.frankfurter.app/latest?from="
 # 只在本地调试时用：把百度地址换成自己的假接口。
 # BAIDU_ENDPOINT = "http://127.0.0.1:8791/api/trans/vip/translate"
+
+# 截图取字（腾讯云「文字识别」→ 通用印刷体识别），跟上面翻译那对密钥不是同一个产品。
+# 去「访问管理 → API 密钥管理」拿一对，再去文字识别控制台开通「通用印刷体识别」，
+# 这个接口每月 1 号送你 1000 次、只在当月有效，够自用；用完就等下个月。两对识图密钥如果都配了，先试腾讯，腾讯不行才交给百度。
+# 另外服务端自己再按「每台设备每月 100 次」限制截图取字（OCR_PER_CLIENT_MONTH，写在 wrangler.toml 里），
+# 这样一台设备不会把大家共用的那点免费次数占光。
+# 不配也能跑，只是 /v1/health 里 ocr 为 false，App 不会上传截图。
+# TENCENT_SECRET_ID = "你的 SecretId"
+# TENCENT_SECRET_KEY = "你的 SecretKey"
+# 默认广州，就近换成 ap-shanghai / ap-beijing 也行。
+# TENCENT_OCR_REGION = "ap-guangzhou"
+# 只在本地调试时用：把识图地址换成自己的假接口。
+# TENCENT_OCR_ENDPOINT = "http://127.0.0.1:8791"
+
+# 截图取字（百度智能云「文字识别」→ 通用文字识别）。
+# 百度那边从 2025 年起要付费才能开通这个接口，没开通报 error_code 6。
+# 留着当兜底可以，新部署建议直接用上面的腾讯云。
+# BAIDU_OCR_API_KEY = "你在百度智能云拿到的 API Key"
+# BAIDU_OCR_SECRET_KEY = "你在百度智能云拿到的 Secret Key"
+# 只在本地调试时用：把识图地址换成自己的假接口。
+# BAIDU_OCR_ENDPOINT = "http://127.0.0.1:8791/rest/2.0/ocr/v1/general_basic"
+# BAIDU_OCR_TOKEN_ENDPOINT = "http://127.0.0.1:8791/oauth/2.0/token"

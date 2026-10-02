@@ -17,6 +17,9 @@ DAILY_CHARS_TOTAL = "30000"
 MAX_CHARS_PER_REQUEST = "2000"
 # 同一个 IP 每分钟的请求数上限，挡住脚本狂刷。
 MAX_REQUESTS_PER_MINUTE = "30"
+# 截图取字（OCR）另外按「单台设备每月几次」限制，0 表示不限。
+# 默认 100 次，写在 handler.js 里；要改就在这行取消注释（SCF 上放环境变量）。
+# OCR_PER_CLIENT_MONTH = "100"
 
 # 每天的计数放在 Durable Object 里（免费版也能用 SQLite 后端），
 # 而不是 KV：KV 免费额度每天只有 1000 次写入，一翻译就写会很快撞上。

@@ -11,6 +11,18 @@ export const YOUDAO_ENDPOINT = "https://openapi.youdao.com/api";
 /** 有道报回来的语言代码换回 App 用的标签。 */
 const APP_TAGS = { "zh-CHS": "zh-CN", "zh-CHT": "zh-TW" };
 
+/**
+ * 有道把「源语言2目标语言」整串放在 `l` 里（`en2zh-CHS`），而不是只放源语言。
+ * 这里取 `2` 左边那一半 —— 那才是它判断出来的源语言 —— 再换回 App 的标签。
+ */
+export function youdaoSource(language) {
+  const value = String(language || "").trim();
+  if (!value) return "";
+  const cut = value.indexOf("2");
+  const source = cut === -1 ? value : value.slice(0, cut);
+  return APP_TAGS[source] || source;
+}
+
 /** 有道把中文拆成简繁两支；另外几个标签的拼法和常见写法不同。 */
 const YOUDAO_CODES = {
   zh: "zh-CHS",
@@ -158,7 +170,7 @@ async function callYoudao({ fetchImpl, appKey, secret, text, from, to, endpoint,
 
   return {
     ok: true,
-    from: typeof data.l === "string" && data.l ? APP_TAGS[data.l] || data.l : youdaoCode(from),
+    from: youdaoSource(data.l) || youdaoCode(from),
     to: youdaoCode(to),
     translation,
   };
