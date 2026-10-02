@@ -11,10 +11,11 @@
 pub mod clipboard;
 pub mod console;
 pub mod desktop;
+pub mod encoding;
 pub mod hotkey;
 pub mod input;
 pub mod input_hook;
 pub mod instance;
-pub mod secrets;
+pub mod screen;
 pub mod speech;
 pub mod uia;

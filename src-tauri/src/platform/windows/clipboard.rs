@@ -386,6 +386,7 @@ pub fn capture_selection(restore: bool) -> (Capture, Option<Pending>) {
     // not be mistaken for the answer to this copy.
     let own = OWN_SEQUENCE.load(Ordering::Relaxed);
 
+    super::desktop::note_focus_owner();
     super::input::send_copy();
 
     let deadline = Instant::now() + Duration::from_millis(700);
@@ -427,6 +428,47 @@ pub fn copy_to_clipboard(text: &str) -> bool {
         return false;
     }
     write_text(text)
+}
+
+/// How long the translation is left on the clipboard for the paste to be read
+/// out of it. A receiving application reads it within milliseconds; the wait is
+/// only there so that putting the old content back cannot beat the paste.
+const PASTE_SETTLE: Duration = Duration::from_millis(250);
+
+/// Writes `text` over the current selection of the application the text was
+/// read from.
+///
+/// The mirror image of a capture: the selection was read with Ctrl+C, so it is
+/// written back with the translation on the clipboard and Ctrl+V. With `restore`
+/// set, what the clipboard held is put back once the paste has been made.
+///
+/// A paste lands in whichever window is in front, and the card can be in front
+/// because it was clicked - so the window the selection came from is put back
+/// there first, and the selection the translation belongs to is still there.
+pub fn replace_selection(text: &str, restore: bool) -> bool {
+    if text.is_empty() {
+        return false;
+    }
+    // Read before the translation is put on the clipboard, because that write
+    // is what would otherwise be captured as "what the clipboard held".
+    let snapshot = if restore {
+        Snapshot::of_clipboard()
+    } else {
+        None
+    };
+    if !write_text(text) {
+        return false;
+    }
+
+    let handover = super::desktop::restore_focus_owner();
+    super::input::send_paste();
+
+    std::thread::sleep(PASTE_SETTLE);
+    drop(handover);
+    if let Some(snapshot) = snapshot {
+        snapshot.restore_settled();
+    }
+    true
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_C,
-    VK_CONTROL, VK_MENU, VK_SHIFT,
+    VK_CONTROL, VK_ESCAPE, VK_MENU, VK_RBUTTON, VK_SHIFT, VK_V,
 };
 
 fn key(vk: VIRTUAL_KEY, up: bool) -> INPUT {
@@ -31,22 +31,50 @@ fn key_is_down(vk: VIRTUAL_KEY) -> bool {
     }
 }
 
+/// True while the user is holding Escape down.
+///
+/// Asked by the screenshot overlay, which covers a whole monitor and takes the
+/// clicks with it: if the page inside it never came up, the key presses go
+/// nowhere, and something outside the page has to notice the way out.
+pub fn escape_is_down() -> bool {
+    key_is_down(VK_ESCAPE)
+}
+
+/// True while the user is holding the right mouse button down, the other way
+/// out of the screenshot overlay.
+pub fn right_button_is_down() -> bool {
+    key_is_down(VK_RBUTTON)
+}
+
 /// Sends Ctrl+C to the foreground window so it copies its current selection.
 ///
 /// Held modifier keys are released first, otherwise the combination would be
 /// interpreted as Ctrl+Shift+C style shortcuts by the receiving application.
 pub fn send_copy() {
+    send_chord(VK_C);
+}
+
+/// Sends Ctrl+V to the foreground window so it writes the clipboard over its
+/// current selection.
+///
+/// The other half of [`send_copy`]: the selection was read with a copy, and it
+/// is written back with a paste.
+pub fn send_paste() {
+    send_chord(VK_V);
+}
+
+fn send_chord(vk: VIRTUAL_KEY) {
     let mut inputs: Vec<INPUT> = Vec::with_capacity(10);
 
-    for vk in [VK_SHIFT, VK_MENU] {
-        if key_is_down(vk) {
-            inputs.push(key(vk, true));
+    for held in [VK_SHIFT, VK_MENU] {
+        if key_is_down(held) {
+            inputs.push(key(held, true));
         }
     }
 
     inputs.push(key(VK_CONTROL, false));
-    inputs.push(key(VK_C, false));
-    inputs.push(key(VK_C, true));
+    inputs.push(key(vk, false));
+    inputs.push(key(vk, true));
     inputs.push(key(VK_CONTROL, true));
 
     unsafe {

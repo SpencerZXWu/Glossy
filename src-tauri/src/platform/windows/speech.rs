@@ -28,6 +28,7 @@ use windows::Win32::System::Com::{
     COINIT_APARTMENTTHREADED,
 };
 
+use crate::log::note;
 use crate::vitals;
 
 /// How long the interface waits for the worker to report that it has a voice.
@@ -62,7 +63,7 @@ fn commands() -> &'static Mutex<Sender<Command>> {
             .name("glossy-speech".to_string())
             .spawn(move || worker(receiver))
         {
-            eprintln!("Glossy could not start its speech thread: {error}");
+            note!("Glossy could not start its speech thread: {error}");
         }
         Mutex::new(sender)
     })
@@ -215,7 +216,7 @@ fn worker(receiver: Receiver<Command>) {
             } => {
                 match unsafe { speak_with(&voice, &mut voices, &text, rate, language.as_deref()) } {
                     Err(error) => {
-                        eprintln!("Glossy could not read the translation out loud: {error}");
+                        note!("Glossy could not read the translation out loud: {error}");
                         settle(reading);
                     }
                     // The voice says the words on its own thread, so this one
@@ -228,7 +229,7 @@ fn worker(receiver: Receiver<Command>) {
             // is still queued, which is how SAPI stops.
             Command::Stop => {
                 if let Err(error) = unsafe { voice.Speak(PCWSTR::null(), purge_flag(), None) } {
-                    eprintln!("Glossy could not stop reading aloud: {error}");
+                    note!("Glossy could not stop reading aloud: {error}");
                 }
             }
         }

@@ -11,12 +11,13 @@
 //! | --- | --- |
 //! | `clipboard` | read and write the system clipboard, capture a selection |
 //! | `console` | attach to the terminal the process was started from |
-//! | `desktop` | cursor, monitors, window handles and what they own, the foreground program, locale |
+//! | `desktop` | cursor, monitors, window handles and what they own, the foreground program, locale, the machine identifier the daily allowance is counted by |
+//! | `encoding` | text written in the code page Windows was installed with |
 //! | `hotkey` | register the global accelerator and route its messages |
 //! | `input` | type the keystrokes that copy a selection |
 //! | `input_hook` | the low level mouse hook and the message loop it runs on |
 //! | `instance` | one Glossy per login, and how a second start announces itself |
-//! | `secrets` | protect a stored credential with the OS key store |
+//! | `screen` | a picture of part of the desktop, for the screenshot translation |
 //! | `speech` | read text aloud |
 //! | `uia` | the text around the current selection, from the accessibility API |
 //!
@@ -34,8 +35,13 @@ mod windows;
 
 #[cfg(windows)]
 pub use windows::{
-    clipboard, console, desktop, hotkey, input, input_hook, instance, secrets, speech, uia,
+    clipboard, console, desktop, encoding, hotkey, input, input_hook, instance, speech, uia,
 };
+
+/// A picture of the desktop, and what is done with one. Taking the picture is
+/// the only part that belongs to a platform, so it lives in the implementation
+/// and is re-exported from the portable module.
+pub mod screen;
 
 #[cfg(not(windows))]
 compile_error!(

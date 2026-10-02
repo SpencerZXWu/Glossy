@@ -3,6 +3,10 @@
 //! that keep the popup out of the way.
 
 use std::ffi::c_void;
+use std::path::Path;
+use std::process::Command;
+use std::sync::atomic::{AtomicIsize, Ordering};
+use std::time::Duration;
 
 use crate::platform::ScreenRect;
 
@@ -13,14 +17,16 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::System::Threading::{
-    GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION,
+    AttachThreadInput, GetCurrentProcessId, OpenProcess, QueryFullProcessImageNameW,
+    PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
+use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetAncestor, GetClassNameW, GetCursorPos, GetForegroundWindow,
-    GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-    IsWindowVisible, SetWindowLongPtrW, WindowFromPoint, GA_PARENT, GA_ROOT, GA_ROOTOWNER,
-    GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    GetGUIThreadInfo, GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW,
+    GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, SetForegroundWindow,
+    SetWindowLongPtrW, ShowWindow, WindowFromPoint, GA_PARENT, GA_ROOT, GA_ROOTOWNER,
+    GUITHREADINFO, GWL_EXSTYLE, SW_RESTORE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 
 /// Native handle of a window, kept as a plain integer so callers never have to
@@ -50,6 +56,75 @@ pub fn user_locale() -> String {
     }
 }
 
+/// What Windows calls this installation of Windows, from the registry.
+///
+/// It is the one identifier that survives Glossy being uninstalled and
+/// installed again, which is what the daily allowance is counted by: a value
+/// drawn at random would be drawn again on every install, and the allowance
+/// would start over with it. It is per installation of Windows rather than per
+/// account, so it is read together with the account name by the caller that
+/// wants one allowance per user.
+///
+/// The value is not personal and not secret — it identifies the Windows
+/// installation, not its owner — and nothing reads it here but the callers that
+/// hash it before it leaves the machine.
+pub fn machine_id() -> Option<String> {
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ,
+    };
+
+    let path: Vec<u16> = "SOFTWARE\\Microsoft\\Cryptography\0"
+        .encode_utf16()
+        .collect();
+    let name: Vec<u16> = "MachineGuid\0".encode_utf16().collect();
+    let mut key = HKEY::default();
+    if unsafe {
+        RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            windows::core::PCWSTR(path.as_ptr()),
+            None,
+            KEY_READ,
+            &mut key,
+        )
+    }
+    .is_err()
+    {
+        return None;
+    }
+
+    let mut kind = REG_SZ;
+    let mut bytes = [0u8; 128];
+    let mut size = bytes.len() as u32;
+    let read = unsafe {
+        RegQueryValueExW(
+            key,
+            windows::core::PCWSTR(name.as_ptr()),
+            None,
+            Some(&mut kind),
+            Some(bytes.as_mut_ptr()),
+            Some(&mut size),
+        )
+    };
+    let _ = unsafe { RegCloseKey(key) };
+    if read.is_err() || size < 2 {
+        return None;
+    }
+
+    // The value is a string, which the registry hands back as UTF-16 with its
+    // closing null inside the byte count.
+    let units: Vec<u16> = bytes[..size as usize - 2]
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect();
+    let value = String::from_utf16_lossy(&units);
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
+    }
+}
+
 /// Cursor position in physical screen pixels.
 pub fn cursor_pos() -> (i32, i32) {
     let mut point = POINT::default();
@@ -57,6 +132,14 @@ pub fn cursor_pos() -> (i32, i32) {
         return (0, 0);
     }
     (point.x, point.y)
+}
+
+/// Whether `handle` is the window that currently holds the keyboard.
+pub fn is_foreground(handle: Handle) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    unsafe { GetForegroundWindow() == handle.to_hwnd() }
 }
 
 /// True when one of our own windows currently owns the foreground.
@@ -411,18 +494,216 @@ pub fn work_area_for_point(x: i32, y: i32) -> Option<ScreenRect> {
     }
 }
 
+/// The window the selection being translated was read from.
+static SELECTION_WINDOW: AtomicIsize = AtomicIsize::new(0);
+
+/// Remember which window the selection in front of the user belongs to.
+///
+/// The popup is shown without taking the focus, but a click on the badge or on
+/// the card still hands it the focus, and a paste goes to whoever is in front -
+/// so who owned the selection has to be written down while it is still true.
+pub fn note_focus_owner() {
+    let window = unsafe { GetForegroundWindow() };
+    SELECTION_WINDOW.store(window.0 as isize, Ordering::Relaxed);
+}
+
+/// Give the focus back to the window remembered by [`note_focus_owner`].
+///
+/// A hand-over of the keyboard that is undone when it goes out of scope.
+///
+/// The keys have to be sent while the two input queues are still joined:
+/// joining them is what lets a window that is not in front be given the
+/// keyboard, and leaving them joined is what keeps the keys going there.
+pub struct FocusHandover {
+    front_thread: u32,
+    target_thread: u32,
+    joined: bool,
+}
+
+impl Drop for FocusHandover {
+    fn drop(&mut self) {
+        if self.joined {
+            unsafe {
+                let _ = AttachThreadInput(self.front_thread, self.target_thread, false);
+            }
+        }
+    }
+}
+
+/// How long a hand-over waits for the keyboard to move, and how often it looks.
+const FOCUS_TRIES: u32 = 25;
+const FOCUS_STEP: Duration = Duration::from_millis(10);
+
+/// Points the keyboard back at the window the selection was read from, and
+/// keeps it there for as long as the returned hand-over lives.
+///
+/// A no-op when that window is already in front - which is the case when the
+/// translation was asked for with a hotkey, since no click ever followed it.
+pub fn restore_focus_owner() -> Option<FocusHandover> {
+    let remembered = SELECTION_WINDOW.swap(0, Ordering::Relaxed);
+    if remembered == 0 {
+        return None;
+    }
+    let target = Handle(remembered).to_hwnd();
+    unsafe {
+        let front = GetForegroundWindow();
+        if front == target || !IsWindow(Some(target)).as_bool() {
+            return None;
+        }
+        if IsIconic(target).as_bool() {
+            let _ = ShowWindow(target, SW_RESTORE);
+        }
+        // Read from the target's own thread, before the queues are joined: once
+        // they are, both answer with the one shared focus.
+        let inner = focus_window(target);
+        let front_thread = GetWindowThreadProcessId(front, None);
+        let target_thread = GetWindowThreadProcessId(target, None);
+        if target_thread == 0 {
+            return None;
+        }
+        // A background process cannot give a window the keyboard; sharing the
+        // input queue of the window that is in front is what makes it possible.
+        let joined = front_thread != 0
+            && front_thread != target_thread
+            && AttachThreadInput(front_thread, target_thread, true).as_bool();
+        let handover = FocusHandover {
+            front_thread,
+            target_thread,
+            joined,
+        };
+        // The window is also brought to the front, so the user sees where the
+        // translation is about to land.
+        let _ = SetForegroundWindow(target);
+        if let Some(inner) = inner {
+            let _ = SetFocus(Some(inner));
+        }
+        let mut tries = 0;
+        while tries < FOCUS_TRIES && !keyboard_is_target(target) {
+            tries += 1;
+            std::thread::sleep(FOCUS_STEP);
+        }
+        Some(handover)
+    }
+}
+
+/// Whether the keys would reach `target`: the window carries the keyboard, and
+/// either it is what the two joined queues call focused or it is in front.
+fn keyboard_is_target(target: HWND) -> bool {
+    unsafe {
+        let inner = match focus_window(target) {
+            Some(inner) => inner,
+            None => return false,
+        };
+        GetForegroundWindow() == target || inner == target || GetAncestor(inner, GA_ROOT) == target
+    }
+}
+
+fn focus_window(target: HWND) -> Option<HWND> {
+    unsafe {
+        let thread = GetWindowThreadProcessId(target, None);
+        let mut info = GUITHREADINFO {
+            cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+            ..Default::default()
+        };
+        if GetGUIThreadInfo(thread, &mut info).is_err() || info.hwndFocus.0.is_null() {
+            return None;
+        }
+        Some(info.hwndFocus)
+    }
+}
+
 /// Keeps the popup from stealing focus from the application the user is reading
 /// in, and from showing up in the taskbar or alt-tab list.
 pub fn make_non_activating(handle: Handle) {
+    set_non_activating(handle, true);
+}
+
+/// Hands the keyboard to the window, undoing [`make_non_activating`], and
+/// reports whether the window ended up in front.
+///
+/// A field inside the popup is typed into, and typing needs the keyboard. Only
+/// the user's own action asks for this, and the next placement puts the window
+/// back out of the way, so the front is held no longer than the edit lasts.
+pub fn make_activating(handle: Handle) -> bool {
+    if handle.is_null() || !set_non_activating(handle, false) {
+        return false;
+    }
+    let hwnd = handle.to_hwnd();
+    unsafe {
+        if GetForegroundWindow() == hwnd {
+            return true;
+        }
+        // A background process is not allowed to put a window in front on its
+        // own. Sharing the input queue of the window that holds the front is
+        // what makes the move possible - the same trick as
+        // [`restore_focus_owner`], only in the other direction.
+        let front = GetForegroundWindow();
+        let front_thread = GetWindowThreadProcessId(front, None);
+        let window_thread = GetWindowThreadProcessId(hwnd, None);
+        let joined = front_thread != 0
+            && window_thread != 0
+            && front_thread != window_thread
+            && AttachThreadInput(front_thread, window_thread, true).as_bool();
+        let _ = SetForegroundWindow(hwnd);
+        let mut tries = 0;
+        while tries < FOCUS_TRIES && GetForegroundWindow() != hwnd {
+            tries += 1;
+            std::thread::sleep(FOCUS_STEP);
+        }
+        if joined {
+            let _ = AttachThreadInput(front_thread, window_thread, false);
+        }
+        GetForegroundWindow() == hwnd
+    }
+}
+
+/// Sets or clears the styles that keep a window out of the foreground; reports
+/// whether the window carries what was asked for afterwards.
+fn set_non_activating(handle: Handle, wanted: bool) -> bool {
     if handle.is_null() {
-        return;
+        return false;
     }
     unsafe {
         let hwnd = handle.to_hwnd();
         let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let updated = current | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
+        let flag = WS_EX_NOACTIVATE.0 as isize;
+        let updated = if wanted {
+            current | flag | (WS_EX_TOOLWINDOW.0 as isize)
+        } else {
+            current & !flag
+        };
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
+        GetWindowLongPtrW(hwnd, GWL_EXSTYLE) == updated
     }
+}
+
+/// Shows a folder in File Explorer, with the file it was asked about selected.
+///
+/// Used for the log, so a user who is asked to hand it over does not have to
+/// find the folder themselves. Explorer is told to select the file rather than
+/// open it: that is what the user needs to see, and opening a text file in
+/// whatever program is registered for `.log` would be a step too far.
+pub fn open_folder(path: &Path) -> Result<(), String> {
+    let argument = format!("/select,\"{}\"", path.display());
+    Command::new("explorer")
+        .arg(argument)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("File Explorer could not be opened: {error}"))
+}
+
+/// Opens a web address in whatever program the user reads the web with.
+///
+/// `FileProtocolHandler` is the shell's own "open this address" entry point, so
+/// the address goes to the default browser and to nothing else — a plain
+/// `Command::new(url)` would look for a program of that name first.
+pub fn open_url(url: &str) -> Result<(), String> {
+    Command::new("rundll32")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(url)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("The browser could not be opened: {error}"))
 }
 
 #[cfg(test)]

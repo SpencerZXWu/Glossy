@@ -30,7 +30,7 @@ pub struct Click {
 struct Handlers {
     click: Box<dyn FnMut(Click)>,
     reload: Box<dyn FnMut()>,
-    fire: Box<dyn FnMut()>,
+    fire: Box<dyn FnMut(hotkey::Slot)>,
 }
 
 thread_local! {
@@ -48,25 +48,44 @@ unsafe extern "system" fn mouse_hook(code: i32, wparam: WPARAM, lparam: LPARAM) 
                 x: info.pt.x,
                 y: info.pt.y,
             };
-            with_handlers(|handlers| (handlers.click)(click));
+            guarded("the mouse hook", || {
+                with_handlers(|handlers| (handlers.click)(click))
+            });
         }
     }
 
     unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
+/// Runs one of the handlers, keeping a panic in it from ending the loop.
+///
+/// Windows calls the hook back on this thread, and a panic that unwound out of
+/// it would leave through an `extern` boundary, which aborts the process: the
+/// notification area icon would go with it even though the click that failed had
+/// nothing to do with it. A failure is written down instead, and the hook stays
+/// installed to answer the next click.
+fn guarded(what: &str, action: impl FnOnce()) {
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(action));
+    if let Err(payload) = outcome {
+        crate::log::note!(
+            "glossy: {what} failed: {}",
+            crate::log::panic_message(&*payload)
+        );
+    }
+}
+
 /// Installs the hook and runs the message loop under it until the loop ends.
 ///
 /// `on_click` sees every left button event, `on_reload` is called when the
-/// settings that pick the accelerator have changed, and `on_fire` when the
-/// accelerator was pressed. Blocks the calling thread, so the caller owns a
+/// settings that pick the accelerators have changed, and `on_fire` with the
+/// slot that was pressed. Blocks the calling thread, so the caller owns a
 /// thread for it, and returns `Err` when the hook could not be installed — in
-/// which case the accelerator is not registered either, since it is delivered
+/// which case no accelerator is registered either, since they are delivered
 /// through this same loop.
 pub fn run(
     on_click: impl FnMut(Click) + 'static,
     on_reload: impl FnMut() + 'static,
-    on_fire: impl FnMut() + 'static,
+    on_fire: impl FnMut(hotkey::Slot) + 'static,
 ) -> Result<(), String> {
     HANDLERS.with(|handlers| {
         *handlers.borrow_mut() = Some(Handlers {
@@ -91,10 +110,14 @@ pub fn run(
         // A message loop is required for low level hooks to be delivered.
         while GetMessageW(&mut message, None, 0, 0).as_bool() {
             if message.message == hotkey::WM_RELOAD {
-                with_handlers(|handlers| (handlers.reload)());
-            } else if hotkey::is_hotkey_message(message.message, message.wParam.0) {
+                guarded("reloading the accelerator", || {
+                    with_handlers(|handlers| (handlers.reload)())
+                });
+            } else if let Some(slot) = hotkey::slot_of(message.message, message.wParam.0) {
                 // Never block: the hook has to stay responsive.
-                with_handlers(|handlers| (handlers.fire)());
+                guarded("the accelerator", || {
+                    with_handlers(|handlers| (handlers.fire)(slot))
+                });
             }
         }
 
