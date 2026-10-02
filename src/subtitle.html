@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossy</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/subtitle-frame.css" />
+    <link rel="stylesheet" href="styles/subtitle.css" />
+  </head>
+  <body data-state="idle">
+    <!-- The translation of what is on screen, inside the box the user picked for
+         it. The window is exactly that box, so nothing here is a dialog: the
+         page is the subtitle itself, and it never takes the mouse. -->
+    <p class="line" id="line"></p>
+    <p class="note" id="note" data-i18n="subtitle.waiting">Waiting for the first line…</p>
+    <script src="js/bridge.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/subtitle.js"></script>
+  </body>
+</html>

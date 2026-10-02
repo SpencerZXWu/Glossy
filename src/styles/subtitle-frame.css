@@ -1,0 +1,27 @@
+/* The dashed box drawn around a region of the screen.
+
+   Two windows use it: the one standing over the part of the screen the subtitles
+   are read from, and the window the translation is drawn in. Both are exactly
+   the rectangle they mark, so the frame is the whole of what they draw — and it
+   has to be faint, because it lies over a video the user is watching.
+
+   A dashed line of one colour disappears over a picture of that colour, so the
+   frame is drawn twice: a light dashed line with a dark one under it, which is
+   the same pair the subtitle text itself is drawn with. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  border: 1px dashed rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}

@@ -1,0 +1,76 @@
+/* The subtitle line: the translation of what is on screen, drawn over the video
+   it belongs to. The window is exactly the box the user picked, so the page is
+   nothing but the line — no frame, no buttons, and nothing that takes the mouse,
+   which is why a click here reaches whatever is underneath. */
+
+:root {
+  --ink: #fff;
+  --edge: rgba(8, 10, 14, 0.62);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  font-family: var(--g-font-ui);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The line is meant to be read over a picture, so it carries its own outline:
+   white text with a dark edge stays readable on a bright frame and on a dark
+   one, and no background box is drawn over the video. */
+.line {
+  margin: 0;
+  max-height: 100%;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow:
+    0 1px 2px var(--edge),
+    0 0 6px var(--edge),
+    0 0 12px var(--edge);
+}
+
+.note {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.75;
+  text-shadow: 0 1px 2px var(--edge);
+}
+
+/* An empty line is not drawn at all: a run that has read nothing yet shows the
+   note instead, and a line that arrives replaces it. */
+body[data-state="idle"] .line,
+body[data-state="failed"] .line {
+  display: none;
+}
+
+body:not([data-state="idle"]) .note {
+  display: none;
+}
+
+body[data-state="failed"] .note {
+  display: block;
+  color: #ffd9d9;
+}

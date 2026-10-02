@@ -1,0 +1,162 @@
+/* The box editor: the two rectangles a subtitle reading is made of, drawn where
+   they are, over the video they are about.
+
+   The screen is not dimmed: what the boxes have to be aimed at is the video
+   itself, and a dark wash over it is exactly what would make that hard. What
+   says the mode is on is the bar at the top, and what the boxes look like is the
+   same dashed frame they keep afterwards. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--g-font-ui);
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* One box: the dashed frame of the same two colours the still boxes use, drawn
+   thicker here because it is being aimed with rather than read past. */
+.box {
+  position: absolute;
+  border: 1px dashed rgba(255, 255, 255, 0.8);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  cursor: move;
+}
+
+.box-tag {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(8, 10, 14, 0.72);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* A box drawn against the top of the screen has no room above it for its tag. */
+.box[data-flip="down"] .box-tag {
+  top: auto;
+  bottom: -20px;
+}
+
+/* The eight points a box can be resized from. Only their middles are drawn: the
+   hit area is a little larger than the mark, because a mark the size of the hit
+   area would be read as part of the frame. */
+.handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+}
+
+.handle::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.handle[data-at="nw"] {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+.handle[data-at="n"] {
+  top: -6px;
+  left: 50%;
+  margin-left: -6px;
+  cursor: ns-resize;
+}
+.handle[data-at="ne"] {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+.handle[data-at="e"] {
+  top: 50%;
+  right: -6px;
+  margin-top: -6px;
+  cursor: ew-resize;
+}
+.handle[data-at="se"] {
+  right: -6px;
+  bottom: -6px;
+  cursor: nwse-resize;
+}
+.handle[data-at="s"] {
+  bottom: -6px;
+  left: 50%;
+  margin-left: -6px;
+  cursor: ns-resize;
+}
+.handle[data-at="sw"] {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+.handle[data-at="w"] {
+  top: 50%;
+  left: -6px;
+  margin-top: -6px;
+  cursor: ew-resize;
+}
+
+.bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--g-radius-lg);
+  border: 1px solid var(--g-stroke-default);
+  background: var(--g-surface-flyout);
+  box-shadow: var(--g-shadow-flyout);
+  color: var(--g-text-primary);
+  font-size: var(--g-fs-caption);
+}
+
+.bar-hint {
+  margin: 0;
+  color: var(--g-text-secondary);
+}
+
+.bar button {
+  padding: var(--g-control-pad-y) var(--g-control-pad-x);
+  border-radius: var(--g-radius-md);
+  border: 1px solid var(--g-stroke-default);
+  background: var(--g-surface-control);
+  color: var(--g-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.bar button:hover {
+  background: var(--g-surface-hover);
+}
+
+.bar button:focus-visible {
+  outline: var(--g-focus-width) solid var(--g-accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+#apply {
+  border-color: var(--g-accent);
+  background: var(--g-accent);
+  color: var(--g-on-accent);
+}
