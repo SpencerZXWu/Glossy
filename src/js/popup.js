@@ -11,6 +11,8 @@
   const langTo = document.getElementById("langTo");
   const langSwap = document.getElementById("langSwap");
   const pinButton = document.getElementById("pin");
+  const starButton = document.getElementById("star");
+  const shotButton = document.getElementById("shot");
   const settingsButton = document.getElementById("settings");
   const badge = document.getElementById("badge");
 
@@ -53,6 +55,23 @@
   /** True while the card is pinned: clicks elsewhere leave it alone and the
       "close by itself" countdown stands still. */
   let pinned = false;
+  /** True while the card on screen is in the wordbook. */
+  let starred = false;
+  /** True while the card answers a selection that is still in place behind it,
+      which is what a translation can be written back over. A card showing an
+      old translation from the history has nothing behind it. */
+  let canOverwrite = false;
+
+  /**
+   * Records whether the card on screen can be written back over, and tells the
+   * backend so: Ctrl+Enter belongs to the card only while there is a translation
+   * of a selection still in place to write back, and it has to go back to the
+   * program in front the moment there is not.
+   */
+  function showWriteBack(value) {
+    canOverwrite = value;
+    Glossy.invoke("popup_set_replace", { armed: value }).catch(() => {});
+  }
   /** The selection the badge is holding, waiting for its click. */
   let waiting = "";
 
@@ -109,6 +128,22 @@
     langFrom.setAttribute("aria-label", Glossy.i18n.t("popup.sourceLang"));
     langTo.setAttribute("aria-label", Glossy.i18n.t("popup.targetLang"));
     langSwap.setAttribute("aria-label", Glossy.i18n.t("popup.swap"));
+    nameWithShortcut(shotButton, "popup.shot", preferences.hotkeyOcr);
+    nameWithShortcut(settingsButton, "popup.settings", preferences.hotkeySettings);
+  }
+
+  /**
+   * Names a header button after what it does, with the shortcut that does the
+   * same thing in brackets.
+   *
+   * The combination is read from the settings on every pass rather than written
+   * into the markup, because the user is the one who records it: a tooltip has to
+   * name the key that works now, and a field the user cleared means no key at all.
+   */
+  function nameWithShortcut(button, key, shortcut) {
+    const label = Glossy.i18n.withShortcut(Glossy.i18n.t(key), shortcut);
+    button.title = label;
+    button.setAttribute("aria-label", label);
   }
 
   /** Pushes the look-and-feel settings into the stylesheet. */
@@ -176,6 +211,49 @@
     pinButton.setAttribute("data-i18n-title", pinned ? "popup.unpin" : "popup.pin");
     pinButton.title = pinLabel();
     pinButton.setAttribute("aria-label", pinButton.title);
+  }
+
+  /** Writes the wordbook state into the star that shows it. */
+  function showStar() {
+    starButton.dataset.state = starred ? "on" : "off";
+    starButton.setAttribute("aria-pressed", starred ? "true" : "false");
+    starButton.setAttribute("data-i18n-title", starred ? "popup.unstar" : "popup.star");
+    starButton.title = Glossy.i18n.t(starred ? "popup.unstar" : "popup.star");
+    starButton.setAttribute("aria-label", starButton.title);
+  }
+
+  /**
+   * Asks whether the card on screen is kept already, and shows the answer on
+   * its star. The question is asked every time a card is drawn, because a card
+   * is drawn again when the lookups fill it in, and it belongs to that card: the
+   * answer is dropped when a newer card has taken over.
+   */
+  async function readStar(result) {
+    const mine = ticket;
+    let kept = false;
+    if (result && result.sourceText) {
+      kept = await Glossy.invoke("vocabulary_keeps", {
+        sourceText: String(result.sourceText),
+        targetLang: String(result.targetLang || ""),
+      }).catch(() => false);
+    }
+    if (mine !== ticket) return;
+    starred = kept === true;
+    showStar();
+  }
+
+  /** Keeps the card in the wordbook, or takes it back out of it. */
+  async function toggleStar() {
+    if (!current) return;
+    let kept = starred;
+    try {
+      kept = await Glossy.invoke("vocabulary_toggle", { result: current });
+    } catch (error) {
+      // The star keeps the state it had; nothing was written.
+      return;
+    }
+    starred = kept === true;
+    showStar();
   }
 
   /**
@@ -331,6 +409,8 @@
     serviceMenu = null;
     current = null;
     text = value;
+    // A badge holds a selection, but it is not a translation yet.
+    showWriteBack(false);
     Glossy.render.stopSpeaking();
     document.body.dataset.state = "badge";
     size = { width: 0, height: 0 };
@@ -346,6 +426,9 @@
 
     text = value;
     current = null;
+    // The card is the answer to a selection the program in front still has,
+    // so the translation can take its place.
+    showWriteBack(true);
     // Redrawing the card throws the list away with it, so it is forgotten here
     // rather than removed.
     serviceMenu = null;
@@ -390,7 +473,13 @@
       // The card that held the list is gone with the loading state.
       serviceMenu = null;
       document.body.dataset.state = "error";
-      Glossy.render.error(content, Glossy.errorMessage(error), () => run(text));
+      // The engine that refused stays on the card, so another one can be picked
+      // from it and the same text asked again — which is what a reader wants
+      // after a failure, rather than a trip to the settings window.
+      Glossy.render.error(content, Glossy.errorMessage(error), () => run(text), {
+        provider: SERVICE_ENGINES[service],
+        onChooseService: toggleServiceMenu,
+      });
       await place(false);
       scheduleAutoClose();
     }
@@ -418,9 +507,11 @@
     Glossy.render.result(content, result, {
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
+      overwrite: canOverwrite,
       pending: true,
       onChooseService: toggleServiceMenu,
       onCopied: cardCopied,
+      onRetranslate: run,
     });
     await place(false);
 
@@ -463,9 +554,12 @@
     Glossy.render.result(content, result, {
       showOriginal: preferences.showOriginal,
       compact: preferences.compactPopup === true,
+      overwrite: canOverwrite,
       onChooseService: toggleServiceMenu,
       onCopied: cardCopied,
+      onRetranslate: run,
     });
+    readStar(result);
   }
 
   /**
@@ -473,10 +567,15 @@
    * lists them. The stored choice is spread over four fields, so the backend is
    * asked which entry it adds up to instead of deriving it again here.
    */
-  const SERVICES = ["cloud-baidu", "cloud-youdao", "google"];
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "google", "offline"];
 
   /** The name each of them answers under, as the backend spells it. */
-  const SERVICE_ENGINES = { "cloud-baidu": "baidu", "cloud-youdao": "youdao", google: "google" };
+  const SERVICE_ENGINES = {
+    "cloud-baidu": "baidu",
+    "cloud-youdao": "youdao",
+    google: "google",
+    offline: "offline",
+  };
 
   /** The service list while it is open, and the name it was opened from. */
   let serviceMenu = null;
@@ -532,7 +631,48 @@
     button.setAttribute("aria-expanded", "true");
     content.appendChild(list);
     serviceMenu = { list, button };
+    keyboardMenu(list, button);
     await place(false);
+  }
+
+  /** The arrows, Home, End and Tab of an open menu.
+   *
+   * The list is a `menu` of `menuitemradio`s, so the keys are the ones that
+   * pattern has: the arrows walk it, Home and End go to its ends, Tab leaves it
+   * and Escape - handled with the card's own Escape - closes it. A menu that
+   * opens without saying where the keyboard is would make the arrows a guess,
+   * so the item the engine is currently on takes the focus.
+   */
+  function keyboardMenu(list, button) {
+    const items = Array.from(list.children);
+    if (!items.length) return;
+    const at = (index) => {
+      const item = items[(index + items.length) % items.length];
+      if (item) item.focus();
+    };
+    const chosen = items.findIndex((item) => item.getAttribute("aria-checked") === "true");
+    at(chosen === -1 ? 0 : chosen);
+
+    list.addEventListener("keydown", (event) => {
+      const here = items.indexOf(document.activeElement);
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        at(here + 1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        at(here < 0 ? items.length - 1 : here - 1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        at(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        at(items.length - 1);
+      } else if (event.key === "Tab") {
+        // Tab belongs to the card, not to the list: the list closes and the
+        // caret stays on the button it was opened from.
+        closeServiceMenu();
+      }
+    });
   }
 
   /** Puts the card back the way it was before the list was opened. */
@@ -541,7 +681,11 @@
     const { list, button } = serviceMenu;
     serviceMenu = null;
     button.setAttribute("aria-expanded", "false");
+    // A caret inside a list that is about to be removed would go with it, and
+    // the tab stop it was on is the button that opened the list.
+    const held = list.contains(document.activeElement);
     if (list.parentNode) list.parentNode.removeChild(list);
+    if (held) button.focus();
     place(false);
   }
 
@@ -610,6 +754,8 @@
 
     text = String(result.sourceText || "");
     current = result;
+    // An old translation has no selection behind it to be written over.
+    showWriteBack(false);
     detected = result.sourceLang || "";
     headword.textContent = text;
     document.body.dataset.state = result.kind === "sentence" ? "sentence" : "word";
@@ -650,6 +796,7 @@
   }
 
   pinButton.addEventListener("click", () => setPinned(!pinned));
+  starButton.addEventListener("click", toggleStar);
   // The badge is the only thing that starts a translation: the selection alone
   // only puts it on screen.
   badge.addEventListener("click", () => {
@@ -658,8 +805,17 @@
     run(value);
   });
   settingsButton.addEventListener("click", () => {
-    dismiss();
+    // A pinned card was asked to stay where it is, so it outlives the errand
+    // the settings button sends the user on.
+    if (!pinned) dismiss();
     Glossy.invoke("open_settings").catch(() => {});
+  });
+  // The screenshot is taken by the backend, which owns the overlay the rectangle
+  // is drawn on. It puts the card away first — the card is what is in the way of
+  // the thing the user wants to read — and the answer comes back to it.
+  shotButton.addEventListener("click", () => {
+    Glossy.render.stopSpeaking();
+    Glossy.invoke("ocr_start_from_card").catch(() => {});
   });
   langFrom.addEventListener("change", () => {
     pair.source = langFrom.value;
@@ -678,6 +834,21 @@
     // first, and the card goes on the next press.
     if (serviceMenu) closeServiceMenu();
     else dismiss();
+  });
+  // The card is shown without the keyboard so that clicking the badge leaves the
+  // text selected in the program behind it alone; the space the original is
+  // written in is editable, though, and the rest of the card answers the
+  // keyboard too, so the focus going into it is what asks for the front.
+  //
+  // It has to be a keyboard focus and not a click on a button: giving the card
+  // the keyboard takes it away from the program the selection came from, and
+  // most of them drop the selection the moment that happens. `:focus-visible`
+  // is the difference - the browser matches it for the caret going into a text
+  // field and for a Tab, and not for a click on a button.
+  document.addEventListener("focusin", (event) => {
+    const field = event.target;
+    if (!field || typeof field.matches !== "function") return;
+    if (field.matches(":focus-visible")) Glossy.invoke("popup_take_focus").catch(() => {});
   });
   // A click anywhere else on the card means the list is not wanted; the click
   // that opens it is stopped from reaching here by the name it started on, and
@@ -705,6 +876,67 @@
 
   Glossy.listen("glossy://result", (event) => {
     showStored(event && event.payload);
+  });
+
+  // Ctrl+Enter writes the translation back over the text it came from. The
+  // card holds the translation, so the accelerator only says that the key was
+  // pressed, and the card answers with the same write its own button makes.
+  Glossy.listen("glossy://replace", () => {
+    if (!canOverwrite || !current || !current.translation) return;
+    Glossy.render.overwrite(String(current.translation));
+  });
+
+  // The first screenshot has to download the recognition engine before it can
+  // read anything, so the card stands where the translation will appear and says
+  // what is being waited for.
+  Glossy.listen("glossy://popup-wait", async (event) => {
+    // The card goes up the moment a rectangle is accepted, before anything is
+    // read: what is coming is either a first-use download of the text reader or
+    // the recognition itself.
+    const waitingFor = String((event && event.payload) || "");
+    resetLanguages();
+    clearTimeout(closeTimer);
+    Glossy.render.stopSpeaking();
+    current = null;
+    text = "";
+    showWriteBack(false);
+    serviceMenu = null;
+    ticket += 1;
+    headword.textContent = "";
+    langbar.hidden = true;
+    document.body.dataset.state = "loading";
+    if (waitingFor === "engine") {
+      Glossy.render.loading(content, { message: Glossy.i18n.t("popup.engineWait") });
+    } else {
+      // Reading the picture: the card is the shape of the answer that is
+      // coming, exactly as it is while a selection is being translated.
+      Glossy.render.loading(content, {
+        provider: SERVICE_ENGINES[service],
+        onChooseService: toggleServiceMenu,
+      });
+    }
+    size = { width: 0, height: 0 };
+    await place(true);
+  });
+
+  // A screenshot that could not be read has no text to translate again, so its
+  // card only says what went wrong — with the engine named under it, because a
+  // screenshot that was refused is often refused by the engine's allowance and
+  // another one answers it.
+  Glossy.listen("glossy://popup-error", async (event) => {
+    resetLanguages();
+    clearTimeout(closeTimer);
+    Glossy.render.stopSpeaking();
+    current = null;
+    text = "";
+    document.body.dataset.state = "error";
+    Glossy.render.error(content, String((event && event.payload) || ""), null, {
+      provider: SERVICE_ENGINES[service],
+      onChooseService: toggleServiceMenu,
+    });
+    size = { width: 0, height: 0 };
+    await place(true);
+    scheduleAutoClose();
   });
 
   Glossy.listen("glossy://settings", async (event) => {
@@ -737,8 +969,19 @@
       });
       return;
     }
+    if (sample === "engine") {
+      // The wait before the first screenshot, while the recognition engine is
+      // being fetched.
+      document.body.dataset.state = "loading";
+      langbar.hidden = true;
+      Glossy.render.loading(content, { message: Glossy.i18n.t("popup.engineWait") });
+      return;
+    }
     if (sample === "error") {
-      Glossy.render.error(content, "Translation failed: the provider is unreachable.", () => run("running"));
+      Glossy.render.error(content, "Translation failed: the provider is unreachable.", () => run("running"), {
+        provider: SERVICE_ENGINES[service],
+        onChooseService: toggleServiceMenu,
+      });
       return;
     }
 
@@ -772,6 +1015,7 @@
     applyAppearance();
     applyLanguage();
     showPin();
+    showStar();
     if (!Glossy.live) preview();
   })();
 })(window.Glossy);

@@ -226,14 +226,21 @@ body {
   height: 17px;
 }
 
-.nav-item .soon {
+.nav-badge {
   margin-left: auto;
   padding: 1px 7px;
-  border: 1px solid var(--line);
-  border-radius: var(--g-radius-pill);
-  color: var(--muted);
-  font-size: 10.5px;
-  font-weight: var(--g-fw-regular);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: var(--g-fw-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.nav-item:disabled .nav-badge {
+  background: var(--g-surface-hover);
+  color: var(--g-text-disabled);
 }
 
 /* ----------------------------------------------------------------- main */
@@ -273,6 +280,17 @@ main::-webkit-scrollbar-thumb {
 
 .panel h2 {
   margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+/* A panel that carries a second, smaller section, such as the screenshot
+   translation page's engine block. */
+.panel h3 {
+  margin: 18px 0 8px;
   font-size: 12px;
   font-weight: 650;
   text-transform: uppercase;
@@ -330,6 +348,32 @@ main::-webkit-scrollbar-thumb {
 
 .hint[data-tone="bad"] {
   color: var(--bad);
+}
+
+/* A file path, which is read character by character and wraps where it must. */
+.hint.path {
+  font-family: var(--g-font-mono);
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+}
+
+/* A web address the app offers to open. In a contrast theme the accent is
+   `Highlight`, which is what a link is drawn in there. */
+.link {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link:hover {
+  color: var(--accent-hover);
+}
+
+.link:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
 }
 
 .row {
@@ -851,6 +895,300 @@ input:focus-visible {
   margin-top: 12px;
 }
 
+/* The box a document is dropped into. */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 22px 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  text-align: center;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.dropzone[data-dragging="true"] {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-soft);
+}
+
+.dropzone-icon {
+  width: 26px;
+  height: 26px;
+  color: var(--muted);
+}
+
+.dropzone-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-soft);
+}
+
+/* The languages and the settings of a document, between the box and the
+   buttons. */
+#documentLangbar {
+  margin-top: 12px;
+}
+
+.advanced {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.advanced summary {
+  color: var(--fg-soft);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.advanced .options {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.field-label {
+  color: var(--fg-soft);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.document-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The folder a translation goes into, which can be a long path. */
+.document-folder .path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg-soft);
+  color: var(--muted);
+  font: var(--g-fs-caption) / 1.4 var(--g-font-mono);
+}
+
+/* A file being translated: the bar fills as the pieces come back. */
+.progress {
+  height: 6px;
+  margin-top: 12px;
+  border-radius: var(--g-radius-pill);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: var(--g-radius-pill);
+  background: var(--accent);
+  transition: width var(--g-dur-base) var(--g-ease-standard);
+}
+
+/* ------------------------------------------------------ resources page */
+
+/* One thing that can be downloaded: what it is, what it takes up, and the
+   buttons that act on it. Each one is a card of its own, so a row that is
+   downloading something says so on its own. */
+.resource {
+  margin-top: 14px;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.resource-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.resource-what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.resource-name {
+  margin: 0;
+  font-size: var(--g-fs-body);
+  font-weight: var(--g-fw-semibold);
+}
+
+.resource-what .hint {
+  margin: 3px 0 0;
+}
+
+.resource-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.resource-state {
+  margin: 8px 0 0;
+}
+
+/* A badge such as `In development`, where a button would be. */
+.pill {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-pill);
+  color: var(--fg-soft);
+  font-size: var(--g-fs-caption);
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------- language packs */
+
+.pack-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--g-radius-md);
+  background: var(--bg-soft);
+}
+
+.pack[data-state="installed"] {
+  border-color: var(--line);
+}
+
+.pack[data-state="downloading"] {
+  border-color: var(--accent);
+}
+
+.pack-pick {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.pack-name {
+  font-size: var(--g-fs-body-sm);
+}
+
+/* A language that is not on the disk cannot be picked, and says so quietly. */
+.pack-pick:disabled,
+.pack-pick:disabled + .pack-name {
+  color: var(--muted);
+  cursor: default;
+}
+
+.pack-state,
+.pack-busy {
+  color: var(--muted);
+  font-size: var(--g-fs-caption);
+  white-space: nowrap;
+}
+
+.pack-state[data-tone="bad"] {
+  color: var(--bad);
+}
+
+.pack-busy[data-tone="ok"] {
+  color: var(--ok);
+}
+
+/* The bar sits on the row that is downloading, next to that row's numbers. */
+.pack-progress {
+  width: 110px;
+  margin-top: 0;
+}
+
+.pack-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.pack-action {
+  padding: 3px 9px;
+  font-size: var(--g-fs-caption);
+}
+
+/* -------------------------------------------------------------- sources */
+
+.sources {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sources summary {
+  cursor: pointer;
+  font-size: var(--g-fs-body-sm);
+  font-weight: var(--g-fw-medium);
+}
+
+.sources summary:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+.source-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.source-what {
+  font-size: var(--g-fs-body-sm);
+  font-weight: var(--g-fw-medium);
+}
+
+.source-by {
+  color: var(--muted);
+  font-size: var(--g-fs-caption);
+}
+
+.document-preview {
+  margin: 12px 0 0;  padding: 10px 12px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg-soft);
+  font: var(--g-fs-caption) / 1.5 var(--g-font-mono);
+  white-space: pre-wrap;
+  user-select: text;
+}
+
 .ghost {
   padding: 6px 12px;
   border: 1px solid var(--line);
@@ -1167,6 +1505,26 @@ input:focus-visible {
   text-overflow: ellipsis;
 }
 
+/* The mark of the app that asked the engine, at the far end of that row. It is
+   kept faint on purpose: it says where the card comes from without competing
+   with the name of the engine that answered. The size has to be written down —
+   the file is 128 pixels square, and a card in this window is not. */
+.foot .brand {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  opacity: 0.42;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.foot .brand-logo {
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+}
+
 /* Why the answer did not come from the service that was asked first. */
 .foot.fallback {
   display: block;
@@ -1323,6 +1681,31 @@ input:focus-visible {
   color: var(--fg);
 }
 
+/* A star that is on fills in, and a hidden translation says so quietly. */
+.history-button[data-state="on"] {
+  color: var(--accent);
+}
+
+.history-button[data-state="on"] svg {
+  fill: currentColor;
+}
+
+.history-translation.masked {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.vocabulary-reveal {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dashed currentColor;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-style: normal;
+  cursor: pointer;
+}
+
 /* ----------------------------------------------------- settings confirm */
 
 .confirm {
@@ -1380,4 +1763,47 @@ input:focus-visible {
 
 .hint.warn {
   color: var(--bad);
+}
+
+/* ------------------------------------------------------ high contrast */
+
+/* Opacity is not a colour, so the token layer cannot lift it. In a contrast
+   theme a faded control is a control that cannot be read, and the two states
+   that fade to mean "not available" say so through `GrayText` and their own
+   `disabled` attribute instead. */
+@media (prefers-contrast: more) {
+  .options[data-disabled="true"],
+  .order[data-disabled="true"] {
+    opacity: 1;
+  }
+
+  /* The mark in the card's footer is faded for the same reason and in the same
+     place: a contrast theme does not allow a faded wordmark, and the wordmark is
+     what says where the card comes from. */
+  .foot .brand {
+    opacity: 1;
+  }
+
+  /* A field's focus ring is drawn in the soft accent, and the soft accent is
+     the window colour here: what tells a focused field apart is worth more than
+     the tint, so the ring takes the accent itself. */
+  select:focus-visible,
+  textarea:focus-visible,
+  input:focus-visible {
+    outline-color: var(--accent);
+  }
+
+  /* A placeholder that pulses is unreadable at the bottom of the pulse, and
+     this is the one mode where nothing may be unreadable. */
+  .pending,
+  .skeleton span {
+    animation: none;
+  }
+
+  /* The section that is open is filled with the soft accent in the ordinary
+     themes, and the soft accent is the window colour here, so it keeps a mark
+     by outlining itself instead — drawn inside, so nothing moves. */
+  .nav-item[aria-current="page"] {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
 }

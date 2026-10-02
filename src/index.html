@@ -38,28 +38,34 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h9M8.5 5v2c0 3.4-2 6.2-5 7.8" /><path d="M6 9.6c1.5 2.6 4 4.2 7 5" /><path d="M13 20l3.6-9 3.6 9M14.4 17.4h4.4" /></svg>
           <span data-i18n="nav.translate">Translate text</span>
         </button>
-        <button type="button" class="nav-item" data-page="document" disabled data-i18n-title="nav.soonTitle" title="Coming in a later version">
+        <button type="button" class="nav-item" data-page="document" disabled title="In development" data-i18n-title="nav.soon">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4" /><path d="M10 12.5h5M10 16h3.5" /></svg>
           <span data-i18n="nav.document">Document translation</span>
-          <span class="soon" data-i18n="nav.soon">Soon</span>
+          <span class="nav-badge" data-i18n="nav.soon">In development</span>
         </button>
-        <button type="button" class="nav-item" data-page="ocr" disabled data-i18n-title="nav.soonTitle" title="Coming in a later version">
+        <button type="button" class="nav-item" data-page="ocr">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8.5V5h3.5M20 8.5V5h-3.5M4 15.5V19h3.5M20 15.5V19h-3.5" /><path d="M7.5 12h9" /></svg>
           <span data-i18n="nav.ocr">OCR translation</span>
-          <span class="soon" data-i18n="nav.soon">Soon</span>
+        </button>
+        <button type="button" class="nav-item" data-page="vocabulary">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.5C10.6 5.2 8.6 4.6 5.5 4.6v12.6c3.1 0 5.1.6 6.5 1.9 1.4-1.3 3.4-1.9 6.5-1.9V4.6c-3.1 0-5.1.6-6.5 1.9z" /><path d="M12 6.5v12.6" /><path d="M8 8.6h1.6M8 11.6h1.6M14.4 8.6H16M14.4 11.6H16" /></svg>
+          <span data-i18n="nav.vocabulary">Wordbook</span>
+        </button>
+        <!-- Subtitles are still being built, so the page is only on show when
+             developer mode has been turned on in the settings. -->
+        <button type="button" class="nav-item" data-page="subtitle" hidden>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11.5H4z" /><path d="M7 10h4M7 13.2h6.5M17 10h.01" /></svg>
+          <span data-i18n="nav.subtitle">Subtitles</span>
+          <span class="nav-badge" data-i18n="nav.developer">Developer</span>
         </button>
         <p class="nav-group" data-i18n="nav.group.settings">Settings</p>
         <button type="button" class="nav-item" data-page="general">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5h7.5M17 7.5h3M4 16.5h4M13 16.5h7" /><circle cx="14.2" cy="7.5" r="2.2" /><circle cx="10.2" cy="16.5" r="2.2" /></svg>
           <span data-i18n="nav.general">General</span>
         </button>
-        <button type="button" class="nav-item" data-page="shortcuts">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5" /><path d="M7 10h1M11 10h1M15 10h1M8 14h8" /></svg>
-          <span data-i18n="nav.shortcuts">Shortcuts</span>
-        </button>
-        <button type="button" class="nav-item" data-page="trigger">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="5" /><path d="M12 6.5v3.5" /></svg>
-          <span data-i18n="nav.trigger">Trigger</span>
+        <button type="button" class="nav-item" data-page="resources">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14v3.5A1.5 1.5 0 005.5 19h13a1.5 1.5 0 001.5-1.5V14" /><path d="M12 4v9.5" /><path d="M8.6 10.2l3.4 3.3 3.4-3.3" /></svg>
+          <span data-i18n="nav.resources">Resources</span>
         </button>
         <button type="button" class="nav-item" data-page="language">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17" /><path d="M12 3.5c2.3 2.5 3.5 5.4 3.5 8.5s-1.2 6-3.5 8.5c-2.3-2.5-3.5-5.4-3.5-8.5S9.7 6 12 3.5z" /></svg>
@@ -83,7 +89,7 @@
         </button>
         <button type="button" class="nav-item" data-page="backup">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2 2 0 016 5.5h3l2 2.5h7a2 2 0 012 2V17a2 2 0 01-2 2H6a2 2 0 01-2-2z" /></svg>
-          <span data-i18n="nav.backup">Settings file</span>
+          <span data-i18n="nav.backup">Files and logs</span>
         </button>
         <button type="button" class="nav-item" data-page="updates">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v7M9 12.5l3 3 3-3" /></svg>
@@ -113,6 +119,7 @@
               <button type="button" id="demoPopup" class="ghost" data-i18n="demo.button">Show in floating popup</button>
               <span class="hint" id="selectionHint" data-i18n="demo.nothing">Nothing selected yet.</span>
             </div>
+            <p class="hint quota-line" id="cloudQuotaDemo"></p>
             <div class="card" id="demoCard" hidden>
               <header class="bar">
                 <div class="grip">
@@ -131,6 +138,162 @@
               </div>
               <div class="content" id="demoResult"></div>
             </div>
+          </section>
+        </section>
+        <section class="page" id="page-ocr" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.ocr">Screenshot translation</h2>
+            <p class="hint" data-i18n="ocr.panelHint">
+              Press the shortcut below, or the button, and the screen freezes; drag a
+              rectangle over the text you want to read and it is translated in the usual
+              popup. Escape, a right click or a rectangle that selects nothing cancels.
+            </p>
+            <div class="demo-actions">
+              <button type="button" id="ocrRun" class="ghost" data-i18n="ocr.run">Take a screenshot</button>
+              <span class="hint" data-i18n="ocr.shortcut">
+                The shortcut works in every program, without opening this window first.
+              </span>
+            </div>
+            <p class="hint quota-line" id="cloudQuotaOcr"></p>
+            <h3 class="ocr-engine-title" data-i18n="ocr.engine.title">Text recognition on this machine</h3>
+            <p class="hint" data-i18n="ocr.engine.where">
+              The recognition engine and the other files Glossy needs are downloaded
+              and removed on the Resources page.
+            </p>
+          </section>
+        </section>
+        <section class="page" id="page-subtitle" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.subtitle">Subtitles</h2>
+            <p class="hint" data-i18n="subtitle.panelHint">
+              Read a part of the screen again and again and draw its translation where you
+              want it. Pick the language the subtitles are written in and the one you read
+              them in, then pick two rectangles: the area the subtitles appear in, and the
+              place the translation is to be drawn. Every time what is read changes, the
+              translation follows. Nothing is uploaded: the picture is read on this
+              machine and only the text goes to the translator.
+            </p>
+          </section>
+          <section class="panel">
+            <h2 data-i18n="subtitle.setup">What is read, and what it is translated into</h2>
+            <div class="field-row">
+              <label for="subtitleSourceLang" data-i18n="subtitle.source">Language of the subtitles</label>
+              <select id="subtitleSourceLang"></select>
+            </div>
+            <div class="field-row">
+              <label for="subtitleTargetLang" data-i18n="subtitle.target">Translation language</label>
+              <select id="subtitleTargetLang"></select>
+            </div>
+            <div class="field-row">
+              <label for="subtitlePack" data-i18n="subtitle.pack">Recognition language</label>
+              <select id="subtitlePack"></select>
+            </div>
+            <div class="field-row">
+              <label for="subtitleFontSize" data-i18n="subtitle.fontSize">Subtitle text size</label>
+              <input id="subtitleFontSize" type="number" min="13" max="40" step="1" />
+            </div>
+            <p class="hint" data-i18n="subtitle.packHint">
+              Only this one language reads the region, which is what keeps a reading down
+              to a fraction of a second; other languages can be checked on the Resources
+              page for screenshots without slowing this down.
+            </p>
+          </section>
+          <section class="panel">
+            <h2 data-i18n="subtitle.control">Reading</h2>
+            <div class="demo-actions">
+              <button type="button" id="subtitleRun" class="ghost" data-i18n="subtitle.start">Pick the area and start</button>
+              <button type="button" id="subtitleStop" class="ghost" data-i18n="subtitle.stop" hidden>Stop</button>
+              <button type="button" id="subtitleAdjust" class="ghost" data-i18n="subtitle.adjust">Move the boxes</button>
+              <span class="hint" id="subtitleState"></span>
+            </div>
+            <p class="hint" data-i18n="subtitle.adjustHint">
+              Both boxes wear a faint dashed frame while a reading runs. This opens them over the
+              video to drag and resize — either the rectangle the subtitles are read from or the one
+              the translation is drawn in — and the reading follows the boxes it is left with.
+            </p>
+            <p class="hint" data-i18n="subtitle.how">
+              The window is drawn exactly where the second rectangle was picked and it
+              lets every click through, so a subtitle is never in the way of the video.
+              Come back to this page to stop the reading.
+            </p>
+          </section>
+        </section>
+        <section class="page" id="page-document" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.document">Document translation</h2>
+            <p class="hint" data-i18n="document.soon">
+              Document translation is still being built. Nothing is translated yet and
+              every request is refused until it is finished.
+            </p>
+          </section>
+          <section class="panel" id="documentPanel" hidden>
+            <h2 data-i18n="panel.document">Document translation</h2>
+            <p class="hint" data-i18n="document.panelHint">
+              Translate a whole file at once — a plain text file, a Markdown file, a
+              subtitle file, a PDF or a Word document. Everything is translated in order
+              and the result is saved where you choose. Nothing else changes: a heading
+              stays a heading, code stays code, a subtitle keeps its timings, and a Word
+              document keeps its styles, its tables and its pictures. A PDF is read into
+              plain text, and a scanned one holds no text to read.
+            </p>
+            <div class="dropzone" id="documentDrop">
+              <svg class="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 16V4" />
+                <path d="M7 9l5-5 5 5" />
+                <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+              </svg>
+              <p class="dropzone-title" data-i18n="document.dropTitle">Drop a file here</p>
+              <p class="hint" data-i18n="document.dropTypes">
+                Plain text, Markdown, subtitles (.srt), PDF or Word (.docx)
+              </p>
+              <button type="button" id="documentPick" class="ghost" data-i18n="document.pick">Choose a file…</button>
+              <input type="file" id="documentFile" accept=".txt,.text,.md,.markdown,.srt,.pdf,.docx" hidden />
+            </div>
+            <div class="langbar" id="documentLangbar">
+              <select class="lang-select" id="documentFrom" data-i18n-title="popup.sourceLang" title="Source language"></select>
+              <button class="lang-swap" id="documentSwap" type="button" data-i18n-title="popup.swap" title="Swap languages" aria-label="Swap languages">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 8h13M14 5l3 3-3 3" />
+                  <path d="M20 16H7M10 13l-3 3 3 3" />
+                </svg>
+              </button>
+              <select class="lang-select" id="documentTo" data-i18n-title="popup.targetLang" title="Target language"></select>
+            </div>
+            <details class="advanced" id="documentAdvanced">
+              <summary data-i18n="document.advanced">Advanced settings</summary>
+              <div class="options">
+                <label class="check">
+                  <input type="checkbox" id="documentSkipPlain" />
+                  <span data-i18n="document.skipPlain">Leave the pieces that hold no letters as they are</span>
+                </label>
+                <label class="check">
+                  <input type="checkbox" id="documentAutoSave" />
+                  <span data-i18n="document.autoSave">Save the translation as soon as it is finished</span>
+                </label>
+                <div class="field">
+                  <label for="documentSegmentLimit" data-i18n="document.segmentLimit">Longest piece sent in one request</label>
+                  <input type="number" id="documentSegmentLimit" min="200" max="1500" step="50" />
+                </div>
+              </div>
+            </details>
+            <div class="field">
+              <span class="field-label" data-i18n="document.saveTo">Save the translation into</span>
+              <div class="document-folder">
+                <span class="path" id="documentFolder"></span>
+                <button type="button" id="documentFolderChange" class="ghost" data-i18n="document.changeFolder">Change…</button>
+              </div>
+            </div>
+            <div class="demo-actions">
+              <button type="button" id="documentRun" class="ghost" data-i18n="document.start" disabled>Translate the file</button>
+              <button type="button" id="documentCancel" class="ghost" data-i18n="document.cancel" hidden>Cancel</button>
+              <button type="button" id="documentSave" class="ghost" data-i18n="document.save" hidden>Save the translation</button>
+            </div>
+            <p class="hint" id="documentState" data-i18n="document.nothing">No file chosen yet.</p>
+            <p class="hint" id="documentSample" hidden></p>
+            <div class="progress" id="documentProgress" hidden aria-hidden="true">
+              <div class="progress-bar" id="documentProgressBar"></div>
+            </div>
+            <pre class="document-preview" id="documentPreview" hidden></pre>
           </section>
         </section>
         <section class="page" id="page-general" hidden>
@@ -154,12 +317,10 @@
               <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
             </div>
           </section>
-        </section>
-        <section class="page" id="page-shortcuts" hidden>
           <section class="panel">
             <h2 data-i18n="panel.shortcuts">Shortcuts</h2>
             <div class="field">
-              <label for="hotkey" data-i18n="field.hotkey">Global hotkey</label>
+              <label for="hotkey" data-i18n="field.hotkey.translate">Translate the selection</label>
               <div class="recorder">
                 <input
                   type="text"
@@ -175,12 +336,54 @@
                 <button type="button" class="ghost" id="hotkeyClear" data-i18n="hotkey.clear">Clear</button>
               </div>
             </div>
+            <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">
+              Translate the clipboard content without selecting anything.
+            </p>
+            <div class="field">
+              <label for="hotkeySettings" data-i18n="field.hotkey.settings">Open this window</label>
+              <div class="recorder">
+                <input
+                  type="text"
+                  id="hotkeySettings"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Ctrl+Alt+G"
+                  data-i18n-placeholder="hotkey.empty"
+                  aria-describedby="hotkeySettingsHint"
+                />
+                <button type="button" class="ghost" id="hotkeySettingsRecord" data-i18n="hotkey.record">Record</button>
+                <button type="button" class="ghost" id="hotkeySettingsClear" data-i18n="hotkey.clear">Clear</button>
+              </div>
+            </div>
+            <p class="hint" id="hotkeySettingsHint" data-i18n="hotkey.values.settings">
+              Bring the Glossy window to the front from any program.
+            </p>
+            <div class="field">
+              <label for="hotkeyOcr" data-i18n="field.hotkey.ocr">Read the screen</label>
+              <div class="recorder">
+                <input
+                  type="text"
+                  id="hotkeyOcr"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Ctrl+Alt+Q"
+                  data-i18n-placeholder="hotkey.empty"
+                  aria-describedby="hotkeyOcrHint"
+                />
+                <button type="button" class="ghost" id="hotkeyOcrRecord" data-i18n="hotkey.record">Record</button>
+                <button type="button" class="ghost" id="hotkeyOcrClear" data-i18n="hotkey.clear">Clear</button>
+              </div>
+            </div>
+            <p class="hint" id="hotkeyOcrHint" data-i18n="hotkey.values.ocr">
+              Freeze the screen, then drag a rectangle over the text to read.
+            </p>
             <p class="hint" data-i18n="hotkey.howto">
               Click the box, then press the combination you want — nothing is typed, so it
               cannot be misspelled. Glossy registers it with Windows at once and reports
               whether Windows accepted it.
             </p>
-            <p class="hint" id="hotkeyHint" data-i18n="hotkey.values">Translate the clipboard content without selecting anything.</p>
             <h3 class="subhead" data-i18n="shortcuts.builtin">Only in this window</h3>
             <p class="hint" data-i18n="shortcuts.local">
               The shortcuts below are handled by the window itself: they work only
@@ -194,8 +397,6 @@
             </ul>
             <p class="hint" data-i18n="shortcuts.more">Every shortcut Glossy gains will be listed here.</p>
           </section>
-        </section>
-        <section class="page" id="page-trigger" hidden>
           <section class="panel">
             <h2 data-i18n="panel.trigger">Trigger</h2>
             <div class="field">
@@ -225,6 +426,114 @@
             <p class="hint" id="sourceLangsHint"></p>
           </section>
         </section>
+        <section class="page" id="page-resources" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.resources">Resources</h2>
+            <p class="hint" data-i18n="resources.hint">
+              Everything Glossy needs to work without a connection is downloaded here
+              and kept on this machine. Nothing is downloaded until you ask for it, and
+              every file says where it comes from.
+            </p>
+
+            <article class="resource" id="resourceCore">
+              <div class="resource-row">
+                <div class="resource-what">
+                  <h3 class="resource-name" data-i18n="resources.core.title">Reading engine</h3>
+                  <p class="hint" data-i18n="resources.core.hint">
+                    The runtime that runs the models and the detector that finds the
+                    lines of text, whatever language they are in. Downloaded once, shared
+                    by every language, about 21 MB.
+                  </p>
+                </div>
+                <div class="resource-actions">
+                  <button type="button" id="ocrEngineDownload" class="ghost" data-i18n="ocr.engine.download">
+                    Download the engine
+                  </button>
+                  <button type="button" id="ocrEngineRemove" class="ghost" data-i18n="ocr.engine.remove">
+                    Delete the engine
+                  </button>
+                </div>
+              </div>
+              <p class="hint resource-state" id="ocrEngineState"></p>
+              <div class="progress" id="ocrEngineProgress" hidden aria-hidden="true">
+                <div class="progress-bar" id="ocrEngineProgressBar"></div>
+              </div>
+            </article>
+
+            <article class="resource" id="resourcePacks">
+              <div class="resource-row">
+                <div class="resource-what">
+                  <h3 class="resource-name" data-i18n="resources.packs.title">Recognition languages</h3>
+                  <p class="hint" data-i18n="resources.packs.hint">
+                    Every language you check is read with: a screenshot is read with all of
+                    them at once, and each line is kept from the language that read it best.
+                    A language reads its own script and nothing else, so check the ones you
+                    really meet.
+                  </p>
+                </div>
+              </div>
+              <ul class="pack-list" id="ocrPackList" role="list"></ul>
+              <p class="hint" id="ocrPacksState"></p>
+              <p class="hint" data-i18n="resources.packs.source">
+                Every language is an ONNX distribution of PaddleOCR's PP-OCR model by
+                RapidOCR, licensed under Apache-2.0.
+              </p>
+            </article>
+
+            <article class="resource" id="resourceOffline">
+              <div class="resource-row">
+                <div class="resource-what">
+                  <h3 class="resource-name" data-i18n="resources.offline.title">Offline translation</h3>
+                  <p class="hint" data-i18n="resources.offline.hint">
+                    Translating without a connection, by a model that runs here. Chinese and
+                    English both ways, and nothing is sent anywhere — which is why this one
+                    channel has no allowance to count. About 244 MB, downloaded once.
+                  </p>
+                </div>
+                <div class="resource-actions">
+                  <button type="button" id="offlineDownload" class="ghost" data-i18n="resources.offline.download">
+                    Download the pack
+                  </button>
+                  <button type="button" id="offlineRemove" class="ghost" data-i18n="resources.offline.remove">
+                    Delete the pack
+                  </button>
+                </div>
+              </div>
+              <p class="hint resource-state" id="offlineState"></p>
+              <ul class="pack-list" id="offlinePairList" role="list"></ul>
+              <div class="progress" id="offlineProgress" hidden aria-hidden="true">
+                <div class="progress-bar" id="offlineProgressBar"></div>
+              </div>
+              <p class="hint" data-i18n="resources.offline.source">
+                OPUS-MT's Chinese and English models (Helsinki-NLP, CC-BY-4.0), exported to ONNX
+                and quantized to int8.
+              </p>
+            </article>
+
+            <details class="sources">
+              <summary data-i18n="resources.source.title">Where these files come from</summary>
+              <p class="hint" data-i18n="resources.source.hint">
+                What Glossy downloads and runs on this machine, and the licence it
+                arrives under. Those licences ask for the source to be named, so it is
+                named here.
+              </p>
+              <ul class="source-list">
+                <li>
+                  <span class="source-what" data-i18n="resources.source.ocr">Recognition engine and language packs</span>
+                  <span class="source-by" data-i18n="resources.source.ocrBy">RapidOCR</span>
+                </li>
+                <li>
+                  <span class="source-what" data-i18n="resources.source.runtime">ONNX Runtime</span>
+                  <span class="source-by" data-i18n="resources.source.runtimeBy">© Microsoft · MIT</span>
+                </li>
+              </ul>
+              <p class="hint" data-i18n="resources.source.licence">
+                The full licence texts are in THIRD_PARTY_NOTICES.md, which ships next to
+                the app.
+              </p>
+            </details>
+          </section>
+        </section>
         <section class="page" id="page-language" hidden>
           <section class="panel">
             <h2 data-i18n="panel.language">Language</h2>
@@ -239,6 +548,7 @@
                   <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
                   <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>
                   <option value="google" data-i18n="service.google">Google</option>
+                  <option value="offline" data-i18n="service.offline">Offline — on this machine</option>
                 </select>
               </div>
             </div>
@@ -362,6 +672,33 @@
             </p>
           </section>
         </section>
+        <section class="page" id="page-vocabulary" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.vocabulary">Wordbook</h2>
+            <div class="grid">
+              <div class="field">
+                <label for="vocabularySearch" data-i18n="field.vocabularySearch">Search</label>
+                <input type="search" id="vocabularySearch" spellcheck="false" autocomplete="off" data-i18n-placeholder="vocabulary.search" placeholder="Word or translation" />
+              </div>
+              <div class="field">
+                <label for="vocabularyHide" data-i18n="field.vocabularyHide">Self-test</label>
+                <label class="unit-toggle">
+                  <input type="checkbox" id="vocabularyHide" class="switch" />
+                  <span data-i18n="vocabulary.hide">Hide translations</span>
+                </label>
+              </div>
+            </div>
+            <p class="hint" data-i18n="vocabulary.hint">
+              Star a translation in the card or in the history to keep it here. Click a word to show
+              it in the floating card again, or to reveal what it means.
+            </p>
+            <ul class="history" id="vocabularyList"></ul>
+            <div class="demo-actions">
+              <button type="button" id="vocabularyClear" class="ghost" data-i18n="vocabulary.clear">Forget everything</button>
+              <span class="hint" id="vocabularyCount"></span>
+            </div>
+          </section>
+        </section>
         <section class="page" id="page-history" hidden>
           <section class="panel">
             <h2 data-i18n="panel.history">History</h2>
@@ -392,7 +729,7 @@
         </section>
         <section class="page" id="page-backup" hidden>
           <section class="panel">
-            <h2 data-i18n="panel.backup">Settings file</h2>
+            <h2 data-i18n="panel.backup">Files and logs</h2>
             <p class="hint" data-i18n="backup.hint">
               Export writes Documents\glossy-settings.json. Import reads back a file you pick.
             </p>
@@ -402,12 +739,35 @@
             </div>
             <input type="file" id="settingsFile" accept=".json,application/json" hidden />
           </section>
+          <section class="panel">
+            <h2 data-i18n="panel.log">Error log</h2>
+            <p class="hint" data-i18n="log.hint">
+              Glossy writes down what goes wrong in a file beside its settings. When it is full it
+              gives way to a new one, so there are never more than two.
+            </p>
+            <p class="hint path" id="logPath"></p>
+            <p class="hint" id="logSize"></p>
+            <div class="demo-actions">
+              <button type="button" id="logOpen" class="ghost" data-i18n="log.open">Open the folder</button>
+              <button type="button" id="logExport" class="ghost" data-i18n="log.export">Export…</button>
+              <button type="button" id="logCopy" class="ghost" data-i18n="log.copy">Copy</button>
+              <button type="button" id="logClear" class="ghost" data-i18n="log.clear">Clear</button>
+            </div>
+          </section>
         </section>
         <section class="page" id="page-updates" hidden>
           <section class="panel">
             <h2 data-i18n="panel.updates">Updates</h2>
-            <p class="hint warn" id="updateUnavailable" data-i18n="update.unavailable" hidden>
-              This build carries no update signing key, so it cannot update itself yet.
+            <p class="hint" id="appVersion"></p>
+            <p class="hint warn" id="updateUnavailable" hidden>
+              <span data-i18n="update.unavailable">This build carries no update signing key, so it cannot update itself yet.</span>
+              <span data-i18n="update.manual">The newest build can always be downloaded here:</span>
+              <a
+                href="https://github.com/SpencerZXWu/Glossy/releases/latest"
+                id="updatePage"
+                class="link"
+                rel="noreferrer"
+              >github.com/SpencerZXWu/Glossy/releases/latest</a>
             </p>
             <div class="options">
               <label class="check"><input type="checkbox" id="checkUpdates" /><span data-i18n="option.checkUpdates">Check for a new version when Glossy starts</span></label>
@@ -418,11 +778,39 @@
               <span class="hint" id="updateStatus"></span>
             </div>
           </section>
+          <section class="panel">
+            <h2 data-i18n="dev.title">Developer mode</h2>
+            <p class="hint" data-i18n="dev.hint">
+              Some pages are still being built and are hidden until developer mode is
+              turned on. Type the key and they appear; nothing else about Glossy changes.
+            </p>
+            <div class="field-row" id="devAsk">
+              <label for="devKey" data-i18n="dev.key">Key</label>
+              <input type="password" id="devKey" autocomplete="off" spellcheck="false" data-i18n-placeholder="dev.keyPlaceholder" placeholder="The developer key" />
+              <button type="button" id="devUnlock" class="ghost" data-i18n="dev.unlock">Turn on</button>
+            </div>
+            <div class="field-row" id="devOn" hidden>
+              <span class="hint" data-tone="ok" data-i18n="dev.on">Developer mode is on. The pages that are still being built are in the sidebar.</span>
+              <button type="button" id="devLock" class="ghost" data-i18n="dev.off">Turn off</button>
+            </div>
+            <p class="hint" id="devState"></p>
+          </section>
         </section>
       </main>
     </div>
 
     <div class="toast" id="toast" hidden></div>
+
+    <div class="confirm" id="confirm" hidden>
+      <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <h3 id="confirmTitle"></h3>
+        <p id="confirmBody"></p>
+        <div class="confirm-actions">
+          <button type="button" class="ghost" id="confirmCancel"></button>
+          <button type="button" id="confirmOk"></button>
+        </div>
+      </div>
+    </div>
 
     <script src="js/bridge.js"></script>
     <script src="js/i18n.js"></script>

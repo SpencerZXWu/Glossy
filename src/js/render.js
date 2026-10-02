@@ -113,6 +113,8 @@
     // and must not leave a tick behind on a button nobody can see.
     if (reading) stopSpeaking();
     if (copied) resetCopy();
+    // The card that held the button is going away with it.
+    overwriteButton = null;
     while (target.firstChild) target.removeChild(target.firstChild);
   }
 
@@ -136,6 +138,9 @@
     wrap.appendChild(node("span"));
     wrap.appendChild(node("span"));
     wrap.appendChild(node("span"));
+    // A wait that has nothing to do with translating, such as the one the first
+    // screenshot spends on the recognition engine, says what it is waiting for.
+    if (opts.message) wrap.appendChild(node("div", "note", opts.message));
     target.appendChild(wrap);
     foot(target, opts.provider, opts);
   }
@@ -168,12 +173,99 @@
   function foot(target, provider, options) {
     const row = node("div", "foot");
     engineName(row, provider, options);
-    if (row.childNodes.length) target.appendChild(row);
+    // The row names the engine that answered; the mark of the app that asked it
+    // closes the line. Without an engine to name there is no row at all.
+    if (!row.childNodes.length) return row;
+    row.appendChild(brand());
+    target.appendChild(row);
     return row;
   }
 
-  function error(target, message, onRetry) {
+  /** The translucent Glossy mark at the right of the row that names the engine. */
+  function brand() {
+    const mark = node("span", "brand");
+    const logo = node("img", "brand-logo");
+    logo.src = "images/logo.png";
+    logo.alt = "";
+    mark.appendChild(logo);
+    mark.appendChild(node("span", "brand-name", "Glossy"));
+    return mark;
+  }
+
+  /**
+   * The grey block holding the text that was translated. It sits under the
+   * language row on every card, word cards included, and it is editable when
+   * the caller offers a way to translate again: the text here is what the answer
+   * is an answer to, so correcting it costs no more than one more translation.
+   */
+  function originalBlock(target, value, options) {
+    const opts = options || {};
+    const committedAtStart = String(value);
+    const block = node("div", "original", committedAtStart);
+    let committed = committedAtStart;
+
+    if (typeof opts.onRetranslate === "function") {
+      block.setAttribute("contenteditable", "plaintext-only");
+      block.setAttribute("spellcheck", "false");
+      block.setAttribute("role", "textbox");
+      block.setAttribute("aria-label", Glossy.i18n.t("render.originalEdit"));
+      block.setAttribute("title", Glossy.i18n.t("render.originalHint"));
+
+      const read = () => String(block.innerText || block.textContent || "").trim();
+
+      // The one place an edit becomes a translation. It ignores text that is
+      // empty or unchanged, so asking twice for the same text — a Ctrl+Enter
+      // followed by the blur it causes — costs one translation, not two.
+      const commit = () => {
+        const edited = read();
+        if (!edited || edited === committed) {
+          block.textContent = committed;
+          return;
+        }
+        committed = edited;
+        block.textContent = edited;
+        opts.onRetranslate(edited);
+      };
+
+      block.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+          // Enter alone still breaks a line; with the modifier it translates.
+          event.preventDefault();
+          commit();
+          block.blur();
+          return;
+        }
+        if (event.key === "Escape") {
+          // Escape belongs to the edit while the caret is in it: the text goes
+          // back to what was translated instead of the card being closed.
+          event.preventDefault();
+          event.stopPropagation();
+          block.textContent = committed;
+          block.blur();
+        }
+      });
+
+      // Leaving the field translates what is in it, so a correction is never
+      // quietly dropped when the reader clicks elsewhere.
+      block.addEventListener("blur", commit);
+    }
+
+    target.appendChild(block);
+    return block;
+  }
+
+  /**
+   * Draws what went wrong.
+   *
+   * The bottom row is the same one a card that answered wears, because a
+   * failure is exactly when a reader wants another engine: the one that just
+   * refused is named there and, when the caller offers a way to choose, the
+   * name opens the list. Leaving the row off the failure card would make the
+   * only way out the settings window, which is not where the reader is.
+   */
+  function error(target, message, onRetry, options) {
     clear(target);
+    const opts = options || {};
     const wrap = node("div", "error");
     const detail = String(message || "").trim();
     wrap.appendChild(node("div", "message", Glossy.i18n.t("render.failed")));
@@ -191,6 +283,7 @@
       wrap.appendChild(retry);
     }
     target.appendChild(wrap);
+    foot(target, opts.provider, opts);
   }
 
   function result(target, value, options) {
@@ -223,10 +316,14 @@
       ? { key: "Translation", text: translation, language: data.targetLang }
       : null;
 
+    // Both shapes of card open with the grey original, under the row that picks
+    // the languages: it is what the translation is of, and the one place a
+    // wrongly selected or misspelled source can be corrected.
+    if (original && opts.showOriginal !== false) {
+      originalBlock(target, original.text, opts);
+    }
+
     if (isSentence) {
-      if (original && opts.showOriginal !== false) {
-        target.appendChild(node("div", "original", original.text));
-      }
       if (original) sideTools(target, original, opts);
       target.appendChild(answer());
       if (answerSide) sideTools(target, answerSide, opts);
@@ -280,23 +377,42 @@
 
     if (extras) units(target, data.conversions);
 
-    // The bottom line of the card: the name of the engine that answered, added
-    // only when there is one to name.
-    const row = node("div", "foot");
-    engineName(row, data.provider, opts);
-    if (row.childNodes.length) target.appendChild(row);
+    // The bottom line of the card: the name of the engine that answered, with
+    // the Glossy mark at the far right.
+    foot(target, data.provider, opts);
 
-    // The card names the service that answered, and says so when that is not the
-    // one the settings picked.
+    // The line under the engine names the one that did *not* answer, which is
+    // the service the settings asked for: the engine in the footer is the one
+    // that answered, and a line that named it again would say nothing. The
+    // reason is told when the relay walked past it for a reason it named.
     if (data.fallbackFrom && data.provider) {
-      target.appendChild(
-        node(
-          "div",
-          "foot fallback",
-          Glossy.i18n.t("render.fallback", Glossy.i18n.providerName(data.fallbackFrom)),
-        ),
-      );
+      const failed = Glossy.i18n.providerName(data.fallbackFrom);
+      const reason = reasonText(data.fallbackCode);
+      const line = reason
+        ? Glossy.i18n.t("render.fallbackWhy", failed, reason)
+        : Glossy.i18n.t("render.fallback", failed);
+      target.appendChild(node("div", "foot fallback", line));
     }
+  }
+
+  /**
+   * What a vendor's own refusal code says, in the reader's language.
+   *
+   * A code this build does not know says nothing here: the line already says
+   * that the engine did not answer, and "it did not say why" after it would only
+   * repeat that. The code itself still reaches `glossy.log`.
+   */
+  function reasonText(code) {
+    // The server writes its codes with underscores (`upstream_limit`); the
+    // dictionary spells its keys without them.
+    const name = String(code || "")
+      .trim()
+      .toLowerCase()
+      .replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
+    if (!name) return "";
+    const key = `reason.${name}`;
+    const text = Glossy.i18n.t(key);
+    return text === key ? "" : text;
   }
 
   /** The inflections of a word, labelled by the tag the backend wrote. */
@@ -382,6 +498,10 @@
     '<svg class="glyph glyph-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2.5" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></svg>';
   const DONE_GLYPH =
     '<svg class="glyph glyph-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>';
+  /** The two arrows of the button that writes the translation back over the
+      original, which is the one thing it does. */
+  const REPLACE_GLYPH =
+    '<svg class="glyph glyph-replace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h12.5l-3-3" /><path d="M20 16H7.5l3 3" /></svg>';
 
   /** How often the card asks whether the voice is still reading. */
   const SPEECH_POLL_MS = 250;
@@ -401,6 +521,8 @@
   /** The button that copied last, and the timer that puts it back to rest. */
   let copied = null;
   let copiedTimer = null;
+  /** The card's own button for writing a translation back over its original. */
+  let overwriteButton = null;
 
   /**
    * The buttons of one side of the card: the one that copies that text and the
@@ -433,7 +555,48 @@
       row.appendChild(say);
     }
 
+    // Only the translation has an original to take the place of, and it only
+    // has one when the card is the answer to a selection: a card that is only
+    // being looked at has nothing behind it to write into.
+    if (opts.overwrite === true && side.key === "Translation") {
+      const write = node("button", "tool");
+      write.type = "button";
+      write.setAttribute("data-overwrite", "render.overwrite");
+      write.innerHTML = `${REPLACE_GLYPH}${DONE_GLYPH}`;
+      name(write, write.getAttribute("data-overwrite"));
+      write.addEventListener("click", () => overwrite(side.text, write));
+      row.appendChild(write);
+      overwriteButton = write;
+    }
+
     target.appendChild(row);
+  }
+
+  /**
+   * Writes `text` over the selection it was translated from.
+   *
+   * The writing itself belongs to the backend, which owns the clipboard and the
+   * paste; the card only names the text and shows the answer. `button` is the
+   * one that asked, when one did: the accelerator arrives without a button, so
+   * the card's own is used, and it may be gone along with the card.
+   */
+  function overwrite(text, button) {
+    if (typeof Glossy.invoke !== "function" || !text) return;
+    const target = button || overwriteButton;
+    Glossy.invoke("replace_selection", { text })
+      .then((written) => report(target, written !== false))
+      .catch(() => report(target, false));
+  }
+
+  /** Says on a button how a write back ended, for as long as a copy is shown. */
+  function report(button, ok) {
+    if (!button) return;
+    if (copied && copied !== button) resetCopy();
+    copied = button;
+    button.dataset.state = ok ? "copied" : "failed";
+    name(button, ok ? "render.overwritten" : "render.overwriteFailed");
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(resetCopy, COPIED_HOLD_MS);
   }
 
   /** Sends one side of the card to the clipboard and says so on its button. */
@@ -460,7 +623,9 @@
     copiedTimer = null;
     if (copied) {
       copied.dataset.state = "off";
-      name(copied, copied.getAttribute("data-copy"));
+      const resting =
+        copied.getAttribute("data-copy") || copied.getAttribute("data-overwrite");
+      name(copied, resting);
     }
     copied = null;
   }
@@ -643,5 +808,5 @@
     if (error && typeof error.message === "string") return error.message;
     return Glossy.i18n.t("render.failed");
   };
-  Glossy.render = { loading, error, result, clear, stopSpeaking };
+  Glossy.render = { loading, error, result, clear, stopSpeaking, overwrite };
 })(window.Glossy);

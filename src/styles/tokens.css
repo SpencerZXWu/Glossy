@@ -219,6 +219,79 @@
   --g-toast-outline: var(--g-stroke-default);
 }
 
+/* ------------------------------------------------------ high contrast */
+
+/* Windows' own high-contrast palette, rather than a second dark theme:
+ * Chromium reports the Windows contrast setting through `prefers-contrast`, and
+ * every colour in the app comes from a token, so this mapping is the whole
+ * theme. There is no entry in the theme menu, because the choice was made in
+ * Windows and the app does not get to overrule it.
+ *
+ * The values are the system colours the scheme itself is built from, so an
+ * inverted, a black or a "desert" scheme each work, and `Highlight` /
+ * `HighlightText` are taken as the pair they are. Translucency and subtlety are
+ * gone with them: nothing here is read through something else, and nothing is
+ * asked to be noticed by being faint.
+ */
+@media (prefers-contrast: more) {
+  :root {
+    color-scheme: light dark;
+
+    --g-surface-window: Canvas;
+    --g-surface-sunken: Canvas;
+    --g-surface-card: Canvas;
+    --g-surface-solid: Canvas;
+    --g-surface-flyout: Canvas;
+    --g-surface-control: Canvas;
+    /* A hover or a selection painted `Highlight` would put `CanvasText` on it,
+       which is the one pairing the scheme does not promise; the state is
+       carried by the accent-coloured text and border of the rules themselves. */
+    --g-surface-hover: Canvas;
+    --g-surface-pressed: Canvas;
+    --g-surface-selected: Canvas;
+
+    --g-text-primary: CanvasText;
+    --g-text-secondary: CanvasText;
+    --g-text-tertiary: CanvasText;
+    --g-text-disabled: GrayText;
+
+    --g-stroke-subtle: CanvasText;
+    --g-stroke-default: CanvasText;
+    --g-stroke-strong: CanvasText;
+
+    --g-accent: Highlight;
+    --g-accent-hover: Highlight;
+    --g-accent-pressed: Highlight;
+    --g-accent-soft: Canvas;
+    --g-on-accent: HighlightText;
+
+    --g-ok: CanvasText;
+    --g-ok-soft: Canvas;
+    --g-warn: CanvasText;
+    --g-warn-soft: Canvas;
+    --g-bad: CanvasText;
+    --g-bad-soft: Canvas;
+
+    /* The dialog keeps its own surface instead of a scrim: a solid sheet over
+       the window would read as the window having gone. */
+    --g-scrim: transparent;
+
+    /* The switch is drawn out of the two tokens above, so its knob has to be
+       the window colour to stay visible on the `CanvasText` track. */
+    --g-knob: Canvas;
+    --g-shadow-knob: none;
+
+    --g-shadow-card: none;
+    --g-shadow-flyout: none;
+    --g-shadow-dialog: none;
+    --g-shadow-toast: none;
+
+    --g-toast-surface: Canvas;
+    --g-toast-text: CanvasText;
+    --g-toast-outline: CanvasText;
+  }
+}
+
 /* ----------------------------------------------------------- density */
 
 :root[data-density="compact"] {

@@ -15,6 +15,8 @@
   const DENSITY_KEY = "glossy.density";
 
   const media = window.matchMedia("(prefers-color-scheme: dark)");
+  /** Windows is asking for a contrast theme rather than for a light palette. */
+  const contrast = window.matchMedia("(prefers-contrast: more)");
   const root = document.documentElement;
   /** Backdrop of the current window; kept so an OS theme change cannot drop it. */
   let lastBackdrop = "none";
@@ -58,7 +60,11 @@
   /** Paints a custom accent, or clears the overrides so the token layer wins. */
   function applyAccent(accent, theme) {
     const style = root.style;
-    if (!isHex(accent)) {
+    // A contrast theme brings an accent of its own - the system highlight - and
+    // a colour that was picked for a light or a dark window is exactly what
+    // cannot be trusted in it. The override is cleared so the token layer, which
+    // the `prefers-contrast` block also feeds, decides.
+    if (!isHex(accent) || contrast.matches) {
       for (const name of ["accent", "accent-hover", "accent-pressed", "accent-soft", "on-accent"]) {
         style.removeProperty(`--g-${name}`);
       }
@@ -94,16 +100,25 @@
     write(DENSITY_KEY, options.density || "comfortable");
   }
 
-  media.addEventListener("change", () => {
-    const cached = read(CACHE_KEY);
-    if (cached === "light" || cached === "dark") return;
+  /** Repaints from the cache after the OS changed something underneath us. */
+  function reapply() {
     apply({
-      theme: "system",
+      theme: read(CACHE_KEY),
       accent: read(ACCENT_KEY),
       density: read(DENSITY_KEY),
       backdrop: lastBackdrop,
     });
+  }
+
+  media.addEventListener("change", () => {
+    const cached = read(CACHE_KEY);
+    if (cached === "light" || cached === "dark") return;
+    reapply();
   });
+
+  // A contrast theme can be turned on or off while a window is open, and the
+  // accent override has to follow it both ways.
+  contrast.addEventListener("change", reapply);
 
   const boot = {
     theme: read(CACHE_KEY),
