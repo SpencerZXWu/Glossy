@@ -13,6 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 
+use crate::log::note;
 use crate::translate::{TranslationResult, WordDetails};
 
 /// Largest history the settings can ask for.
@@ -208,7 +209,7 @@ fn store(app: &AppHandle) {
         let _ = std::fs::create_dir_all(parent);
     }
     if let Err(error) = std::fs::write(&path, raw) {
-        eprintln!("Glossy could not write its translation history: {error}");
+        note!("Glossy could not write its translation history: {error}");
     }
 }
 
@@ -231,6 +232,7 @@ mod tests {
             synonyms: Vec::new(),
             forms: Vec::new(),
             fallback_from: None,
+            fallback_code: None,
             pairs: Vec::new(),
             conversions: Vec::new(),
         }

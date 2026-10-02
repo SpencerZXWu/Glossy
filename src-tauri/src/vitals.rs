@@ -9,6 +9,8 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use crate::log::note;
+
 /// Installations of the low level mouse hook, and their removals.
 static HOOK_INSTALLS: AtomicU64 = AtomicU64::new(0);
 static HOOK_UNINSTALLS: AtomicU64 = AtomicU64::new(0);
@@ -141,7 +143,7 @@ pub fn report_leak() -> Option<&'static str> {
     let again = SEEN.swap(named.is_some(), Ordering::Relaxed);
     let named = named?;
     if say(again, &REPORTED) {
-        eprintln!("glossy: {named} was not given back");
+        note!("glossy: {named} was not given back");
     }
     Some(named)
 }
