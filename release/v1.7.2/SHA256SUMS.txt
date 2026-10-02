@@ -1,0 +1,3 @@
+a3aa9550f1e587f85b9e7fef57b9df608f32fe0daf65a1b0b2dbdc357a64b4aa  Glossy_1.7.2_x64-setup.exe
+0b92968efcf62039672bb0abd7beea31541382ea0704b283c36553a22e4c1b74  Glossy_1.7.2_x64_en-US.msi
+9ba9a050c911afcd31653906b91dee46f17f980bbd04f88e5c5e43fae443c7bb  Glossy_1.7.2_x64_portable.zip
