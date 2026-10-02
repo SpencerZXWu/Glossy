@@ -29,12 +29,10 @@ const CURRENCY_BUDGET: Duration = Duration::from_millis(2500);
 /// the rate vendors are reached from the server's network instead of the user's
 /// — which is also what keeps the address and the vendors in one place. The app
 /// still calls the vendors directly when the server has nothing to say, so an
-/// older deployment, or a home server that is down, changes nothing.
+/// older deployment, or a home server that is down, changes nothing. The
+/// address itself is part of the build, so this carries only the device.
 #[derive(Debug, Clone, Copy)]
 pub struct Relay<'a> {
-    /// The address the settings hold. `translate::cloud` still decides whether
-    /// the one built into the app wins.
-    pub endpoint: &'a str,
     /// The install id the server knows this device by.
     pub install_id: &'a str,
 }
@@ -80,7 +78,15 @@ pub async fn conversions(
     let deadline = Instant::now() + CURRENCY_BUDGET;
 
     let mut out: Vec<Conversion> = Vec::new();
+    // The amounts already annotated, so a measurement that is written more than
+    // once is one row and one lookup. Kept beside `out` so the two never drift.
+    let mut seen: Vec<Found> = Vec::new();
     for hit in scan(text, has_kana(text)) {
+        // This is skipped before the rate is asked for: the same amount of money
+        // twice is one row and one request.
+        if seen.iter().any(|other| same_amount(other, &hit.found)) {
+            continue;
+        }
         let conversion = match hit.found {
             Found::Measure { unit, value } => measure(unit, value, &hit, system),
             Found::Money { code, value } => {
@@ -102,15 +108,47 @@ pub async fn conversions(
         let Some(conversion) = conversion else {
             continue;
         };
-        if out.iter().any(|seen| seen.original == conversion.original) {
-            continue;
-        }
+        seen.push(hit.found);
         out.push(conversion);
         if out.len() >= MAX_CONVERSIONS {
             break;
         }
     }
     out
+}
+
+/// Whether two hits are the same amount written in the same unit.
+///
+/// This is what keeps a repeated measurement down to one row, and it is decided
+/// by the amount rather than by the way it was typed: `12 ft` written twice,
+/// `12ft` next to `12 ft`, and `12 ft` next to `12 feet` are each one
+/// annotation, while `12 ft` and `13 ft` are two. Two amounts that only differ
+/// below the digits the card shows are two rows as well — they are different
+/// numbers, and the reader asked about both.
+fn same_amount(one: &Found, other: &Found) -> bool {
+    match (one, other) {
+        (
+            Found::Measure {
+                unit: first,
+                value: left,
+            },
+            Found::Measure {
+                unit: second,
+                value: right,
+            },
+        ) => first.category == second.category && first.display == second.display && left == right,
+        (
+            Found::Money {
+                code: first,
+                value: left,
+            },
+            Found::Money {
+                code: second,
+                value: right,
+            },
+        ) => first == second && left == right,
+        _ => false,
+    }
 }
 
 /// The conversions to annotate a card with.
@@ -726,6 +764,33 @@ mod tests {
             None,
             None,
         ))
+    }
+
+    #[test]
+    fn a_repeated_measurement_is_one_row_however_it_was_typed() {
+        // The same rope measured twice is one annotation, and it stays one when
+        // the translation writes the unit differently the second time.
+        for text in [
+            "The rope is 12 ft and the other rope is 12 ft.",
+            "The rope is 12 ft and the other rope is 12ft.",
+            "The rope is 12ft and the other rope is 12 feet.",
+        ] {
+            let found = annotate(text, text, "zh-CN");
+            assert_eq!(
+                found.len(),
+                1,
+                "expected one conversion in `{text}`: {found:?}"
+            );
+            assert_eq!(found[0].converted, "3.66 m");
+        }
+    }
+
+    #[test]
+    fn two_different_amounts_are_two_rows() {
+        let text = "The rope is 1 ft and the other rope is 2 ft.";
+        let found = annotate(text, text, "zh-CN");
+        let originals: Vec<&str> = found.iter().map(|entry| entry.original.as_str()).collect();
+        assert_eq!(originals, vec!["1 ft", "2 ft"]);
     }
 
     #[test]

@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the Glossy main window and the translation popup.",
-  "windows": ["main", "popup"],
+  "description": "Capabilities for the Glossy main window, the translation popup, the screenshot overlay and the subtitle line.",
+  "windows": ["main", "popup", "ocr", "subtitle", "subtitle-area", "subtitle-edit"],
   "permissions": [
     "core:default",
     "core:event:default",

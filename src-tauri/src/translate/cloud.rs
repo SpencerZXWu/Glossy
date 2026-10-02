@@ -11,8 +11,9 @@ use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 
 use crate::classify::Kind;
+use crate::log::note;
 
-use super::TranslationResult;
+use super::{Failure, TranslationResult};
 
 /// Address the build points at when the user has not set one.
 ///
@@ -25,20 +26,39 @@ use super::TranslationResult;
 pub const DEFAULT_ENDPOINT: &str = "https://1492303375-cwrw0pdztr.ap-guangzhou.tencentscf.com";
 
 /// Characters the server wants an install id to have.
+///
+/// It is derived from the machine and the Windows account rather than drawn at
+/// random, so that installing the app again lands on the id it had — an
+/// allowance counted by a random id starts over for anybody who reinstalls,
+/// which is exactly the bug this fixes. Nothing about the machine is sent
+/// itself: the server only ever sees the 32 hex characters below.
+///
+/// A machine whose identifier cannot be read falls back on a random one, which
+/// is what every install used to have and is still better than refusing to
+/// translate.
 pub fn new_install_id() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_nanos())
-        .unwrap_or(0);
-    let seed = format!(
-        "{nanos}-{}-{}",
-        std::process::id(),
-        COUNTER.fetch_add(1, Ordering::Relaxed)
-    );
+    let machine = crate::platform::desktop::machine_id();
+    let seed = match machine {
+        Some(machine) => {
+            let account = std::env::var("USERNAME").unwrap_or_default();
+            format!("glossy-{machine}-{account}")
+        }
+        None => {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or(0);
+            format!(
+                "glossy-{nanos}-{}-{}",
+                std::process::id(),
+                COUNTER.fetch_add(1, Ordering::Relaxed)
+            )
+        }
+    };
     // MD5 is already along for the Baidu signature, and its 32 hex characters
     // are exactly the kind of id the server accepts.
     format!("{:x}", Md5::digest(seed.as_bytes()))
@@ -56,26 +76,20 @@ pub struct Quota {
 }
 
 /// The address requests go to, or an explanation of why there is none.
-fn endpoint_of(configured: &str) -> Result<String, String> {
-    endpoint_from(configured, DEFAULT_ENDPOINT)
+///
+/// It is part of the build rather than a setting: the window has had no field
+/// for it for years, and a wrong address in an old file would break the one
+/// service that needs nothing set up. A build made without an address — which
+/// is what a fork that has not deployed `server/` gets — says so instead.
+fn endpoint_of() -> Result<String, String> {
+    endpoint_from(DEFAULT_ENDPOINT)
 }
 
 /// `endpoint_of` with the build default passed in, so the branch that has
 /// nothing to send to stays reachable for a test even though this build ships
 /// with an address.
-///
-/// The address this build was made with wins over the one in the settings file:
-/// the window has no field for it any more, so a value found there is a leftover
-/// from an older version, and a wrong one breaks the only service that needs
-/// nothing set up. A build made without an address still honors the setting.
-fn endpoint_from(configured: &str, build_default: &str) -> Result<String, String> {
-    let build_default = build_default.trim().trim_end_matches('/');
-    let configured = configured.trim().trim_end_matches('/');
-    let endpoint = if build_default.is_empty() {
-        configured
-    } else {
-        build_default
-    };
+fn endpoint_from(build_default: &str) -> Result<String, String> {
+    let endpoint = build_default.trim().trim_end_matches('/');
     if endpoint.is_empty() {
         return Err(
             "The cloud translator has no server address yet. Deploy the service from `server/` \
@@ -87,14 +101,6 @@ fn endpoint_from(configured: &str, build_default: &str) -> Result<String, String
         return Err("The cloud translator address has to start with `https://`.".to_string());
     }
     Ok(endpoint.to_string())
-}
-
-/// The address this build sends requests to, for the callers that need the same
-/// choice `endpoint_of` makes without wanting its error path: what they do with
-/// a missing address is skip the server entirely, so an empty string is the
-/// answer for a build that carries no address of its own.
-pub fn resolved_endpoint(configured: &str) -> String {
-    endpoint_from(configured, DEFAULT_ENDPOINT).unwrap_or_default()
 }
 
 /// What one translation asks the server for.
@@ -124,10 +130,9 @@ impl Request<'_> {
 pub async fn translate(
     client: &reqwest::Client,
     request: Request<'_>,
-    configured_endpoint: &str,
     install_id: &str,
-) -> Result<TranslationResult, String> {
-    let endpoint = endpoint_of(configured_endpoint)?;
+) -> Result<TranslationResult, Failure> {
+    let endpoint = endpoint_of().map_err(Failure::from)?;
     let payload = request.payload(install_id);
 
     let response = client
@@ -135,20 +140,34 @@ pub async fn translate(
         .json(&payload)
         .send()
         .await
-        .map_err(|error| format!("Could not reach the Glossy translation server: {error}"))?;
+        .map_err(|error| {
+            Failure::coded(
+                format!("Could not reach the Glossy translation server: {error}"),
+                RELAY_UNREACHABLE,
+            )
+        })?;
 
     let status = response.status();
     let body = response.text().await.map_err(|error| {
-        format!("Could not read the Glossy translation server response: {error}")
+        Failure::coded(
+            format!("Could not read the Glossy translation server response: {error}"),
+            RELAY_UNREACHABLE,
+        )
     })?;
 
     let data: serde_json::Value = serde_json::from_str(&body).map_err(|_| {
         if status.is_success() {
-            "The Glossy translation server sent a response the app could not read.".to_string()
+            Failure::coded(
+                "The Glossy translation server sent a response the app could not read.".to_string(),
+                RELAY_UNREACHABLE,
+            )
         } else {
-            format!(
-                "The Glossy translation server answered HTTP {status}. Check that the service \
-                 deployed from `server/` is still running."
+            Failure::coded(
+                format!(
+                    "The Glossy translation server answered HTTP {status}. Check that the service \
+                     deployed from `server/` is still running."
+                ),
+                RELAY_UNREACHABLE,
             )
         }
     })?;
@@ -163,7 +182,9 @@ pub async fn translate(
         .unwrap_or_default()
         .to_string();
     if translation.trim().is_empty() {
-        return Err("The Glossy translation server returned an empty translation.".to_string());
+        return Err(Failure::plain(
+            "The Glossy translation server returned an empty translation.".to_string(),
+        ));
     }
 
     // The server names the engine that answered, so the footer can say which
@@ -178,7 +199,43 @@ pub async fn translate(
         .and_then(|value| value.as_str())
         .unwrap_or("auto")
         .to_string();
+    // The relay walks its own list of backends when the one it was asked for
+    // fails, and answers from the one that did. That is a fallback the user never
+    // asked for and the app cannot see coming, so it is marked like one the app
+    // made itself: the card then names the engine that answered *and* the one
+    // that did not, instead of looking as if the choice had moved on its own.
+    let asked = request.vendor.trim();
+    if !asked.is_empty() && !provider.eq_ignore_ascii_case(asked) {
+        let refused = refused_with(&data, asked);
+        note!(
+            "glossy: the relay answered with {provider} instead of {asked}{}",
+            match refused.as_deref() {
+                Some(code) => format!(" ({code})"),
+                None => String::new(),
+            }
+        );
+        result.fallback_from = Some(asked.to_string());
+        result.fallback_code = refused;
+    }
     Ok(result)
+}
+
+/// The code a vendor was refused with, when the deployment reports it.
+///
+/// A deployment that walks past a backend without saying why leaves this empty,
+/// which is what an older relay does: the card can still say that the answer came
+/// from somewhere else, just not why the one that was asked for stepped aside.
+fn refused_with(data: &serde_json::Value, vendor: &str) -> Option<String> {
+    data.get("attempts")?
+        .as_array()?
+        .iter()
+        .find(|attempt| {
+            attempt
+                .get("vendor")
+                .and_then(|value| value.as_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case(vendor))
+        })
+        .and_then(|attempt| attempt.get("code")?.as_str().map(str::to_string))
 }
 
 /// The name the card shows for the engine that answered.
@@ -194,12 +251,8 @@ fn answered_by<'a>(data: &'a serde_json::Value, vendor: &'a str) -> &'a str {
 }
 
 /// Reads today's allowance for this installation.
-pub async fn quota(
-    client: &reqwest::Client,
-    configured_endpoint: &str,
-    install_id: &str,
-) -> Result<Quota, String> {
-    let endpoint = endpoint_of(configured_endpoint)?;
+pub async fn quota(client: &reqwest::Client, install_id: &str) -> Result<Quota, String> {
+    let endpoint = endpoint_of()?;
     let response = client
         .get(format!("{endpoint}/v1/quota"))
         .query(&[("client", install_id)])
@@ -221,7 +274,7 @@ pub async fn quota(
     })?;
 
     if data.get("ok").and_then(|value| value.as_bool()) != Some(true) {
-        return Err(problem(&data, status));
+        return Err(problem(&data, status).to_string());
     }
 
     let number = |path: &[&str]| -> u64 {
@@ -269,13 +322,8 @@ const RATE_TIMEOUT: Duration = Duration::from_secs(4);
 /// The server books these calls against its per-minute limit and nothing
 /// against the daily characters, so a card that only holds a currency
 /// conversion still costs no quota.
-pub async fn rates(
-    client: &reqwest::Client,
-    base: &str,
-    configured_endpoint: &str,
-    install_id: &str,
-) -> Option<RateTable> {
-    let endpoint = endpoint_of(configured_endpoint).ok()?;
+pub async fn rates(client: &reqwest::Client, base: &str, install_id: &str) -> Option<RateTable> {
+    let endpoint = endpoint_of().ok()?;
     let response = client
         .get(format!("{endpoint}/v1/rates"))
         .query(&[("base", base), ("client", install_id)])
@@ -323,7 +371,11 @@ pub async fn rates(
 /// The server answers in Chinese, and a desktop app that may be running in
 /// either language should not show one language's text in the other, so the
 /// codes carry the wording and the server text is only the last resort.
-fn problem(data: &serde_json::Value, status: reqwest::StatusCode) -> String {
+/// The code that says the relay itself never answered: the one thing the card
+/// can name when the failure is not a vendor's own refusal.
+const RELAY_UNREACHABLE: &str = "relay_unreachable";
+
+fn problem(data: &serde_json::Value, status: reqwest::StatusCode) -> Failure {
     let code = data
         .get("code")
         .and_then(|value| value.as_str())
@@ -334,7 +386,7 @@ fn problem(data: &serde_json::Value, status: reqwest::StatusCode) -> String {
         .unwrap_or("")
         .trim();
 
-    match code {
+    let message = match code {
         "client_quota_exceeded" | "ip_quota_exceeded" | "global_quota_exceeded" => {
             "The free cloud translation quota for today is used up. It starts over at 00:00 UTC."
                 .to_string()
@@ -367,6 +419,31 @@ fn problem(data: &serde_json::Value, status: reqwest::StatusCode) -> String {
         }
         _ if !message.is_empty() => message.to_string(),
         _ => format!("The cloud translator answered HTTP {status}."),
+    };
+    Failure {
+        message,
+        code: vendor_code(code),
+    }
+}
+
+/// The refusal codes the card has a sentence for.
+///
+/// Only the ones about a vendor are passed on. The rest are about the relay
+/// itself — its own daily allowance, its rate limit, a request it would not
+/// take — and a line saying that the engine named in the footer ran out of
+/// quota when it was the relay that refused would be a lie. Those keep the
+/// message alone: the log has the detail, and the card says only that the
+/// engine did not answer.
+fn vendor_code(code: &str) -> Option<String> {
+    match code {
+        "upstream_limit"
+        | "upstream_credentials"
+        | "upstream_timeout"
+        | "upstream_error"
+        | "upstream_unreachable"
+        | "not_configured"
+        | "unsupported_language" => Some(code.to_string()),
+        _ => None,
     }
 }
 
@@ -379,38 +456,33 @@ mod tests {
         let id = new_install_id();
         assert_eq!(id.len(), 32);
         assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
-        assert_ne!(id, new_install_id());
+    }
+
+    #[test]
+    fn the_install_id_of_one_machine_stays_the_same() {
+        // The allowance is counted by this id, so drawing it at random would
+        // hand a fresh allowance to anybody who installs the app again. It is
+        // read off the machine instead, and this is what says so: two calls in
+        // one process — which is all a test can see of a second install — have
+        // to agree.
+        assert_eq!(new_install_id(), new_install_id());
     }
 
     #[test]
     fn a_missing_address_is_explained_instead_of_sent_somewhere() {
-        // A build without an address of its own, and nothing set here, has
-        // nowhere to send the text.
-        let error = endpoint_from("", "").unwrap_err();
+        // A build made without an address — a fork that has not deployed
+        // `server/` — has nowhere to send the text.
+        let error = endpoint_from("").unwrap_err();
         assert!(error.contains("no server address"));
-        // Otherwise the build's own address is what every setting means.
-        assert_eq!(endpoint_of("").unwrap(), DEFAULT_ENDPOINT);
+        // This build has one, and it is the address every request goes to.
+        assert_eq!(endpoint_of().unwrap(), DEFAULT_ENDPOINT);
         assert!(DEFAULT_ENDPOINT.starts_with("https://"));
-        // A build made without an address of its own is the one case where the
-        // settings file is still read, because there is nothing else to use.
+        // Whatever it is, it is trimmed and has to be a URL.
         assert_eq!(
-            endpoint_from(" https://glossy.example.workers.dev/ ", "").unwrap(),
+            endpoint_from(" https://glossy.example.workers.dev/ ").unwrap(),
             "https://glossy.example.workers.dev"
         );
-        // The address in the settings file is a leftover the window cannot show,
-        // so it never replaces the one the build was made with.
-        assert_eq!(
-            endpoint_of("https://glossy.example.workers.dev").unwrap(),
-            DEFAULT_ENDPOINT
-        );
-        assert!(endpoint_from("glossy.example.workers.dev", "").is_err());
-        // Callers that answer with "no server" instead of an error get the same
-        // address: the one the build was made with, whatever the file says.
-        assert_eq!(
-            resolved_endpoint("https://glossy.example.workers.dev"),
-            DEFAULT_ENDPOINT
-        );
-        assert_eq!(resolved_endpoint("  "), DEFAULT_ENDPOINT);
+        assert!(endpoint_from("glossy.example.workers.dev").is_err());
     }
 
     #[test]
@@ -461,22 +533,75 @@ mod tests {
     }
 
     #[test]
+    fn a_vendor_the_relay_walked_past_gives_up_why() {
+        let reported = serde_json::json!({
+            "ok": true,
+            "vendor": "youdao",
+            "attempts": [
+                {"vendor": "baidu", "code": "upstream_credentials"},
+            ],
+        });
+        assert_eq!(
+            refused_with(&reported, "baidu").as_deref(),
+            Some("upstream_credentials")
+        );
+        // The engine that answered is not the one that was refused.
+        assert_eq!(refused_with(&reported, "youdao"), None);
+        // A deployment that walks past a backend without saying why, which is
+        // what a relay older than this build does.
+        assert_eq!(
+            refused_with(&serde_json::json!({"vendor": "youdao"}), "baidu"),
+            None
+        );
+        assert_eq!(
+            refused_with(&serde_json::json!({"attempts": []}), "baidu"),
+            None
+        );
+        // A code that is not a string is not a reason either.
+        assert_eq!(
+            refused_with(
+                &serde_json::json!({"attempts": [{"vendor": "baidu", "code": 12}]}),
+                "baidu"
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn refusals_become_one_sentence_per_code() {
         let quota = problem(
             &serde_json::json!({"code": "client_quota_exceeded"}),
             reqwest::StatusCode::TOO_MANY_REQUESTS,
         );
-        assert!(quota.contains("used up"));
+        assert!(quota.message.contains("used up"));
         let config = problem(
             &serde_json::json!({"code": "not_configured"}),
             reqwest::StatusCode::SERVICE_UNAVAILABLE,
         );
-        assert!(config.contains("BAIDU_APP_ID"));
+        assert!(config.message.contains("BAIDU_APP_ID"));
         // An unknown code keeps whatever the server explained.
         let other = problem(
             &serde_json::json!({"code": "mystery", "message": "服务器说得很清楚"}),
             reqwest::StatusCode::BAD_GATEWAY,
         );
-        assert_eq!(other, "服务器说得很清楚");
+        assert_eq!(other.message, "服务器说得很清楚");
+    }
+
+    #[test]
+    fn only_a_vendors_own_refusal_says_why_on_the_card() {
+        // A vendor that ran out of quota is what the line under the engine is
+        // for; the relay's own daily allowance has nothing to do with the engine
+        // named in the footer, so that one says nothing at all.
+        assert_eq!(
+            vendor_code("upstream_limit"),
+            Some("upstream_limit".to_string())
+        );
+        assert_eq!(
+            vendor_code("upstream_credentials"),
+            Some("upstream_credentials".to_string())
+        );
+        assert_eq!(vendor_code("client_quota_exceeded"), None);
+        assert_eq!(vendor_code("rate_limited"), None);
+        assert_eq!(vendor_code("mystery"), None);
     }
 }

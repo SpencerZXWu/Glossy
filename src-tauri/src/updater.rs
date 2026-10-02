@@ -12,6 +12,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_updater::UpdaterExt;
 
+use crate::log::note;
+
 /// The placeholder in `tauri.conf.json`, which is not a usable key.
 const PLACEHOLDER: &str = "PLACEHOLDER_";
 
@@ -90,7 +92,7 @@ pub fn check_in_background(app: &AppHandle) {
                 let _ = handle.emit("glossy://update", info);
             }
             Ok(None) => {}
-            Err(error) => eprintln!("Glossy could not check for updates: {error}"),
+            Err(error) => note!("Glossy could not check for updates: {error}"),
         }
     });
 }
@@ -99,6 +101,12 @@ pub fn check_in_background(app: &AppHandle) {
 #[tauri::command]
 pub fn update_capability(app: AppHandle) -> bool {
     configured(&app)
+}
+
+/// The version this copy is, which is what an update would replace.
+#[tauri::command]
+pub fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 #[tauri::command]

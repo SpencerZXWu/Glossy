@@ -11,11 +11,11 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::classify::{self, Kind};
+use crate::log::note;
 use crate::settings::{Service, Settings};
 
 pub use self::cloud::{
-    new_install_id, quota as cloud_quota, rates as cloud_rates,
-    resolved_endpoint as cloud_endpoint, Quota as CloudQuota,
+    new_install_id, quota as cloud_quota, rates as cloud_rates, Quota as CloudQuota,
 };
 
 /// The free public endpoints reject requests without a browser like agent.
@@ -73,9 +73,16 @@ pub struct TranslationResult {
     pub forms: Vec<crate::morphology::Form>,
     /// The service the user chose, when another one had to answer because the
     /// chosen one failed. `None` when the chosen service answered, or when it
-    /// is the only one that was asked.
+    /// is the only one that was asked. Holds the name of an engine, the way
+    /// [`provider`](Self::provider) does, so a card can show it as it is.
     #[serde(default)]
     pub fallback_from: Option<String>,
+    /// Why the engine that answered was asked at all, when the relay was the one
+    /// that moved on: the code the vendor refused with (`upstream_credentials`,
+    /// `upstream_limit`, …). `None` for a fallback the app made itself, and for
+    /// an answer from the engine that was asked for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fallback_code: Option<String>,
     /// The translation split sentence by sentence against the original, for the
     /// optional side-by-side view. Empty unless the setting is on, and a single
     /// pair when the two do not divide the same way, which reads as "no
@@ -103,6 +110,7 @@ impl TranslationResult {
             synonyms: Vec::new(),
             forms: Vec::new(),
             fallback_from: None,
+            fallback_code: None,
             pairs: Vec::new(),
             conversions: Vec::new(),
         }
@@ -274,6 +282,46 @@ pub fn client() -> Result<&'static reqwest::Client, String> {
         })
         .as_ref()
         .map_err(|error| error.clone())
+}
+
+/// Translates `text` from one language into another, both named by the caller.
+///
+/// The subtitle reading knows both: the reader picks them once before it starts,
+/// and every line that comes out of the region is read with the same pair. The
+/// source is named rather than detected because the picture is in one language
+/// and the same reading comes back every tick — asking the provider to work it
+/// out again would cost a round trip per line for an answer that cannot change.
+pub async fn translate_pair(
+    text: &str,
+    source: &str,
+    target: &str,
+    settings: &Settings,
+) -> Result<TranslationResult, String> {
+    let text = text.trim();
+    let characters = text.chars().count();
+    if characters == 0 {
+        return Err("Nothing was selected.".to_string());
+    }
+    if characters > MAX_TEXT_CHARS {
+        return Err(format!(
+            "That selection is too long ({characters} characters, limit {MAX_TEXT_CHARS})."
+        ));
+    }
+
+    let kind = classify::classify(text);
+    let client = client()?;
+    let source = if source.trim().is_empty() {
+        "auto".to_string()
+    } else {
+        normalize_lang_code(source)
+    };
+    let target = normalize_lang_code(target);
+
+    let mut result = call_provider(client, settings, text, &source, &target, kind).await?;
+    result.source_lang = normalize_lang_code(&result.source_lang);
+    result.kind = kind.as_str().to_string();
+    result.target_lang = target;
+    Ok(result)
 }
 
 /// Translates `text` according to `settings`.
@@ -449,13 +497,60 @@ pub async fn sentence_context(
     (!translation.is_empty()).then_some(SentenceContext { text, translation })
 }
 
+/// A service that did not answer, and what the card can say about it.
+///
+/// The message is what the log and the last-resort error say. The code, when
+/// there is one, is what the card looks the reason up by: a service that fails
+/// while the app is falling back to another has to explain itself the same way
+/// as one the relay walked past, and both sides know the same small set of
+/// codes.
+#[derive(Debug)]
+struct Failure {
+    pub(super) message: String,
+    /// One of the codes `render.js` has a sentence for, such as `upstream_limit`
+    /// or `relay_unreachable`; `None` when the card is better off saying only
+    /// that the engine did not answer.
+    pub(super) code: Option<String>,
+}
+
+impl Failure {
+    /// A failure the card can say something about.
+    pub(super) fn coded(message: String, code: &str) -> Failure {
+        Failure {
+            message,
+            code: Some(code.to_string()),
+        }
+    }
+
+    /// A failure with nothing the card could add.
+    pub(super) fn plain(message: String) -> Failure {
+        Failure {
+            message,
+            code: None,
+        }
+    }
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Failure {
+        Failure::plain(message)
+    }
+}
+
+impl std::fmt::Display for Failure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
 /// Sends the text to whichever backend the settings name, and to the next one
 /// in the fallback order when it fails.
 ///
 /// A public endpoint that rate-limits or drops a request is the normal case
 /// rather than an error, so the chosen service is tried first and, unless the
 /// fallback is switched off, the others after it. The card names the service
-/// that answered; `fallback_from` tells it whether that was the chosen one.
+/// that answered; `fallback_from` tells it whether that was the chosen one, and
+/// `fallback_code` why the chosen one stepped aside.
 async fn call_provider(
     client: &reqwest::Client,
     settings: &Settings,
@@ -466,31 +561,42 @@ async fn call_provider(
 ) -> Result<TranslationResult, String> {
     let chosen = settings.service();
     let order = settings.service_order();
-    let mut last: Option<String> = None;
+    // Why the chosen one stepped aside is why the first attempt failed, and the
+    // chosen one is always the first attempt: a later one failing says nothing
+    // about it. `None` inside the `Some` is a failure with nothing to say, which
+    // is what a card showing a reason it made up would be worse than.
+    let mut chosen_code: Option<Option<String>> = None;
+    let mut last: Option<Failure> = None;
 
     for (index, service) in order.iter().enumerate() {
         match call_service(client, settings, *service, text, source, target, kind).await {
             Ok(mut result) => {
                 if *service != chosen {
-                    result.fallback_from = Some(chosen.id().to_string());
+                    result.fallback_from = Some(chosen.provider().to_string());
+                    result.fallback_code = chosen_code.flatten();
                 }
                 return Ok(result);
             }
-            Err(error) => {
+            Err(failure) => {
+                if chosen_code.is_none() {
+                    chosen_code = Some(failure.code.clone());
+                }
                 if index + 1 < order.len() {
-                    eprintln!(
-                        "glossy: {} failed ({error}), trying the next service",
+                    note!(
+                        "glossy: {} failed ({failure}), trying the next service",
                         service.id()
                     );
                 }
-                last = Some(error);
+                last = Some(failure);
             }
         }
     }
 
     // Only the first failure is worth showing: the ones after it are the same
     // problem met again by another service.
-    Err(last.unwrap_or_else(|| "No translation service is available.".to_string()))
+    Err(last
+        .map(|failure| failure.message)
+        .unwrap_or_else(|| "No translation service is available.".to_string()))
 }
 
 /// Sends the text to one service, whoever it is.
@@ -502,14 +608,12 @@ async fn call_service(
     source: &str,
     target: &str,
     kind: Kind,
-) -> Result<TranslationResult, String> {
+) -> Result<TranslationResult, Failure> {
     match service {
-        Service::Google => google::translate(client, text, source, target, kind).await,
+        Service::Google => google::translate(client, text, source, target, kind)
+            .await
+            .map_err(Failure::from),
         Service::CloudBaidu | Service::CloudYoudao => {
-            let vendor = match service {
-                Service::CloudYoudao => "youdao",
-                _ => "baidu",
-            };
             cloud::translate(
                 client,
                 cloud::Request {
@@ -517,12 +621,25 @@ async fn call_service(
                     source,
                     target,
                     kind,
-                    vendor,
+                    vendor: service.provider(),
                 },
-                &settings.cloud_endpoint,
                 &settings.cloud_id,
             )
             .await
+        }
+        // The one service that is not a service: the text is translated on this
+        // machine, which is a second of arithmetic rather than a request, so it
+        // is put on a thread that is allowed to take it.
+        Service::Offline => {
+            let text = text.to_string();
+            let source = source.to_string();
+            let target = target.to_string();
+            tauri::async_runtime::spawn_blocking(move || {
+                crate::offline::translate(&text, &source, &target)
+            })
+            .await
+            .map_err(|error| Failure::plain(format!("The offline engine could not run: {error}")))?
+            .map_err(Failure::plain)
         }
     }
 }
@@ -630,6 +747,15 @@ pub fn normalize_lang_code(code: &str) -> String {
     if lower.is_empty() {
         return String::new();
     }
+    // A provider that answers with the pair it translated rather than with the
+    // source alone — Youdao names its pair `en2zh-CHS` — is naming the language
+    // it read the text as on the left of that pair, and the pair itself is
+    // nothing the popup could show or the next request could use.
+    if let Some((source, target)) = lower.split_once('2') {
+        if is_language_tag(source) && is_language_tag(target) {
+            return normalize_lang_code(source);
+        }
+    }
     let base = lower.split('-').next().unwrap_or("");
 
     if base == "zh" || base == "cht" {
@@ -676,6 +802,16 @@ pub fn normalize_lang_code(code: &str) -> String {
         other => return other.to_string(),
     }
     .to_string()
+}
+
+/// Whether a piece of a language pair a provider sent looks like a language tag
+/// rather than like part of a code that happens to contain a digit.
+fn is_language_tag(part: &str) -> bool {
+    !part.is_empty()
+        && part.len() <= 8
+        && part
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 fn resembles(a: &str, b: &str) -> bool {
@@ -735,6 +871,18 @@ mod tests {
         assert_eq!(normalize_lang_code("zh_TW"), "zh-TW");
         assert_eq!(normalize_lang_code("fil"), "fil");
         assert_eq!(normalize_lang_code(""), "");
+    }
+
+    #[test]
+    fn the_pair_a_provider_translated_is_read_as_its_source() {
+        // Youdao answers with the pair in `l` rather than with the source alone,
+        // which used to end up in the language bar of the popup as it stood.
+        assert_eq!(normalize_lang_code("en2zh-CHS"), "en");
+        assert_eq!(normalize_lang_code("zh-CHS2en"), "zh-CN");
+        assert_eq!(normalize_lang_code("ja2zh-CHT"), "ja");
+        assert_eq!(normalize_lang_code("auto2en"), "auto");
+        // A code that is not a pair is left alone, digit or no digit.
+        assert_eq!(normalize_lang_code("de-CH-1996"), "de");
     }
 
     #[test]

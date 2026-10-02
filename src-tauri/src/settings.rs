@@ -1,10 +1,11 @@
 //! User settings, persisted as JSON in the application config directory.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager};
+
+use crate::log::note;
 
 /// Minimum selection length (in characters) that may trigger the popup.
 pub const MIN_SELECTION_LEN: usize = 2;
@@ -20,90 +21,27 @@ pub const MIN_SELECTION_LEN: usize = 2;
 /// the number alone. When it does move, `migrate` carries every file written
 /// before it up to it, so a settings file from any `1.3.0` or later release
 /// keeps loading.
-pub const FORMAT_VERSION: u32 = 1;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum Provider {
-    /// Free public Google translate endpoint, no API key required.
-    #[default]
-    #[serde(rename = "google")]
-    Google,
-    /// Zhipu GLM chat completions, free tier, requires an API key.
-    #[serde(rename = "zhipu")]
-    Zhipu,
-    /// Baidu Translate, free monthly quota, requires an APP ID and a key.
-    #[serde(rename = "baidu")]
-    Baidu,
-    /// Glossy's own proxy (see `server/`), which keeps the provider
-    /// credentials server side so nothing has to be filled in here. Kept so
-    /// that a file written before the channels existed still reads; the cloud
-    /// *channel* replaced it, and the menu no longer offers it.
-    #[serde(rename = "cloud")]
-    Cloud,
-    /// DeepL, requires an API key.
-    #[serde(rename = "deepl")]
-    DeepL,
-    /// OpenAI chat completions, requires an API key.
-    #[serde(rename = "openai")]
-    OpenAI,
-}
-
-impl Provider {
-    /// Stable name used as the key of the saved credentials.
-    pub fn key(self) -> &'static str {
-        match self {
-            Provider::Google => "google",
-            Provider::Zhipu => "zhipu",
-            Provider::Baidu => "baidu",
-            Provider::Cloud => "cloud",
-            Provider::DeepL => "deepl",
-            Provider::OpenAI => "openai",
-        }
-    }
-}
+///
+/// Version 2 is the release that folds the four fields naming the translation
+/// service — `channel`, `cloudProvider`, `cloudVendor` and `provider` — into the
+/// single `service` this build writes, and drops the two fields nothing has read
+/// for years: the address of the relay, which the build carries, and the
+/// credential map, which no service in this build asks for. Everything a file
+/// said with them is migrated into `service`; nothing else about a `1.x` file
+/// changes.
+pub const FORMAT_VERSION: u32 = 2;
 
 /// Where a translation comes from.
 ///
-/// The two channels are the two ways a desktop app can offer translation: on
-/// somebody else's account, or on the user's own. Every vendor forbids handing
-/// a free allowance on to third parties, so the cloud channel cannot simply
-/// resell one of their keys; it runs on an account Glossy pays for, or on a
-/// model running on this machine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum Channel {
-    /// Through Glossy's own server (`server/`), so nothing has to be filled in
-    /// and a fresh install works right away.
-    #[default]
-    #[serde(rename = "cloud")]
-    Cloud,
-    /// Straight to a service the user holds an account with, using the
-    /// credentials saved under `provider`.
-    #[serde(rename = "api")]
-    Api,
-}
-
-/// What the cloud channel translates with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-pub enum CloudProvider {
-    /// The account behind Glossy's own deployment.
-    #[default]
-    #[serde(rename = "builtin")]
-    Builtin,
-    /// A model the reader ran on their own machine, reached over an OpenAI
-    /// compatible endpoint. Kept so that a file written while the window still
-    /// offered that entry reads; the list does not offer it any more, and
-    /// [`Service::stored`] resolves it to the built-in engine.
-    #[serde(rename = "local")]
-    Local,
-}
-
-/// One entry of the translation-service list.
+/// The three channels are the three ways a desktop app can offer translation:
+/// on somebody else's account, on the user's own, or on this machine. Every
+/// vendor forbids handing a free allowance on to third parties, so the cloud
+/// channel cannot simply resell one of their keys; it runs on an account Glossy
+/// pays for, or on a model running on this machine.
 ///
-/// The window shows a single dropdown and its entries are exactly these three.
-/// What is stored keeps the shape it has always had - `channel`,
-/// `cloudProvider` and `cloudVendor` - so a settings file written earlier still
-/// reads; this type is what the window, the fallback order and the tests speak,
-/// and every id matches the `value` of an `<option>`.
+/// Version 1 of the file stored this as `channel` plus three more fields; the
+/// `service` they added up to is what version 2 keeps, which is what
+/// [`Service`] is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Service {
@@ -115,6 +53,9 @@ pub enum Service {
     CloudYoudao,
     /// The free public Google endpoint.
     Google,
+    /// The models on this machine, which translate Chinese and English and
+    /// nothing else.
+    Offline,
 }
 
 impl Service {
@@ -122,7 +63,12 @@ impl Service {
     ///
     /// The window builds its dropdown from the markup, so what walks this list
     /// is [`Service::from_id`] and the tests.
-    pub const ALL: [Service; 3] = [Service::CloudBaidu, Service::CloudYoudao, Service::Google];
+    pub const ALL: [Service; 4] = [
+        Service::CloudBaidu,
+        Service::CloudYoudao,
+        Service::Google,
+        Service::Offline,
+    ];
 
     /// The id the window and the settings file use.
     pub fn id(self) -> &'static str {
@@ -130,12 +76,27 @@ impl Service {
             Service::CloudBaidu => "cloud-baidu",
             Service::CloudYoudao => "cloud-youdao",
             Service::Google => "google",
+            Service::Offline => "offline",
+        }
+    }
+
+    /// The name of the engine that answers, the way a result carries it.
+    ///
+    /// The two cloud entries are one relay in front of two engines, so `id` —
+    /// which names the *entry* — is not what a card should show: what answered
+    /// is Baidu or Youdao.
+    pub fn provider(self) -> &'static str {
+        match self {
+            Service::CloudBaidu => "baidu",
+            Service::CloudYoudao => "youdao",
+            Service::Google => "google",
+            Service::Offline => "offline",
         }
     }
 
     /// The entry an id names; the inverse of [`Service::id`].
     ///
-    /// `None` means the id is not one of the three, which is what a window or a
+    /// `None` means the id is not one of the four, which is what a window or a
     /// shortcut carrying a stale id has to hear instead of a silent fallback.
     pub fn from_id(id: &str) -> Option<Service> {
         let wanted = id.trim();
@@ -145,65 +106,56 @@ impl Service {
             .find(|service| service.id() == wanted)
     }
 
-    /// The service a stored file names.
+    /// The service a file written before the one-field shape named.
     ///
-    /// Anything this build no longer offers - a provider that wanted the user's
-    /// own key, a vendor the server dropped - reads as the built-in engine, so
-    /// the window has an entry to show and the first save replaces it.
-    pub fn stored(
-        channel: Channel,
-        cloud: CloudProvider,
-        vendor: &str,
-        provider: Provider,
+    /// A `1.x` file spread the choice over `channel`, `cloudProvider`,
+    /// `cloudVendor` and `provider`, and named entries this build no longer
+    /// offers — a provider that wanted the user's own key, a vendor the server
+    /// dropped, a model reached over an OpenAI-compatible endpoint. All of them
+    /// read as the entry that is nearest to what they meant, so a window always
+    /// has something to show and the first save writes the current shape.
+    ///
+    /// `cloudProvider` is not read at all: its two values were the built-in
+    /// engine, which is the only one of the two this build has, and a file that
+    /// named the local model was already read as the built-in engine in `1.x`.
+    ///
+    /// `migrate` is the only caller: this is the version-to-version bridge, not
+    /// part of reading a file this build wrote.
+    pub fn from_legacy(
+        channel: Option<&str>,
+        cloud_vendor: Option<&str>,
+        provider: Option<&str>,
     ) -> Self {
-        if channel == Channel::Api {
-            return match provider {
-                Provider::Google => Service::Google,
-                _ => Service::CloudBaidu,
+        let named = |value: Option<&str>, wanted: &str| {
+            value
+                .map(|value| value.trim().eq_ignore_ascii_case(wanted))
+                .unwrap_or(false)
+        };
+        // The two windows of `1.x` that went somewhere other than Glossy's own
+        // server: this machine, and the free endpoint.
+        if named(channel, "offline") {
+            return Service::Offline;
+        }
+        // The api channel was the free endpoint and everything that wanted a
+        // key of the user's; only the free endpoint is an entry now, and a
+        // provider this build does not offer reads as the built-in engine.
+        if named(channel, "api") {
+            return if named(provider, "google") {
+                Service::Google
+            } else {
+                Service::CloudBaidu
             };
         }
-        match cloud {
-            // The local model is not offered any more: a file that still names
-            // it reads as the built-in engine, and the next save replaces it.
-            CloudProvider::Local => Service::CloudBaidu,
-            CloudProvider::Builtin if vendor.trim().eq_ignore_ascii_case("youdao") => {
-                Service::CloudYoudao
-            }
-            CloudProvider::Builtin => Service::CloudBaidu,
+        // A file written before the channels existed names only a provider, and
+        // the free endpoint is the one of those that is an entry of its own.
+        if channel.is_none() && named(provider, "google") {
+            return Service::Google;
         }
-    }
-}
-
-/// Credentials of one provider, kept so switching back just works.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct Credentials {
-    /// Baidu only: the public half of the credential pair.
-    pub app_id: String,
-    /// API key, or Baidu's secret half.
-    pub api_key: String,
-}
-
-impl Credentials {
-    fn is_empty(&self) -> bool {
-        self.app_id.is_empty() && self.api_key.is_empty()
-    }
-
-    fn trimmed(&self) -> Credentials {
-        Credentials {
-            app_id: self.app_id.trim().to_string(),
-            api_key: self.api_key.trim().to_string(),
+        if named(cloud_vendor, "youdao") {
+            return Service::CloudYoudao;
         }
+        Service::CloudBaidu
     }
-}
-
-/// The two credential fields under the names they carry in the JSON file, so
-/// protecting and revealing can share one loop body.
-fn credential_fields(credentials: &mut Credentials) -> [(&'static str, &mut String); 2] {
-    [
-        ("appId", &mut credentials.app_id),
-        ("apiKey", &mut credentials.api_key),
-    ]
 }
 
 /// Language the interface itself is drawn in.
@@ -224,6 +176,17 @@ pub enum UiLanguage {
 /// and therefore an `AppHandle`, exists.
 const IDENTIFIER: &str = "com.glossy.translator";
 
+/// The folder the app keeps its own files in, under `%APPDATA%`.
+///
+/// It is derived rather than asked of Tauri because two callers need it before
+/// there is an `AppHandle` to ask: the interface language is read before the app
+/// is built, and a translation asks for the offline pack from the middle of the
+/// translation path, where no window is in sight. `None` on a machine whose
+/// `APPDATA` is not set, which is a machine the app cannot run on anyway.
+pub fn data_dir() -> Option<PathBuf> {
+    std::env::var_os("APPDATA").map(|base| PathBuf::from(base).join(IDENTIFIER))
+}
+
 /// The stored interface language preference, read without an `AppHandle`.
 pub fn stored_ui_language() -> UiLanguage {
     #[derive(Deserialize)]
@@ -232,10 +195,9 @@ pub fn stored_ui_language() -> UiLanguage {
         ui_lang: UiLanguage,
     }
 
-    let Some(base) = std::env::var_os("APPDATA") else {
+    let Some(path) = data_dir().map(|dir| dir.join("settings.json")) else {
         return UiLanguage::default();
     };
-    let path = PathBuf::from(base).join(IDENTIFIER).join("settings.json");
     let Ok(raw) = std::fs::read_to_string(path) else {
         return UiLanguage::default();
     };
@@ -406,36 +368,16 @@ pub struct Settings {
     pub trigger_on_double_click: bool,
     /// Language the selection is translated into.
     pub target_lang: String,
-    /// Whether the text goes through Glossy's own server or through an account
-    /// of the user's own.
-    pub channel: Channel,
-    /// What the cloud channel translates with.
-    pub cloud_provider: CloudProvider,
-    /// Which vendor Glossy's own server should translate with — `baidu`,
-    /// `youdao`, or empty to let the server pick. A fresh install starts on
-    /// `baidu`. The server falls back to its own order when it cannot serve the
-    /// one named here.
-    pub cloud_vendor: String,
-    /// Backend of the api channel. The cloud channel ignores it, so it is kept
-    /// rather than cleared and switching back lands on what was picked before.
-    pub provider: Provider,
-    /// Address of Glossy's own translation proxy (the Worker in `server/`).
-    /// Kept for the settings files written before the window stopped showing a
-    /// field for it: the address the build was made with wins, and this is only
-    /// read by a build that has none.
-    pub cloud_endpoint: String,
+    /// Which service translates.
+    ///
+    /// One field for one choice. A `1.x` file spread it over `channel`,
+    /// `cloudProvider`, `cloudVendor` and `provider`, which `migrate` folds
+    /// into this.
+    pub service: Service,
     /// Random identifier of this installation, so the proxy can count the daily
-    /// characters of one device. Generated once and kept, because a fresh one
-    /// on every launch would look like a new device to the quota.
+    /// characters of one device. Derived from the machine rather than drawn at
+    /// random, so installing the app again does not land on a new allowance.
     pub cloud_id: String,
-    /// Credentials of every provider that was configured so far.
-    pub credentials: BTreeMap<String, Credentials>,
-    /// API key written by versions that only kept one credential pair.
-    #[serde(rename = "apiKey", default, skip_serializing)]
-    pub legacy_api_key: String,
-    /// Baidu APP ID written by versions that only kept one credential pair.
-    #[serde(rename = "appId", default, skip_serializing)]
-    pub legacy_app_id: String,
     /// Put the previous clipboard content back after reading a selection.
     ///
     /// The whole clipboard is covered, not just its text: images and file lists
@@ -482,6 +424,40 @@ pub struct Settings {
     pub history_limit: u32,
     /// Accelerator such as `Ctrl+Alt+C` that translates the clipboard.
     pub hotkey: String,
+    /// Accelerator such as `Ctrl+Alt+G` that brings the settings window up.
+    pub hotkey_settings: String,
+    /// Accelerator such as `Ctrl+Alt+Q` that starts a screenshot translation.
+    pub hotkey_ocr: String,
+    /// Which languages the on-machine recogniser may read with.
+    ///
+    /// Each language is a downloadable pack of two files (the recogniser and
+    /// its dictionary), and every language named here is tried on a screenshot:
+    /// the reading each of them gives a line is weighed against the others and
+    /// the best one is kept, so a screenshot holding Japanese and English comes
+    /// back right without the user having to say which it is. The list always
+    /// holds at least one language; a name this build does not offer is
+    /// dropped.
+    pub ocr_packs: Vec<String>,
+    /// Whether the features that are still being built are on show.
+    ///
+    /// Nothing about it reaches a user: the switch is turned on by typing a key
+    /// into its field, and a build in which it is off behaves exactly as it did
+    /// before any of those features existed. What it hides is the **Subtitles**
+    /// page, which reads a part of the screen over and over.
+    pub developer_mode: bool,
+    /// The language the subtitles are written in.
+    pub subtitle_source_lang: String,
+    /// The language the subtitle translation is read in.
+    pub subtitle_target_lang: String,
+    /// Size of the subtitle text in the translation box, in pixels.
+    pub subtitle_font_size: u32,
+    /// The one recognition language subtitle reading uses.
+    ///
+    /// It is a language of its own rather than [`Self::ocr_packs`] because the
+    /// region is read again every second: reading it with one recogniser costs a
+    /// fraction of reading it with every checked language, and a subtitle is
+    /// only ever written in one of them.
+    pub subtitle_pack: String,
     /// Ask the other services when the chosen one fails or rate-limits.
     pub fallback_enabled: bool,
     /// The services to try, in order, after the chosen one failed. The chosen
@@ -505,15 +481,10 @@ impl Default for Settings {
             trigger_on_drag: true,
             trigger_on_double_click: true,
             target_lang: default_target_lang(),
-            channel: Channel::default(),
-            cloud_provider: CloudProvider::default(),
-            cloud_vendor: "baidu".to_string(),
-            provider: Provider::default(),
-            cloud_endpoint: String::new(),
+            // A fresh install asks Glossy's own server, which needs nothing
+            // filled in and works from mainland China.
+            service: Service::CloudBaidu,
             cloud_id: crate::translate::new_install_id(),
-            credentials: BTreeMap::new(),
-            legacy_api_key: String::new(),
-            legacy_app_id: String::new(),
             restore_clipboard: true,
             show_original: true,
             min_selection_len: MIN_SELECTION_LEN,
@@ -532,6 +503,14 @@ impl Default for Settings {
             check_updates: false,
             history_limit: 50,
             hotkey: "Ctrl+Alt+C".to_string(),
+            hotkey_settings: "Ctrl+Alt+G".to_string(),
+            hotkey_ocr: "Ctrl+Alt+Q".to_string(),
+            ocr_packs: vec![crate::ocr::models::DEFAULT_PACK.to_string()],
+            developer_mode: false,
+            subtitle_source_lang: "auto".to_string(),
+            subtitle_target_lang: default_target_lang(),
+            subtitle_font_size: 26,
+            subtitle_pack: crate::ocr::models::DEFAULT_PACK.to_string(),
             fallback_enabled: true,
             fallback_order: vec![Service::CloudYoudao, Service::Google],
             word_sentence: false,
@@ -545,33 +524,16 @@ impl Default for Settings {
 impl Settings {
     /// The entry of the service list this file names.
     pub fn service(&self) -> Service {
-        Service::stored(
-            self.channel,
-            self.cloud_provider,
-            &self.cloud_vendor,
-            self.provider,
-        )
+        self.service
     }
 
-    /// Makes `service` the active one, in the stored shape.
+    /// Makes `service` the active one.
     ///
-    /// The api channel is only left for the free endpoint; everything else is
-    /// the cloud channel, which is why picking a service never asks for a key.
+    /// One field, so there is nothing to keep in step: the same call used to
+    /// write four of them, and a file that held them is folded into this one by
+    /// `migrate` before anything reads it.
     pub fn set_service(&mut self, service: Service) {
-        match service {
-            Service::CloudBaidu => self.uses_cloud("baidu"),
-            Service::CloudYoudao => self.uses_cloud("youdao"),
-            Service::Google => {
-                self.channel = Channel::Api;
-                self.provider = Provider::Google;
-            }
-        }
-    }
-
-    fn uses_cloud(&mut self, vendor: &str) {
-        self.channel = Channel::Cloud;
-        self.cloud_provider = CloudProvider::Builtin;
-        self.cloud_vendor = vendor.to_string();
+        self.service = service;
     }
 
     /// The services a translation may be asked of, the chosen one first.
@@ -613,7 +575,7 @@ impl Settings {
                         Some(backup) => format!(", kept as {}", backup.display()),
                         None => String::new(),
                     };
-                    eprintln!(
+                    note!(
                         "glossy: {} is not in format {FORMAT_VERSION}{kept}, \
                          so Glossy starts from the defaults",
                         path.display()
@@ -621,22 +583,21 @@ impl Settings {
                     return Settings::default();
                 }
                 let mut settings = Self::parse(&raw);
-                let mut rewrite = settings.reveal_credentials();
-                // A file written before the cloud provider existed carries no
-                // install id, and the generated one has to reach the disk:
-                // otherwise the proxy would see a new device on every launch and
-                // hand out the daily quota again.
+                // A file written before the install id was derived from the
+                // machine carries no id, and the one this build computes has to
+                // reach the disk: otherwise the proxy would see a new device on
+                // every launch and hand out the daily allowance again.
+                let mut rewrite = false;
                 if !Self::stores(&raw, "cloudId") || settings.cloud_id.trim().is_empty() {
                     settings.cloud_id = crate::translate::new_install_id();
                     rewrite = true;
                 }
                 if rewrite {
-                    // The file held plain text, or a credential this login
-                    // cannot unlock. Both are gone from memory by now, so write
-                    // the result back; failing to do so only means the next save
-                    // is the one that cleans the file up.
+                    // The file was missing something this build computes, so
+                    // write the result back; failing to do so only means the
+                    // next save is the one that cleans the file up.
                     if let Err(error) = settings.save(app) {
-                        eprintln!("glossy: cannot rewrite the settings file: {error}");
+                        note!("glossy: cannot rewrite the settings file: {error}");
                     }
                 }
                 settings
@@ -680,7 +641,7 @@ impl Settings {
         match std::fs::copy(path, &backup) {
             Ok(_) => Some(backup),
             Err(error) => {
-                eprintln!("glossy: cannot keep a copy of {}: {error}", path.display());
+                note!("glossy: cannot keep a copy of {}: {error}", path.display());
                 None
             }
         }
@@ -704,21 +665,45 @@ impl Settings {
     /// follows only has to deal with the current shape. A step is gated on the
     /// version it upgrades from, so the chain stays readable as it grows.
     fn migrate(stored: &mut serde_json::Map<String, serde_json::Value>, from: u32) {
-        if from < 1 {
-            // Version 0 is every file written before the freeze. One of them
-            // names a provider and no channel, and merging it into the defaults
-            // would silently move it to the cloud channel: everything it could
-            // have named needs an account of the user's, except the proxy
-            // itself, which is what the cloud channel replaced.
-            if !stored.contains_key("channel") {
-                let channel = match stored.get("provider").and_then(serde_json::Value::as_str) {
-                    Some(name) if name != "cloud" => Channel::Api,
-                    _ => Channel::Cloud,
-                };
-                stored.insert(
-                    "channel".to_string(),
-                    serde_json::to_value(channel).unwrap_or(serde_json::json!("cloud")),
+        if from < 2 {
+            // Version 1 spread the choice of service over four fields. They are
+            // read into the one field this build writes, and the four are
+            // removed: a key left behind would be merged back in by `parse` as
+            // a value nothing reads.
+            //
+            // A version 0 file names only a provider, and one of those — the
+            // free endpoint — is an entry of its own, which `from_legacy` knows.
+            //
+            // A file that already names `service` is left as it is: it is a
+            // hand edit or a file whose version says nothing, and reading the
+            // four fields it does not have would overwrite what it says.
+            if !stored.contains_key("service") {
+                let service = Service::from_legacy(
+                    stored.get("channel").and_then(serde_json::Value::as_str),
+                    stored
+                        .get("cloudVendor")
+                        .and_then(serde_json::Value::as_str),
+                    stored.get("provider").and_then(serde_json::Value::as_str),
                 );
+                stored.insert(
+                    "service".to_string(),
+                    serde_json::to_value(service).unwrap_or(serde_json::json!("cloud-baidu")),
+                );
+            }
+            for key in [
+                "channel",
+                "cloudProvider",
+                "cloudVendor",
+                "provider",
+                // The address of the relay is part of the build, and the window
+                // has had no field for it since 1.7; the credential map holds
+                // keys for providers this build does not offer.
+                "cloudEndpoint",
+                "credentials",
+                "apiKey",
+                "appId",
+            ] {
+                stored.remove(key);
             }
         }
         // Whatever the file said, the shape read from here on is the current
@@ -727,6 +712,16 @@ impl Settings {
             "formatVersion".to_string(),
             serde_json::json!(FORMAT_VERSION),
         );
+
+        // A file written before a screenshot could be read with more than one
+        // language names exactly one, in `ocrPack`: it becomes the only language
+        // that is checked, so the language the user chose is not quietly
+        // forgotten and read as Chinese and English instead.
+        if !stored.contains_key("ocrPacks") {
+            if let Some(pack) = stored.remove("ocrPack") {
+                stored.insert("ocrPacks".to_string(), serde_json::json!([pack]));
+            }
+        }
     }
 
     /// Reads persisted JSON, falling back to the defaults for anything unusable.
@@ -760,9 +755,11 @@ impl Settings {
         Self::migrate(&mut stored, from);
 
         for (key, value) in stored {
-            // Keys written by older versions are kept: they are migrated into
-            // `credentials` by `sanitized`, so they must survive the merge.
-            if !merged.contains_key(&key) && !matches!(key.as_str(), "apiKey" | "appId") {
+            // A key this build does not write is dropped: `migrate` has already
+            // turned everything an older version said into the current shape,
+            // so what is left over is a hand edit or a key from a build that is
+            // newer than this one.
+            if !merged.contains_key(&key) {
                 continue;
             }
             // Deserializing the single setting tells whether it still fits; the
@@ -772,7 +769,7 @@ impl Settings {
                 Ok(_) => {
                     merged.insert(key, value);
                 }
-                Err(error) => eprintln!("glossy: ignoring the stored setting `{key}`: {error}"),
+                Err(error) => note!("glossy: ignoring the stored setting `{key}`: {error}"),
             }
         }
 
@@ -807,97 +804,8 @@ impl Settings {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let json = serde_json::to_string_pretty(&self.protected_for_storage())
-            .map_err(|e| e.to_string())?;
+        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
         std::fs::write(&path, json).map_err(|e| e.to_string())
-    }
-
-    /// Replaces the stored API keys with the values they protect.
-    ///
-    /// Returns whether the file has to be written again: it held plain text
-    /// written by an older version, or a credential that this Windows login
-    /// cannot unlock and that was therefore dropped.
-    fn reveal_credentials(&mut self) -> bool {
-        let mut rewrite = false;
-        for (provider, credentials) in self.credentials.iter_mut() {
-            for (field, value) in credential_fields(credentials) {
-                if value.is_empty() {
-                    continue;
-                }
-                if !crate::platform::secrets::is_protected(value) {
-                    rewrite = true;
-                    continue;
-                }
-                match crate::platform::secrets::reveal(value) {
-                    Some(plain) => *value = plain,
-                    None => {
-                        eprintln!(
-                            "glossy: the {field} of `{provider}` was protected for another \
-                             Windows login, enter it again"
-                        );
-                        value.clear();
-                        rewrite = true;
-                    }
-                }
-            }
-        }
-        rewrite
-    }
-
-    /// The copy written to disk, with every credential DPAPI protected.
-    fn protected_for_storage(&self) -> Settings {
-        let mut stored = self.clone();
-        for (provider, credentials) in stored.credentials.iter_mut() {
-            for (field, value) in credential_fields(credentials) {
-                if value.is_empty() || crate::platform::secrets::is_protected(value) {
-                    continue;
-                }
-                match crate::platform::secrets::protect(value) {
-                    Ok(protected) => *value = protected,
-                    // Storing the key unprotected beats losing it; DPAPI is part
-                    // of Windows, so this only happens in a broken environment.
-                    Err(error) => {
-                        eprintln!("glossy: cannot protect the {field} of `{provider}`: {error}")
-                    }
-                }
-            }
-        }
-        stored
-    }
-
-    /// Credentials saved for the provider that is currently selected.
-    ///
-    /// No service in this build asks the user for a key, so nothing the app
-    /// does needs this; only the tests read back what a file written by an
-    /// older version carried over into the map.
-    #[cfg(test)]
-    pub fn active_credentials(&self) -> Credentials {
-        self.credentials
-            .get(self.provider.key())
-            .cloned()
-            .unwrap_or_default()
-    }
-
-    /// Moves the single credential pair written by older versions into the
-    /// per-provider map, so it stays available after switching away.
-    fn migrate_legacy_credentials(&mut self) {
-        let legacy = Credentials {
-            app_id: std::mem::take(&mut self.legacy_app_id),
-            api_key: std::mem::take(&mut self.legacy_api_key),
-        };
-        if legacy.is_empty() {
-            return;
-        }
-        let stored = self
-            .credentials
-            .entry(self.provider.key().to_string())
-            .or_default();
-        if stored.api_key.is_empty() {
-            stored.api_key = legacy.api_key;
-        }
-        if stored.app_id.is_empty() {
-            stored.app_id = legacy.app_id;
-        }
     }
 
     pub fn sanitized(mut self) -> Settings {
@@ -909,7 +817,6 @@ impl Settings {
             // dropdown has nothing to show for it.
             self.target_lang = crate::translate::normalize_lang_code(&self.target_lang);
         }
-        self.migrate_legacy_credentials();
         self.min_selection_len = self.min_selection_len.clamp(1, 40);
         self.ignored_apps = ignored_processes(&self.ignored_apps);
         self.source_langs = language_codes(&self.source_langs);
@@ -919,48 +826,58 @@ impl Settings {
         self.auto_close_secs = self.auto_close_secs.min(600);
         self.history_limit = self.history_limit.min(crate::history::MAX_LIMIT);
         self.hotkey = self.hotkey.trim().to_string();
-        // A pasted address easily carries a trailing slash or a path, and the
-        // request URL is built by appending `/v1/...` to it.
-        self.cloud_endpoint = self.cloud_endpoint.trim().trim_end_matches('/').to_string();
-        // Anything but a vendor the server knows is the same as letting the
-        // server choose, and that is what the empty string means.
-        self.cloud_vendor = match self.cloud_vendor.trim().to_lowercase().as_str() {
-            "baidu" => "baidu".to_string(),
-            "youdao" => "youdao".to_string(),
-            _ => String::new(),
+        self.hotkey_settings = self.hotkey_settings.trim().to_string();
+        self.hotkey_ocr = self.hotkey_ocr.trim().to_string();
+        // The languages the recogniser reads with: names this build does not
+        // offer are dropped, a repeat is kept once, the order is the one the
+        // page shows, and a list that ends up empty is the language that was
+        // always there.
+        self.ocr_packs = crate::ocr::models::checked(&self.ocr_packs);
+        // The subtitles read one language and are translated into another, both
+        // named by the user before the reading starts: a name this build cannot
+        // read or write falls back to what everything else falls back to.
+        self.subtitle_pack = crate::ocr::models::checked(std::slice::from_ref(&std::mem::take(
+            &mut self.subtitle_pack,
+        )))
+        .first()
+        .cloned()
+        .unwrap_or_else(|| crate::ocr::models::DEFAULT_PACK.to_string());
+        self.subtitle_source_lang = match self.subtitle_source_lang.trim() {
+            "" => "auto".to_string(),
+            code if code.eq_ignore_ascii_case("auto") => "auto".to_string(),
+            code => crate::translate::normalize_lang_code(code),
         };
+        self.subtitle_target_lang = self.subtitle_target_lang.trim().to_string();
+        if self.subtitle_target_lang.is_empty() {
+            self.subtitle_target_lang = default_target_lang();
+        } else {
+            self.subtitle_target_lang =
+                crate::translate::normalize_lang_code(&self.subtitle_target_lang);
+        }
+        self.subtitle_font_size = self.subtitle_font_size.clamp(13, 40);
         if self.cloud_id.is_empty() {
             self.cloud_id = crate::translate::new_install_id();
         }
-        self.credentials = self
-            .credentials
-            .iter()
-            // The provider names come from the settings file, so normalize the
-            // spelling the same way the rest of the settings are normalized.
-            .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trimmed()))
-            .filter(|(name, value)| !name.is_empty() && !value.is_empty())
-            .collect();
         if !self.trigger_on_drag && !self.trigger_on_double_click {
             self.trigger_on_drag = true;
         }
         // The order is a list the window lets the user shuffle, so a hand edit
         // is as likely as a click; a duplicate would only be tried twice.
+        //
+        // `offline` is dropped from it as well: the models on this machine are a
+        // choice the reader makes rather than a substitution the app makes for
+        // them, and a fallback that quietly reaches for a 244 MB download is not
+        // what turning the switch on asks for. A file that names it there loses
+        // it the next time the settings are written.
         let mut seen: Vec<Service> = Vec::new();
         self.fallback_order.retain(|service| {
-            if seen.contains(service) {
+            if *service == Service::Offline || seen.contains(service) {
                 false
             } else {
                 seen.push(*service);
                 true
             }
         });
-        // The window only shows the three services of `Service`, and a file
-        // written by an earlier version can name a provider this build no
-        // longer offers. Writing the stored fields back in the shape the chosen
-        // service has means a save never leaves a stale channel, vendor or
-        // provider behind for the next read to interpret.
-        let selected = self.service();
-        self.set_service(selected);
         self.speech_rate = self.speech_rate.clamp(-10, 10);
         self
     }
@@ -1039,17 +956,17 @@ mod tests {
     }
 
     #[test]
-    fn one_unreadable_setting_keeps_the_saved_credentials() {
+    fn one_unreadable_setting_keeps_the_rest_of_the_file() {
+        // A file that names a credential map — one this build no longer has —
+        // and one setting written by hand as a word: the map is dropped, and
+        // only that setting falls back to its default.
         let settings = Settings::parse(
-            "{\"provider\":\"baidu\",\"fontScale\":\"big\",\
+            "{\"service\":\"cloud-youdao\",\"fontScale\":\"big\",\
              \"credentials\":{\"baidu\":{\"appId\":\" 2024 \",\"apiKey\":\" secret \"}}}",
         );
 
-        assert_eq!(settings.provider, Provider::Baidu);
+        assert_eq!(settings.service(), Service::CloudYoudao);
         assert_eq!(settings.font_scale, 100);
-        let baidu = settings.active_credentials();
-        assert_eq!(baidu.app_id, "2024");
-        assert_eq!(baidu.api_key, "secret");
     }
 
     #[test]
@@ -1058,9 +975,9 @@ mod tests {
             Settings::parse("{\"unknownSetting\":42,\"targetLang\":\"fr\",\"provider\":\"gone\"}");
 
         assert_eq!(settings.target_lang, "fr");
-        // A provider that was removed falls back to the default one, and the
-        // remaining settings are untouched.
-        assert_eq!(settings.provider, Provider::default());
+        // A provider that was removed leaves the engine on the default one, and
+        // the remaining settings are untouched.
+        assert_eq!(settings.service(), Service::CloudBaidu);
         assert!(settings.enabled);
     }
 
@@ -1153,22 +1070,61 @@ mod tests {
     }
 
     #[test]
-    fn keeps_only_a_vendor_the_server_knows() {
-        let vendor = |value: &str| {
+    fn a_vendor_the_server_dropped_keeps_the_engine_it_was_served_by() {
+        // `cloudVendor` is not part of the file any more; what it said is read
+        // once, while a `1.x` file is migrated, and lands on the entry the
+        // server can still ask.
+        assert_eq!(
+            Settings::parse("{\"channel\":\"cloud\",\"cloudVendor\":\" Youdao \"}").service(),
+            Service::CloudYoudao
+        );
+        assert_eq!(
+            Settings::parse("{\"channel\":\"cloud\",\"cloudVendor\":\"BAIDU\"}").service(),
+            Service::CloudBaidu
+        );
+        assert_eq!(
+            Settings::parse("{\"channel\":\"cloud\",\"cloudVendor\":\"deepl\"}").service(),
+            Service::CloudBaidu
+        );
+        assert_eq!(
+            Settings::parse("{\"channel\":\"cloud\"}").service(),
+            Service::CloudBaidu
+        );
+    }
+
+    #[test]
+    fn the_languages_that_are_read_with_survive_a_settings_file() {
+        // A name this build does not know — a hand edit, or a language a later
+        // build dropped — is dropped from the list instead of being carried
+        // into a download of a model that does not exist, and a list that is
+        // left with nothing is the language that was always there.
+        let packs = |values: &[&str]| {
             Settings {
-                cloud_vendor: value.to_string(),
+                ocr_packs: values.iter().map(|value| value.to_string()).collect(),
                 ..Settings::default()
             }
             .sanitized()
-            .cloud_vendor
+            .ocr_packs
         };
 
-        assert_eq!(vendor(" Youdao "), "youdao");
-        assert_eq!(vendor("BAIDU"), "baidu");
-        // A vendor this build no longer offers - or none at all - reads as the
-        // built-in engine, and the file is rewritten to name it.
-        assert_eq!(vendor(""), "baidu");
-        assert_eq!(vendor("deepl"), "baidu");
+        assert_eq!(packs(&["ch"]), vec!["ch"]);
+        assert_eq!(packs(&[" CH "]), vec!["ch"]);
+        assert_eq!(packs(&["ko", "ch"]), vec!["ch", "ko"]);
+        assert_eq!(packs(&["ja", "ja"]), vec!["ja"]);
+        assert_eq!(packs(&["klingon"]), vec!["ch"]);
+        assert_eq!(packs(&[]), vec!["ch"]);
+    }
+
+    #[test]
+    fn the_language_a_file_written_before_this_one_names_is_kept() {
+        // The key was `ocrPack` and held one language; it is read as the one
+        // language that is checked, so the choice the user made is not quietly
+        // read as Chinese and English instead.
+        let settings = Settings::parse("{\"ocrPack\":\"ja\"}");
+        assert_eq!(settings.ocr_packs, vec!["ja"]);
+        // A file that names both — a hand edit — is read as the newer key.
+        let settings = Settings::parse("{\"ocrPack\":\"ja\",\"ocrPacks\":[\"cht\"]}");
+        assert_eq!(settings.ocr_packs, vec!["cht"]);
     }
 
     #[test]
@@ -1186,130 +1142,15 @@ mod tests {
     }
 
     #[test]
-    fn keeps_a_single_api_key_next_to_the_per_provider_map() {
-        let mut settings = Settings::parse("{\"provider\":\"zhipu\",\"apiKey\":\" old-key \"}");
-        assert_eq!(settings.active_credentials().api_key, "old-key".to_string());
-
-        // Switching provider and back keeps the key.
-        settings.provider = Provider::Google;
-        settings = settings.sanitized();
-        assert!(settings.active_credentials().is_empty());
-        assert_eq!(
-            settings.credentials.get("zhipu").unwrap().api_key,
-            "old-key"
-        );
-
-        settings.provider = Provider::Zhipu;
-        settings = settings.sanitized();
-        assert_eq!(settings.active_credentials().api_key, "old-key");
-    }
-
-    #[test]
-    fn forgets_empty_credentials() {
-        let settings = Settings {
-            credentials: [
-                (
-                    "baidu".to_string(),
-                    Credentials {
-                        app_id: " 2024 ".to_string(),
-                        api_key: " secret ".to_string(),
-                    },
-                ),
-                ("deepl".to_string(), Credentials::default()),
-            ]
-            .into_iter()
-            .collect(),
-            ..Settings::default()
-        }
-        .sanitized();
-
-        assert_eq!(settings.credentials.len(), 1);
-        let baidu = settings.credentials.get("baidu").unwrap();
-        assert_eq!(baidu.app_id, "2024");
-        assert_eq!(baidu.api_key, "secret");
-    }
-
-    fn settings_with_one_key() -> Settings {
-        Settings {
-            provider: Provider::DeepL,
-            credentials: [(
-                "deepl".to_string(),
-                Credentials {
-                    app_id: String::new(),
-                    api_key: "sk-secret".to_string(),
-                },
-            )]
-            .into_iter()
-            .collect(),
-            ..Settings::default()
-        }
-    }
-
-    #[test]
-    fn writes_the_keys_dpapi_protected_and_reads_them_back() {
-        let settings = settings_with_one_key();
-
-        let stored = settings.protected_for_storage();
-
-        let written = &stored.credentials.get("deepl").unwrap().api_key;
-        assert!(crate::platform::secrets::is_protected(written));
-        assert!(!serde_json::to_string(&stored)
-            .unwrap()
-            .contains("sk-secret"));
-
-        // What the rest of the application keeps in memory stays usable.
-        assert_eq!(settings.active_credentials().api_key, "sk-secret");
-
-        let mut reloaded = stored;
-        // Nothing to rewrite: the file is already in its final shape.
-        assert!(!reloaded.reveal_credentials());
-        assert_eq!(reloaded.active_credentials().api_key, "sk-secret");
-    }
-
-    #[test]
-    fn the_next_save_protects_a_key_written_by_an_older_version() {
-        let mut settings = Settings::parse("{\"provider\":\"deepl\",\"apiKey\":\"sk-old\"}");
-        // `parse` only reads the JSON, so the key is still plain text here.
-        assert_eq!(settings.active_credentials().api_key, "sk-old");
-
-        // Which is what makes `load` rewrite the file.
-        assert!(settings.reveal_credentials());
-        assert_eq!(settings.active_credentials().api_key, "sk-old");
-        assert!(crate::platform::secrets::is_protected(
-            &settings
-                .protected_for_storage()
-                .credentials
-                .get("deepl")
-                .unwrap()
-                .api_key
-        ));
-    }
-
-    #[test]
-    fn forgets_a_key_that_belongs_to_another_windows_login() {
-        // Well-formed base64 that DPAPI cannot unlock in this login.
-        let raw = "{\"provider\":\"deepl\",\"credentials\":{\"deepl\":\
-                   {\"apiKey\":\"dpapi:bm90IGEgYmxvYg==\"}}}";
-        let mut settings = Settings::parse(raw);
-        assert!(crate::platform::secrets::is_protected(
-            &settings.active_credentials().api_key
-        ));
-
-        // The file has to be rewritten so the unusable blob stops being read.
-        assert!(settings.reveal_credentials());
-        assert!(settings.active_credentials().is_empty());
-    }
-
-    #[test]
     fn imports_a_file_this_app_exported() {
         let raw = serde_json::to_string_pretty(&Settings::parse(
-            "{\"targetLang\":\"ja\",\"provider\":\"deepl\",\"apiKey\":\"sk-exported\"}",
+            "{\"targetLang\":\"ja\",\"service\":\"cloud-youdao\"}",
         ))
         .unwrap();
 
         let imported = Settings::import(&raw).unwrap();
         assert_eq!(imported.target_lang, "ja");
-        assert_eq!(imported.active_credentials().api_key, "sk-exported");
+        assert_eq!(imported.service(), Service::CloudYoudao);
     }
 
     #[test]
@@ -1366,18 +1207,20 @@ mod tests {
         );
 
         assert_eq!(settings.service(), Service::CloudBaidu);
-        // Sanitizing writes the shape the chosen service has, so the keys of
-        // the dropped entry do not survive into the next file.
-        assert_eq!(settings.sanitized().cloud_provider, CloudProvider::Builtin);
     }
 
     #[test]
-    fn the_free_endpoint_is_the_one_entry_that_leaves_the_cloud_channel() {
+    fn the_free_endpoint_is_the_one_entry_that_left_the_cloud_channel() {
         let mut settings = Settings::default();
         settings.set_service(Service::Google);
 
-        assert_eq!(settings.channel, Channel::Api);
-        assert_eq!(settings.provider, Provider::Google);
+        assert_eq!(settings.service(), Service::Google);
+        // One field, so there is nothing left over that could disagree with it.
+        let written = serde_json::to_value(&settings).unwrap();
+        assert_eq!(written["service"], serde_json::json!("google"));
+        for gone in ["channel", "provider", "cloudVendor", "cloudProvider"] {
+            assert!(written.get(gone).is_none(), "{gone} is still written");
+        }
     }
 
     #[test]
@@ -1401,6 +1244,21 @@ mod tests {
         assert_eq!(
             settings.service_order(),
             vec![Service::CloudBaidu, Service::Google, Service::CloudYoudao,]
+        );
+    }
+
+    #[test]
+    fn the_fallback_order_never_reaches_for_the_offline_models() {
+        let settings = Settings {
+            fallback_order: vec![Service::Offline, Service::Google, Service::Offline],
+            ..Settings::default()
+        };
+        let settings = settings.sanitized();
+
+        assert_eq!(settings.fallback_order, vec![Service::Google]);
+        assert_eq!(
+            settings.service_order(),
+            vec![Service::CloudBaidu, Service::Google]
         );
     }
 
@@ -1484,27 +1342,97 @@ mod tests {
         // channel, and the migration is what keeps its intent: the free
         // endpoint stays the free endpoint instead of sliding into the cloud
         // channel, which is what a plain merge into the defaults would do.
-        let free = Settings::parse("{\"provider\":\"google\"}");
-        assert_eq!(free.channel, Channel::Api);
-        assert_eq!(free.service(), Service::Google);
-
-        let proxy = Settings::parse("{\"provider\":\"cloud\"}");
-        assert_eq!(proxy.channel, Channel::Cloud);
+        assert_eq!(
+            Settings::parse("{\"provider\":\"google\"}").service(),
+            Service::Google
+        );
 
         // A provider that wanted an account of the user's is not offered any
-        // more: the migration still reads it as that shape, and the first save
+        // more: the migration still reads what it meant, and the first save
         // replaces it with an entry this build has.
         assert_eq!(
             Settings::parse("{\"provider\":\"baidu\"}").service(),
             Service::CloudBaidu
         );
+        assert_eq!(
+            Settings::parse("{\"provider\":\"cloud\"}").service(),
+            Service::CloudBaidu
+        );
 
-        // The single credential pair of those files survives the migration.
+        // The rest of such a file is kept, including the settings the keys of
+        // that era used to sit next to.
         let settings = Settings::parse(
             "{\"apiKey\":\"stored-key\",\"provider\":\"baidu\",\"targetLang\":\"ja\"}",
         );
-        assert_eq!(settings.active_credentials().api_key, "stored-key");
         assert_eq!(settings.target_lang, "ja");
+        assert_eq!(settings.service(), Service::CloudBaidu);
+    }
+
+    #[test]
+    fn a_one_field_file_is_read_as_the_service_it_names() {
+        for service in Service::ALL {
+            let written = serde_json::to_string(&Settings {
+                service,
+                ..Settings::default()
+            })
+            .unwrap();
+
+            assert_eq!(
+                Settings::parse(&written).service(),
+                service,
+                "{}",
+                service.id()
+            );
+        }
+    }
+
+    #[test]
+    fn the_four_fields_of_a_one_x_file_are_folded_into_one() {
+        // What 1.8 wrote for each entry: the file has to keep meaning the same
+        // engine after the four fields are gone.
+        let cases = [
+            ("cloud", "builtin", "baidu", "baidu", Service::CloudBaidu),
+            ("cloud", "builtin", "youdao", "baidu", Service::CloudYoudao),
+            ("api", "builtin", "", "google", Service::Google),
+            ("offline", "builtin", "", "baidu", Service::Offline),
+        ];
+        for (channel, cloud_provider, vendor, provider, expected) in cases {
+            let raw = format!(
+                "{{\"formatVersion\":1,\"channel\":\"{channel}\",\
+                 \"cloudProvider\":\"{cloud_provider}\",\"cloudVendor\":\"{vendor}\",\
+                 \"provider\":\"{provider}\",\"targetLang\":\"de\"}}"
+            );
+            let settings = Settings::parse(&raw);
+            assert_eq!(settings.service(), expected, "{raw}");
+            // Everything else in the file is kept.
+            assert_eq!(settings.target_lang, "de");
+
+            // And what is written back is the current shape, with nothing of
+            // the four left behind for a later read to interpret.
+            let written = serde_json::to_value(&settings).unwrap();
+            assert_eq!(written["service"], serde_json::json!(expected.id()));
+            assert_eq!(written["formatVersion"], serde_json::json!(FORMAT_VERSION));
+            for gone in ["channel", "cloudProvider", "cloudVendor", "provider"] {
+                assert!(written.get(gone).is_none(), "{gone} survived");
+            }
+        }
+    }
+
+    #[test]
+    fn the_fields_nothing_reads_any_more_are_dropped_by_the_migration() {
+        // A 1.8 file: the relay address and a credential map. Neither is a
+        // setting this build has, so neither may survive into the next write.
+        let raw = "{\"formatVersion\":1,\"channel\":\"api\",\"provider\":\"google\",\
+                   \"cloudEndpoint\":\"https://glossy.example.workers.dev\",\
+                   \"credentials\":{\"baidu\":{\"appId\":\"2024\",\"apiKey\":\"dpapi:AQAA\"}},\
+                   \"apiKey\":\"plain-key\",\"appId\":\"2024\"}";
+        let settings = Settings::parse(raw);
+
+        assert_eq!(settings.service(), Service::Google);
+        let written = serde_json::to_value(&settings).unwrap();
+        for gone in ["cloudEndpoint", "credentials", "apiKey", "appId"] {
+            assert!(written.get(gone).is_none(), "{gone} survived");
+        }
     }
 
     #[test]
@@ -1512,7 +1440,7 @@ mod tests {
         // A newer format can give a key a meaning this build does not know, so
         // none of it may be merged into the defaults.
         assert!(Settings::unreadable(
-            "{\"formatVersion\":2,\"targetLang\":\"ja\"}"
+            "{\"formatVersion\":999,\"targetLang\":\"ja\"}"
         ));
         // Half a file after a crash, and a file that is JSON but holds nothing.
         assert!(Settings::unreadable("{\"targetLang\":"));

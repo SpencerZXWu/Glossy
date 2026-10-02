@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "1.4.1"
+version = "2.0.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"
@@ -20,13 +20,24 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-updater = "2"
+# The folder a translation is saved into is picked with the system dialog.
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2"
 base64 = "0.22"
 md-5 = "0.10.6"
+# Text is read on the machine itself: the PaddleOCR models run through
+# onnxruntime, which is loaded from the runtime the user downloads next to the
+# models (see `src/ocr/models.rs`), hence `load-dynamic` and a pinned runtime.
+png = "0.17"
+ort = { version = "2.0.0-rc.13", default-features = false, features = ["load-dynamic", "std"] }
+sha2 = "0.10"
 tokio = { version = "1", features = ["time"] }
+pdf-extract = "0.12"
+zip = { version = "4", default-features = false, features = ["deflate"] }
+quick-xml = "0.39.4"
 
 # The only platform implementation the crate has; `src/platform/windows/` is the
 # single place that depends on it (see `src/platform/mod.rs`).
@@ -38,8 +49,6 @@ windows = { version = "0.61", features = [
     "Win32_Graphics_Gdi",
     # `CreateMutexW` names a `SECURITY_ATTRIBUTES` parameter it never uses here.
     "Win32_Security",
-    # `CryptProtectData` and `CryptUnprotectData` for the stored API keys.
-    "Win32_Security_Cryptography",
     "Win32_System_DataExchange",
     "Win32_System_Console",
     "Win32_System_LibraryLoader",
@@ -47,6 +56,9 @@ windows = { version = "0.61", features = [
     # COM is initialised on the speech worker thread and by the UI Automation
     # sentence reader.
     "Win32_System_Com",
+    # The machine identifier the daily allowance is counted by, so that
+    # installing the app again lands on the same one.
+    "Win32_System_Registry",
     "Win32_System_Threading",
     # `ISpVoice` reads a translation out loud.
     "Win32_Media_Speech",

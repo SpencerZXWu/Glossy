@@ -1,6 +1,7 @@
 //! Placement, sizing and dismissal of the floating translation popup.
 
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicIsize, AtomicU32, Ordering};
+use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewWindow};
@@ -37,6 +38,9 @@ struct PopupBounds {
     /// Set while the user has pinned the card, which is what keeps a click
     /// elsewhere from dismissing it.
     pinned: AtomicBool,
+    /// Set while the card's own accelerator (Ctrl+Enter) should be registered.
+    /// It follows the card itself, so it is armed only while one is on screen.
+    replace: AtomicBool,
     /// Native window the card is drawn in, zero until one has been seen.
     handle: AtomicIsize,
     /// Browser process drawing the card, zero until one has been seen.
@@ -50,6 +54,7 @@ static BOUNDS: PopupBounds = PopupBounds {
     bottom: AtomicI32::new(0),
     visible: AtomicBool::new(false),
     pinned: AtomicBool::new(false),
+    replace: AtomicBool::new(false),
     handle: AtomicIsize::new(0),
     webview: AtomicU32::new(0),
 };
@@ -87,6 +92,26 @@ pub fn pinned() -> bool {
 /// Pins or unpins the card, as chosen by the button in its header.
 pub fn set_pinned(pinned: bool) {
     BOUNDS.pinned.store(pinned, Ordering::Relaxed);
+}
+
+/// True while the card's own accelerator should be registered.
+pub fn replace_armed() -> bool {
+    BOUNDS.replace.load(Ordering::Relaxed)
+}
+
+/// Arms or releases the card's own accelerator.
+///
+/// The registration happens on the thread that owns the accelerators, so the
+/// change is only noted here and the reload is asked for; a state that is
+/// already in force asks for nothing. Only a card that holds a translation of a
+/// selection still in place can be written back over, so the key is held by the
+/// interface while such a card is up, and by nothing else: a badge waiting for
+/// its click, an old result from the history and a card that has gone away all
+/// leave Ctrl+Enter to the program in front.
+pub fn set_replace(armed: bool) {
+    if BOUNDS.replace.swap(armed, Ordering::Relaxed) != armed {
+        platform::hotkey::request_reload();
+    }
 }
 
 /// Whether a mouse click at this screen point dismisses the card.
@@ -274,6 +299,18 @@ pub fn reveal(
     );
 }
 
+/// Shows a card that says why there is no translation, where the pointer is.
+///
+/// The card the user was expecting is not coming, so this one takes its place:
+/// the same message the screenshot flow uses when a reading cannot be made.
+pub fn fail(app: &AppHandle, message: &str) {
+    if let Some(state) = app.try_state::<Arc<AppState>>() {
+        let (x, y) = crate::platform::desktop::cursor_pos();
+        state.set_anchor((x as f64, y as f64));
+    }
+    let _ = app.emit("glossy://popup-error", message.to_string());
+}
+
 /// Shows the card for a translation that was already made, which is how the
 /// history puts an old result back on screen without asking the provider again.
 pub fn reveal_result(
@@ -354,6 +391,8 @@ pub fn place(
         window.show().map_err(|e| e.to_string())?;
     }
 
+    keep_non_activating(&window);
+
     store_bounds(ScreenRect {
         left: x as i32,
         top: y as i32,
@@ -363,6 +402,40 @@ pub fn place(
 
     let anchor_scale = scale_at(&window, anchor, scale);
     Ok((area.bottom - area.top) as f64 / anchor_scale)
+}
+
+/// Puts the style that keeps the popup out of the foreground back on.
+///
+/// The style is set once when the window is created, but showing it takes the
+/// style away, and a window without it takes the keyboard when the user clicks
+/// the badge or the card. That click is the whole point of the badge, so the
+/// program the selection came from is told it is no longer in front — WeChat
+/// drops the selection at that moment and the translation would land next to
+/// the text instead of over it. The style is therefore restored after every
+/// placement, before the click that follows one can arrive.
+fn keep_non_activating(window: &WebviewWindow) {
+    if let Ok(hwnd) = window.hwnd() {
+        crate::platform::desktop::make_non_activating(crate::platform::desktop::Handle(
+            hwnd.0 as isize,
+        ));
+    }
+}
+
+/// Hands the keyboard to the popup, so a field in the card can be typed into.
+///
+/// The card's original is editable, and typing needs the keyboard the popup
+/// otherwise keeps away from - see [`keep_non_activating`]. Only the user
+/// opening that field asks for this, and the next placement takes the keyboard
+/// back off the popup.
+pub fn take_focus(app: &AppHandle) {
+    let Some(window) = app.get_webview_window(POPUP_LABEL) else {
+        return;
+    };
+    if let Ok(hwnd) = window.hwnd() {
+        crate::platform::desktop::make_activating(crate::platform::desktop::Handle(
+            hwnd.0 as isize,
+        ));
+    }
 }
 
 /// Scale factor of the monitor that contains `point`.
@@ -389,14 +462,47 @@ fn scale_at(window: &WebviewWindow, point: (f64, f64), fallback: f64) -> f64 {
 
 pub fn hide(app: &AppHandle) {
     if let Some(window) = popup_window(app) {
+        // The card can have been given the keyboard - a field in it is typed
+        // into, and its buttons answer Tab and the arrows - so it may be the
+        // window in front when it is closed. That window is going away, and the
+        // keyboard left there would go nowhere: it goes back to the program the
+        // selection came from, which is the one the user was reading in.
+        //
+        // Only when the card itself holds it: a card that sent the user to the
+        // settings window must not take the keyboard away from it.
+        let mine = window
+            .hwnd()
+            .map(|hwnd| {
+                crate::platform::desktop::is_foreground(crate::platform::desktop::Handle(
+                    hwnd.0 as isize,
+                ))
+            })
+            .unwrap_or(false);
         let _ = window.hide();
+        if mine {
+            crate::platform::desktop::restore_focus_owner();
+        }
     }
     // A card that is out of sight must not keep talking.
     speech::stop();
     BOUNDS.visible.store(false, Ordering::Relaxed);
+    // Nor may it keep the key that writes a translation back: the card it would
+    // write into is gone.
+    set_replace(false);
     // The pin belongs to the card that is on screen, not to the popup window,
     // which lives on between translations.
     BOUNDS.pinned.store(false, Ordering::Relaxed);
+}
+
+/// Tells the card that the user asked to write the translation back over the
+/// text it came from.
+///
+/// The card holds the translation, so the request carries nothing but the
+/// question: the button in the card asks for exactly the same thing.
+pub fn request_replace(app: &AppHandle) {
+    if let Some(window) = popup_window(app) {
+        let _ = window.emit("glossy://replace", ());
+    }
 }
 
 /// Re-anchors the popup after the user dragged it to a new position.
@@ -553,5 +659,18 @@ mod tests {
         set_pinned(false);
         assert!(!pinned());
         assert!(dismisses_click(500, 500));
+    }
+
+    #[test]
+    fn the_write_back_key_is_only_held_while_the_card_holds_a_translation() {
+        // Nothing on screen owns Ctrl+Enter until a card says it does.
+        set_replace(false);
+        assert!(!replace_armed());
+
+        set_replace(true);
+        assert!(replace_armed());
+
+        set_replace(false);
+        assert!(!replace_armed());
     }
 }

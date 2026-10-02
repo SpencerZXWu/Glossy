@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Glossy",
-  "version": "1.4.1",
+  "version": "2.0.0",
   "identifier": "com.glossy.translator",
   "build": {
     "frontendDist": "../src"
@@ -20,7 +20,8 @@
         "center": true,
         "resizable": true,
         "transparent": true,
-        "visible": false
+        "visible": false,
+        "dragDropEnabled": false
       },
       {
         "label": "notice",
@@ -28,6 +29,81 @@
         "url": "notice.html",
         "width": 340,
         "height": 104,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false,
+        "center": false
+      },
+      {
+        "label": "ocr",
+        "title": "Glossy Screenshot",
+        "url": "ocr.html",
+        "width": 800,
+        "height": 600,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false,
+        "center": false
+      },
+      {
+        "label": "subtitle",
+        "title": "Glossy Subtitles",
+        "url": "subtitle.html",
+        "width": 640,
+        "height": 120,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false,
+        "center": false
+      },
+      {
+        "label": "subtitle-area",
+        "title": "Glossy Subtitle Area",
+        "url": "subtitle-area.html",
+        "width": 320,
+        "height": 90,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": false,
+        "center": false
+      },
+      {
+        "label": "subtitle-edit",
+        "title": "Glossy Subtitle Boxes",
+        "url": "subtitle-edit.html",
+        "width": 800,
+        "height": 600,
         "resizable": false,
         "maximizable": false,
         "minimizable": false,
@@ -69,7 +145,8 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "resources": {
-      "resources/WebView2Loader.dll": ""
+      "resources/WebView2Loader.dll": "",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
     },
     "icon": [
       "icons/32x32.png",

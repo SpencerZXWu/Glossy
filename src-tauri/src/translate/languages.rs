@@ -31,12 +31,21 @@ const BAIDU: [&str; 23] = [
 /// 有道智云 文本翻译, whose list covers every language Glossy offers.
 const YOUDAO: [&str; 31] = ALL;
 
+/// The offline pack: one model per direction, and only Chinese and English
+/// between them.
+///
+/// `zh-TW` is left out rather than offered and answered in Simplified: the
+/// model was trained on one of the two, and a reader who asked for the other
+/// script is better served by a channel that really writes it.
+const OFFLINE: [&str; 2] = ["en", "zh-CN"];
+
 /// The languages one channel translates, in menu order.
 pub fn served(service: Service) -> &'static [&'static str] {
     match service {
         Service::CloudBaidu => &BAIDU,
         Service::CloudYoudao => &YOUDAO,
         Service::Google => &ALL,
+        Service::Offline => &OFFLINE,
     }
 }
 
@@ -114,6 +123,17 @@ mod tests {
                 assert!(serves(service, code), "{:?} {code}", service);
             }
         }
+    }
+
+    #[test]
+    fn the_offline_pack_only_takes_the_two_languages_it_has_models_for() {
+        for code in ["en", "zh-CN", "zh"] {
+            assert!(serves(Service::Offline, code), "{code}");
+        }
+        for code in ["zh-TW", "ja", "ko", "fr"] {
+            assert!(!serves(Service::Offline, code), "{code}");
+        }
+        assert_eq!(fallback(Service::Offline), "en");
     }
 
     #[test]

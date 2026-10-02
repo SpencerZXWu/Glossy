@@ -19,6 +19,7 @@ use tauri::{AppHandle, Emitter};
 use crate::classify;
 use crate::context;
 use crate::notice;
+use crate::ocr;
 use crate::platform;
 use crate::platform::clipboard::{self, Capture};
 use crate::platform::hotkey;
@@ -126,8 +127,14 @@ struct Down {
 /// reading in, so they must never start a translation. The card's own windows
 /// count as well, which is what keeps the list of a `<select>` from turning a
 /// press on one of its entries into a translation of whatever lies behind it.
+/// The screenshot overlay counts for the same reason: the drag that marks a
+/// region to read is a drag like any other, and reading it as a text selection
+/// would spend a translation the user never asked for.
 fn on_overlay(x: i32, y: i32) -> bool {
-    popup::contains(x, y) || popup::owns_point(x, y) || notice::contains(x, y)
+    popup::contains(x, y)
+        || popup::owns_point(x, y)
+        || notice::contains(x, y)
+        || ocr::contains(x, y)
 }
 
 fn now_ms() -> u128 {
@@ -234,11 +241,22 @@ pub fn install(app: AppHandle, state: Arc<AppState>) {
 
         let fire_app = app.clone();
         let fire_state = Arc::clone(&state);
-        let on_fire = move || {
+        let on_fire = move |slot: hotkey::Slot| {
             // Never block: the hook has to stay responsive.
             let app = fire_app.clone();
             let state = Arc::clone(&fire_state);
-            std::thread::spawn(move || on_hotkey(&app, &state));
+            std::thread::spawn(move || match slot {
+                hotkey::Slot::Translate => on_hotkey(&app, &state),
+                // The window is brought up from the same thread the tray uses,
+                // so a hidden window and a minimised one behave alike.
+                hotkey::Slot::Settings => crate::tray::show_main(&app),
+                // Taking the screenshot blocks for a moment, and the overlay
+                // reports the region back through its own commands.
+                hotkey::Slot::Ocr => crate::ocr::begin(&app),
+                // The card holds the translation, so it is asked to do the
+                // writing; the same request the button in it makes.
+                hotkey::Slot::Replace => crate::popup::request_replace(&app),
+            });
         };
 
         if let Err(error) = platform::input_hook::run(handle_click, on_reload, on_fire) {
@@ -257,7 +275,11 @@ fn worker(app: AppHandle, state: Arc<AppState>, rx: Receiver<HookEvent>) {
                 Err(_) => return,
             },
         };
-        match event {
+        // One click that goes wrong must not end the worker: the hook would keep
+        // arriving and nothing would answer it for the rest of the run, which
+        // looks exactly like an app that stopped working. The failure is written
+        // down and the next click is answered as if nothing had happened.
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| match event {
             HookEvent::ButtonDown { x, y } => {
                 // A click on the list of a language dropdown counts as a click
                 // on the card: the list reaches past the card's edges, so the
@@ -271,6 +293,12 @@ fn worker(app: AppHandle, state: Arc<AppState>, rx: Receiver<HookEvent>) {
                 on_trigger(&app, &state, x, y, trigger);
             }
             HookEvent::Pick { x, y } => on_pick(&app, x, y),
+        }));
+        if let Err(payload) = outcome {
+            crate::log::note!(
+                "glossy: a click failed: {}",
+                crate::log::panic_message(&*payload)
+            );
         }
     }
 }
@@ -430,22 +458,34 @@ fn on_hotkey(app: &AppHandle, state: &AppState) {
         return;
     };
 
-    let text = text::normalize(&text);
-    if !long_enough(&settings, &text) {
-        return;
-    }
-    if !settings::allows_source(&settings.source_langs, &text) {
-        return;
-    }
-
-    let (x, y) = platform::desktop::cursor_pos();
-    let context = enclosing_sentence(&settings, &text);
-    // The shortcut was pressed on purpose: it asks for the translation itself.
-    popup::reveal(app, state, text, context, (x as f64, y as f64), true);
+    translate_text(app, state, &text);
     // The restore waits for the application that was copied from, so it happens
     // once the popup has been told what to show.
     drop(pending);
     vitals::report_leak();
+}
+
+/// Translates a piece of text the user asked for, wherever the asking came
+/// from: the checks every way in shares, and then the card.
+///
+/// `false` means nothing was asked of a provider — the text is too short, or
+/// written in a language this user filtered out — which the caller may want to
+/// say out loud, or not, depending on how the user asked.
+pub(crate) fn translate_text(app: &AppHandle, state: &AppState, text: &str) -> bool {
+    let settings = state.settings();
+    let text = text::normalize(text);
+    if !long_enough(&settings, &text) {
+        return false;
+    }
+    if !settings::allows_source(&settings.source_langs, &text) {
+        return false;
+    }
+
+    let (x, y) = platform::desktop::cursor_pos();
+    let context = enclosing_sentence(&settings, &text);
+    // The user asked on purpose: it asks for the translation itself.
+    popup::reveal(app, state, text, context, (x as f64, y as f64), true);
+    true
 }
 
 /// The text to translate: the selection that was just copied, or the clipboard
@@ -509,11 +549,11 @@ fn looks_like_a_path(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::Provider;
+    use crate::settings::Service;
 
     fn settings() -> Settings {
         Settings {
-            provider: Provider::Google,
+            service: Service::Google,
             ..Settings::default()
         }
     }

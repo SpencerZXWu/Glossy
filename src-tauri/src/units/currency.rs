@@ -249,7 +249,7 @@ async fn fetch(client: &reqwest::Client, base: &str, relay: Option<Relay<'_>>) -
 /// The table the server keeps. It answers with the numbers plus the vendor they
 /// came from, which is what the card names under the conversion.
 async fn fetch_relay(client: &reqwest::Client, base: &str, relay: Relay<'_>) -> Option<Table> {
-    let table = cloud_rates(client, base, relay.endpoint, relay.install_id).await?;
+    let table = cloud_rates(client, base, relay.install_id).await?;
     Some(Table {
         source: table.source,
         date: table.date,
