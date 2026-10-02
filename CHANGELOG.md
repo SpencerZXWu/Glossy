@@ -6,8 +6,694 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
-## [1.4.1] - 2026-09-25
+## [2.0.0] - 2026-10-02
 
+The release that writes the project's promises down, and uses the contract break it is
+allowed to take to put the settings file in one piece.
+
+### Added
+
+- **`FAQ.md`, `PROVIDERS.md`, `COMPATIBILITY.md`.** The questions the README answered only
+  in passing, the terms of every translation service the app offers, and what a new version
+  may do to an installation that already exists — three documents a reader can check instead
+  of trusting, each linked from the README.
+
+### Changed
+
+- **The settings file is format version `2`.** The choice of translation service used to be
+  spelled across four keys, because the app once offered modes it no longer has; it is now
+  one `service` value (`cloud-baidu`, `cloud-youdao`, `google` or `offline`). Every settings
+  file from `1.3.0` onwards is migrated on first launch, and nothing else in it moves: the
+  language, the shortcuts, the ignored programs and the history setting all arrive as they
+  were. This is the one break a major version is allowed to make, and
+  [`COMPATIBILITY.md`](./COMPATIBILITY.md) is the promise about it, key by key.
+- **A file written by a newer version is set aside rather than misread.** The rule already
+  existed; the compatibility statement is where it is written down now.
+
+### Removed
+
+- **The mode that took an API key of the user's own**, and the storage that went with it: the
+  `credentials` map, the `apiKey` and `appId` fields, the DPAPI machinery that encrypted them
+  and the module that held it. No service this build offers asks for a key — the two
+  server-backed entries hold the vendor account on the relay, Google takes none and the
+  offline models run here — so the mode had nothing left to configure. A key left in an old
+  settings file is dropped the next time the settings are saved, and is neither used nor sent
+  anywhere. Nothing in either window changes: the credential panel was already gone in `0.8.0`,
+  and the dropdown had four entries before this release and has four after it.
+- **The relay address as a setting.** It was already part of the build rather than a field in
+  the window; the `cloudEndpoint` key a `1.x` file may hold is dropped with the rest.
+
+### Fixed
+
+- **Choosing the offline channel in the settings window did not stick.** The list the window
+  validates the stored service against held only the three services that go through a network,
+  so `offline` was read as an unknown value and the dropdown fell back to Baidu the moment the
+  save came back — the choice was written to the file and then shown as something else, and
+  reopening the window showed Baidu while the card translated offline. The list holds all four
+  entries now, and the list of fallbacks is a second, shorter one that leaves `offline` out:
+  the models on this machine are a choice the reader makes, never a substitution the app makes
+  for them, which is what the README has promised all along. The backend now drops `offline`
+  from a hand-edited fallback order too, so the promise holds for a file as well as for a click.
+- **`PRIVACY.md` and the README described screenshot translation as going through the relay.**
+  It does not: PP-OCRv4 reads the rectangle on this machine and only the recognised text is
+  sent, which is what the code has done since the reader became local. The privacy document
+  said otherwise, and the Chinese settings table promised a monthly screenshot allowance that
+  no build has counted since then. Both now say what actually happens.
+
+## [1.8.3] - 2026-10-01
+
+The release that translates without a connection, and that stops handing out a fresh
+allowance to anybody who installs the app again.
+
+### Added
+
+- **Offline translation, the fourth channel.** `opus-mt-en-zh` and `opus-mt-zh-en` — OPUS-MT's
+  English and Chinese models, Helsinki-NLP, Apache-2.0 and CC-BY-4.0 — run as int8 ONNX through the same
+  runtime the recogniser uses. The text never leaves the machine, there is no allowance to
+  count, and a sentence takes about a second. Chinese and English both ways and nothing else.
+  The two directions are downloaded and deleted one at a time on the **Resources**
+  page — each is about 114 MB and is a whole translator on its own, so one way
+  round never waits for the other — and each file is checked against its digest
+  before it is used. They come from ModelScope's mirror of the two `Xenova`
+  repositories, which carries byte-for-byte the same artifacts and answers about
+  ten times faster than the Hugging Face mirrors do from a mainland connection.
+  The channel answers with a readable error while a direction is not there, which
+  is also what the fallback order does with it.
+- **The allowance is shown where it is spent.** Today's free characters used to appear only
+  next to the service dropdown on the Language page; the same line is now written on the
+  **Translate text** page and the **OCR** page too, because those are the pages a translation
+  is started from.
+
+### Fixed
+
+- **A failed card offered no way to change the engine.** The bottom row of the popup — the
+  one that names the engine and opens the list of the others — was drawn only on a card that
+  had something to show, so a translation that failed left the reader with a retry button and
+  nothing else: switching to another engine, the offline one included, meant opening the
+  settings window. The row is on the failure card now, which is exactly where a switch is
+  wanted, and the card that a failed screenshot draws carries it too.
+- **The daily allowance started over after a reinstall.** It is counted per installation id,
+  and that id was drawn at random when the settings file was first written — so installing
+  Glossy again (or deleting the settings file) was a new device with a new allowance. The id
+  is now derived from the machine it runs on together with the Windows account, so an install
+  that comes back lands on the id it had. Nothing about the machine is sent anywhere: only the
+  32 hex characters the id hashes to.
+
+### Changed
+
+- **Subtitle text size.** The Settings window's subtitle page now takes the size of the
+  translated line directly, `13`–`40` CSS pixels, instead of the line being scaled to fit the
+  box and nothing else. What is set is still stepped down when a long translation would not
+  fit, and the box can still make it bigger than the setting.
+
+## [1.8.2] - 2026-10-01
+
+The release that makes a subtitle reading actually start.
+
+### Fixed
+
+- **A subtitle reading that started and then read nothing.** Starting a run ends the one
+  before it, and the way a run was ended took the two boxes with it — so the run that
+  followed was left with no area to read and no place to draw in: the loop returned before
+  its first tick, the log said the reading had started, nothing was translated, and neither
+  dashed box ever appeared. Ending a run and forgetting the boxes are two different things
+  now, and a start stores both of its own rectangles after the run before it has been ended.
+
+### Changed
+
+- **The settings window stays where it is when a reading starts.** It used to hide itself,
+  because it is in front of the video — but a window that vanished the moment the second
+  rectangle was released read as the feature closing itself. It is yours to move, minimise
+  or close, and closing it still only hides it, as it does everywhere else in Glossy.
+
+## [1.8.1] - 2026-10-01
+
+The release that makes the two rectangles of a subtitle reading visible, and lets them be moved
+while the reading is running.
+
+### Added
+
+- **Both boxes are drawn, and both can be moved.** A region of the screen that is read every
+  second is invisible by nature, so each box wears a faint dashed frame: one around the part
+  the subtitles are read from, one around the window the translation goes in. Neither frame
+  takes a click — they are guides, not targets. **Move the boxes** on the page — or
+  *Adjust the subtitle boxes* on the tray menu, which is the way to them while a reading runs
+  and the settings window is out of the way — opens both over the video, where they are
+  dragged by their middles and resized by their eight handles. A box is never dragged off the
+  screen or shrunk below what a reading needs, and the reading follows the boxes it is left
+  with: the next line is read from the new rectangle, and the translation is drawn in the new
+  place, without stopping and starting again. `Esc` leaves the boxes where they were.
+
+## [1.8.0] - 2026-10-01
+
+The release that reads subtitles off the screen and keeps them translated. It is a page that
+does not exist until developer mode is turned on, because it is the first thing Glossy does
+that keeps looking at the screen by itself.
+
+### Added
+
+- **Subtitle translation.** Pick the part of the screen the subtitles appear in, then the
+  place the translation is to be drawn: Glossy reads that rectangle about once a second,
+  translates it whenever what it read changes, and writes the translation into a window
+  drawn exactly over the second rectangle. The window is transparent, always on top and
+  never takes a click, so a subtitle line is never in the way of the video it belongs to.
+  The two languages are chosen before the reading starts — what the subtitles are written
+  in, and what they are read in — and only **one** recognition language is used, picked from
+  the packs that are already on the disk: reading a small region with one recogniser costs a
+  fraction of reading it with every checked language, and a subtitle is only ever written in
+  one of them. The region is read on this machine, exactly like a screenshot, and only the
+  text that comes back is sent to the translator, so one subtitle line costs one small
+  request of the daily allowance and nothing of the picture leaves the machine. The settings
+  window puts itself away when a reading starts, because it is in front of the video; the
+  tray icon brings it back, and the **Stop** button on the page ends the reading — as does
+  turning developer mode off.
+- **Developer mode**, on the **Updates** page. It is a key field and nothing else: type the
+  key and the pages that are still being built appear in the sidebar; **Turn off** puts them
+  away again and closes any of them that is open. The key is compared in the process rather
+  than in the window, so the page never holds it, and the switch is stored as
+  `developerMode` in `settings.json`. With it off, Glossy behaves exactly as it did before
+  this release: the entry is not in the sidebar at all, and a subtitle reading asked for by
+  any other route is refused.
+
+### Changed
+
+- **The screenshot overlay says what the rectangle is for.** It is one window used for three
+  things now — a screenshot, the area the subtitles are read from, and the place their
+  translation is drawn — so the sentence on it names the one that is being asked for rather
+  than always talking about recognising text.
+- **A page whose sidebar entry is hidden is skipped by the keyboard.** Walking the sidebar
+  with the arrows no longer stops on an entry that is not on show, and a page that is open
+  when the mode that shows it goes away is closed behind it.
+
+## [1.7.3] - 2026-09-30
+
+The release where a card that fell back by itself says why. It is the same line the relay's
+own fallback already wrote; the app simply had nothing to put in it.
+
+### Fixed
+
+- **A fallback the app made itself showed no reason.** When the chosen service fails, the app
+  tries the next one and the card names the engine that answered and the one that did not —
+  but only the *relay's* fallback carried a reason, because the refusal code it reports came
+  with it. The app-side case went out with an empty code, so a card read "Youdao Translate did
+  not answer" with nothing after it, while `glossy.log` held the whole story ("Could not reach
+  the Glossy translation server"). A service that does not answer now reports why in the same
+  small set of codes the relay uses — the vendor's own refusal (`upstream_limit` and friends)
+  or `relay_unreachable` when it was the relay itself that never answered — and the card says
+  "Youdao Translate did not answer — the Glossy relay could not be reached". The relay's own
+  refusals (its daily allowance, its rate limit) deliberately carry no code: a line blaming the
+  engine named in the footer for a limit the relay hit would be a lie, and the log has the
+  detail.
+
+## [1.7.2] - 2026-09-30
+
+The release that puts the other recognition languages back, after checking each one on a
+real screen — where more than one of them can be checked at once and the best reading wins,
+and where reading a screenshot got three times quicker.
+
+### Added
+
+- **The notification area menu carries the two actions that need no window.** It had
+  **Open Glossy** and **Quit** — but closing the settings window hides it, and that menu is
+  then the only place the shortcut keys are written down at all, so **Translate a screenshot**
+  and **Translate the clipboard** are on it now as well. Each entry names the combination
+  doing the same thing, taken from the settings, and the menu is rebuilt whenever the settings
+  are saved, so a shortcut the user records is in it before the next launch. The clipboard
+  entry translates what is on the clipboard when it is clicked, rather than pressing `Ctrl+C`
+  first the way the shortcut does: a menu click cannot promise the program the user meant is
+  still in front. When there is nothing to translate, or translations are switched off, that
+  is said in the card instead of the click doing nothing.
+- **A screenshot can be read with several languages at once.** The rows on the **Resources**
+  page are checkboxes now rather than a single choice: every language that is checked reads
+  the same screenshot, and each line is kept from the language that read it best. A picture
+  holding Japanese and English no longer needs the user to say which it is, and the choice
+  costs almost nothing — measured on a real machine, a screenshot read with two languages
+  takes about 0.7 s against 0.5 s for one, and the extra work grows with the languages
+  checked rather than with the size of the picture. The order is the one the page shows, at
+  least one language always stays checked, and a language the settings file names that this
+  build does not offer is dropped rather than carried into a download of a model that does
+  not exist.
+
+### Changed
+
+- **The detector stops stretching a wide, short screenshot.** The region is brought up to the
+  detector's size on its shorter side, which is what makes small text readable — but on its own
+  that turned a 900×140 region into 4736×736, fifteen times the pixels of the picture it came
+  from. The longer side is held at 1440 now, so the detector's work stays near the size of the
+  region whatever its shape: reading the same picture went from 1.3 s to 0.17 s, and a
+  screenshot translation from about 1.4 s to 0.5 s. The recognisers also share one detector
+  instead of loading a copy each, which is what made reading with two languages cost 2.3 s
+  before it cost 0.7 s.
+- **The recognition languages are six again, and each one says what it reads.** The
+  **Resources** page offers Chinese and English, Japanese, Traditional Chinese, the Latin-script
+  languages, the Cyrillic ones and Korean, as it did before 1.6.1 — each is downloaded, checked
+  and removed on its own, and a language already on the disk shows up as installed rather than
+  being fetched a second time. The hint above them says the thing that made this look broken:
+  a pack reads its own script and nothing else, so the language has to be picked rather than
+  guessed.
+
+### Fixed
+
+- **Japanese screenshots were read with the Chinese recogniser.** Since the language packs
+  were taken off the **Resources** page in 1.6.1 only Chinese and English could be picked, and
+  a settings file still naming another language was quietly read as Chinese and English rather
+  than reported — the Chinese pack's dictionary holds no kana at all, so a Japanese screenshot
+  came back with every kana missing and the kanji guessed, which is what "Japanese recognition
+  is completely wrong" was. Each of the six languages was then read over a picture written in
+  its own script — `ch`, `ja`, `cht`, `latin`, `cyrillic` and `ko` — and each one read its own
+  script back: Japanese at 0.998, Traditional Chinese at 1.000, English and French at 1.000 and
+  0.984, Russian at 1.000, Korean at 0.997. Nothing in the models, the dictionaries or the
+  engine was wrong; only the page was, and all six are offered again.
+- **The source language a card detected showed up as a code.** Youdao names the pair it
+  translated rather than the source alone — `l: "en2zh-CHS"` — and the relay passed the whole
+  of it on as `from`, so a card that had asked for the language to be detected read
+  "Detect language · EN2ZH-CHS" where "Detect language · English" belongs. The relay now
+  answers with the left half of the pair, and `normalize_lang_code` reads a pair that way too,
+  so a deployment older than this build is fixed by the app rather than by a redeploy — and a
+  pair can no longer reach the next request as a source the provider would reject.
+- **The page renamed to *Files and logs* in 1.7.0 still had its old heading.** The sidebar
+  said **Files and logs** while the heading above the page said *Settings file*, and the
+  English list of pages in `README.md` said the same. Both say what the page is now.
+
+## [1.7.1] - 2026-09-29
+
+The release where a channel that stopped answering says so — and where the card can take the
+picture itself. Nothing about which engine is asked first changed; what changed is that the
+app no longer looks as if it had moved the choice by itself.
+
+### Added
+
+- **A camera button in the card.** Reading a rectangle off the screen no longer needs the
+  keyboard: the button sits in the card's header, next to the pin and the wordbook star. The
+  card itself is taken off the screen first — it is always on top and normally sits right next
+  to what the user wants to read — and the answer, or the reason there is none, comes back to
+  the same card, exactly as it does for `Ctrl+Alt+Q`.
+- **The relay reports which backends it walked past.** `POST /v1/translate` now answers with
+  `attempts`: one `{vendor, code}` per upstream that refused, in the order they were tried, so
+  a deployment that holds both keys can say why the one that was asked for stepped aside
+  instead of quietly answering with the other one's translation. The relay also writes it to
+  its own log (`console.warn`), where the operator — the only one who can fix a vendor's
+  credentials or quota — can see it. A deployment older than this build simply leaves the
+  field out, which the app reads the same way.
+
+### Changed
+
+- **A button that has a shortcut says so in its tooltip.** The camera and the settings buttons
+  in the card, and the screenshot button in the settings window, now name the combination that
+  does the same thing. The three shortcuts are recorded by the user, so the tooltip is built
+  from the stored value every time the window is drawn rather than written into the markup: it
+  always names the key that works now, and a field the user cleared leaves the tooltip with the
+  action alone.
+
+### Fixed
+
+- **The Glossy mark in the settings window's card was 128 pixels square.** Nothing in
+  `app.css` gave the mark a size, so the card drawn on the Translate page used the size of the
+  file itself while the floating popup drew the same mark at 13 pixels. It is 13 pixels in both
+  windows now, faded in the same way, and a contrast theme lifts that fade in both.
+- **The fallback list follows the service chosen above it.** The chosen service is always
+  asked first, so a copy of it in the list below was a second attempt on the same backend —
+  and it pushed one engine out of the list altogether: switching the first entry from Baidu
+  to Youdao left Youdao listed twice and Baidu nowhere. The list is now rebuilt from the
+  choice: every other engine once, in the order the user put them in, with an engine that
+  was not in the list yet landing at the end.
+- **A card whose answer came from another engine says which one — and why.** The relay in
+  front of Baidu and Youdao walks its own list of backends when the one it was asked for
+  fails, which is what made a card read "Youdao" while the settings still said Baidu, with
+  the fallback list switched off and nothing to explain it. The card names the engine that
+  answered in its footer, and the line under it names the engine that did *not*: "Baidu
+  Translate did not answer — its allowance is used up", with the reason the relay gave when it
+  gave one (a code this build does not know leaves the line at "Baidu Translate did not
+  answer"). The name in that line is the engine (`Baidu Translate`) rather than the identifier
+  of the entry of the channel list, which is what it used to print — and it used to say that
+  the engine that *failed* was the one that answered. The same line goes into `glossy.log`.
+
+## [1.7.0] - 2026-09-29
+
+The release where Glossy writes down what went wrong. A failure in the mouse hook or in the
+card no longer ends the process in silence, and the messages the app used to print to a
+console nobody was watching now land in a file beside its settings.
+
+### Added
+
+- **An error log beside the settings.** `glossy.log` sits next to `settings.json` and takes
+  every failure the app reports, stamped in UTC. It stops at 256 KB by becoming
+  `glossy.log.1` and starting a new file, so a machine that runs for months leaves two
+  bounded files instead of one that grows without end; nothing else is ever written into it.
+  The new **Files and logs** section of the settings window — the page that was *Settings
+  file* — shows its path and how much it holds, and offers `Open the folder`, which opens
+  Explorer with the file selected, `Export…`, which writes it to `Documents\glossy-log-<unix
+  seconds>.txt` the way an exported settings file is written, `Copy`, which puts it on the
+  clipboard to paste into a message, and `Clear`. The log exists because a release is linked
+  as a Windows GUI application and has no console at all: everything the app printed with
+  `eprintln!` reached nobody when it was started from Explorer or the notification area,
+  which is how it is normally started.
+- **The Updates section says where a new build can be downloaded by hand.** The line that
+  already says this build cannot update itself now ends with the releases address —
+  `github.com/SpencerZXWu/Glossy/releases/latest` — and clicking it opens that page in the
+  browser, which is the way to a new build until a signing key pair exists. The window itself
+  never navigates anywhere: the address is part of the build, and the command that opens it
+  takes no argument, so nothing else can be opened this way.
+
+### Changed
+
+- **The log is handed over by the user, not sent anywhere.** The planned anonymous reporting
+  — a payload shown before it was sent, described in `PRIVACY.md` — is not built: `Export…`
+  and `Copy` give whoever is asked for the log exactly the same thing, and nothing about a
+  failure leaves the machine unless the user does it themselves. The settings page that was
+  called *Settings file* is now **Files and logs**, because it holds both.
+
+### Fixed
+
+- **A failure in the mouse hook or in the card no longer takes the notification area icon
+  with it.** The hook callback is called by Windows, and a panic that unwound out of it
+  would have left through an `extern` boundary and aborted the whole process. The click
+  handler, the accelerator handlers and the thread that reads a selection are now guarded:
+  a failure is written to the log and the next click is answered as if nothing had happened.
+  A panic anywhere else is recorded with its location before the process goes, which is the
+  only way a crash nobody was watching can still be read afterwards.
+
+## [1.6.1] - 2026-09-28
+
+The release where the machine reads more than Chinese and English, and where the
+settings say where every file it downloads comes from. The card for a screenshot is also up
+before the picture is read rather than after it, and the engine the card switches to is no
+longer at the mercy of the settings window.
+
+### Added
+
+- **The reading engine is a shared half plus a language.** The ONNX Runtime and the detector
+  — about 21 MB, shared by every language — are now separate files from a language's
+  recogniser and its dictionary, about 10 MB, which is what the app has always downloaded
+  for Chinese and English. A language is a pack of its own on the **Resources** page, where
+  it can be downloaded, picked and deleted on its own; the engine and the languages already
+  on the disk are not fetched again. **Chinese and English is the language this build
+  offers**: Japanese, Traditional Chinese, the Latin-script languages, the Cyrillic ones and
+  Korean are built the same way and are already in the table the downloader and the notices
+  file use, but they are not offered yet — their recognition has to be checked on a real
+  screen first, and one word in `ocr/models.rs` offers them.
+- **Every downloaded file says where it comes from.** Each row on the Resources page names
+  its source and its licence, and [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) — put
+  next to the app by the installer and into the portable archive — carries the full licence
+  texts together with the address and SHA-256 of everything the app downloads. The list is
+  checked against the table the downloader uses, so it cannot quietly go stale. All of it is
+  Apache-2.0: PaddleOCR's PP-OCR models, distributed as ONNX by RapidOCR.
+
+### Changed
+
+- **The Resources page is a list of files, not two paragraphs.** Everything that can be
+  downloaded is a row of its own with its size, its state and the button that acts on it,
+  the languages it can read are one list with the one in use marked, and the sources are
+  folded away at the bottom for whoever wants them.
+- **The first-use prompt names the size of what it is about to fetch.** A second language no
+  longer reads as a second whole engine.
+
+### Fixed
+
+- **The keyboard stays where it was.** Every list in the settings window is drawn
+  again rather than updated in place — by a save, by a download's progress, or by the window
+  taking the focus back — which used to throw the focus away with the element it was on, so
+  picking a language with Space moved the reader to the top of the page. The control that had
+  it is found again by what it says about itself, and the row it belonged to stands in when
+  the control itself is what the change removed.
+- **A language reports its own progress on its own row.** The bar and its numbers used to
+  appear under the shared engine and count the runtime and the detector together with the
+  language, so a 10 MB download read as a 33 MB one. Each row now counts the files it is
+  fetching — the engine row the runtime and the detector, a language's row that language —
+  and a failure is reported on the row it belongs to.
+- **The card for a screenshot is up while the picture is being read.** Taking a screenshot
+  showed nothing at all until the text had been recognised and translated, because the
+  waiting card was only put up when the reading engine still had to be downloaded. It now
+  appears the moment the rectangle is accepted — with the name of the engine that is about
+  to be asked, or saying that the reading engine is being fetched — and the translation
+  takes its place.
+- **A choice made in the card is no longer undone by the settings window.** The settings
+  window writes the whole settings file on every save, engine and target language included,
+  taken from its own controls; a window that was not on screen while the card switched its
+  engine could write the older choice back, which puts the app back on Baidu. Those two are
+  only written back when the pick was made on that screen, and the window re-reads the
+  stored settings whenever it comes back into view.
+
+## [1.6.0] - 2026-09-28
+
+The release where the two windows can be worked with the keyboard alone, and where a
+contrast theme is something the app follows rather than something it paints over.
+
+### Added
+
+- **The keyboard reaches everything, in both windows.** The settings window walks its
+  sidebar with the arrows, Home and End, and its sections with Tab in the order they are
+  drawn; the confirm dialog that asks before something is thrown away now keeps the
+  keyboard inside its two buttons while it is up, and gives it back to whatever had it
+  before. In the card, the caret going into the grey original — or a Tab once the card
+  holds the keyboard — is what hands the popup the front, and the engine menu at its foot
+  opens with the arrows, moves with the arrows, Home and End, and closes with `Esc` or Tab
+  back onto the button it belongs to.
+- **The keyboard goes back when the card does.** A card that was given the front so a
+  field in it could be typed into returns it to the program the selection came from when
+  it closes, instead of leaving it on a window that is no longer there.
+- **A high-contrast theme, taken from Windows.** With a contrast theme turned on, every
+  colour in the app comes from the system palette: the surfaces turn solid, the strokes
+  stop being subtle, the accent becomes the system highlight and the focus rings stay on
+  top of it. It is not an entry in the theme menu, because the choice was already made in
+  Windows — and a custom accent stops overriding the system highlight for as long as one
+  is on.
+
+### Changed
+
+- **Nothing is read through something else while a contrast theme is on.** The card's
+  opacity, the faint wordmark at its foot, the dimmed sections whose controls are off, and
+  the pulsing placeholder all keep their own colour and their own weight in that mode.
+
+### Fixed
+
+- **The same measurement written twice is one row.** The annotation under the card
+  compared the numbers as they were typed, so `12 ft` twice was one row but `12ft` next to
+  `12 ft`, or `12 ft` next to `12 feet`, became two rows with the same answer. It compares
+  the amount and the unit now, so a repeated measurement is one row however the
+  translation spells it — and two different amounts are still two rows, which is what the
+  reader asked about.
+- **A shortcut field no longer holds the keyboard.** Recording starts when the box is
+  focused, and it used to record every key it saw — including Tab, which is how the
+  keyboard had reached the box. Tab and Shift+Tab now leave it unchanged, the hint under it
+  says so, and the combination that was there is still there afterwards.
+
+## [1.5.5] - 2026-09-27
+
+The release where the screen is read on the machine it is on, and where the settings stop
+being a list of pages that each held one switch.
+
+### Added
+
+- **The screenshot is read here, not by a service.** Recognition runs on this machine
+  through PP-OCRv4 on ONNX Runtime: the picture never leaves the machine, it works with no
+  connection at all, and a reading costs nothing. The engine is fetched the first time a
+  screenshot is asked for — a prompt gives its size, about 33 MB, before anything is
+  downloaded — and lands next to the app's own files, where *Delete the engine* takes it
+  off the disk again.
+- **A Resources page.** Everything Glossy keeps on the machine is downloaded, sized and
+  removed in one place: the recognition engine today, and the offline translation pack when
+  it lands.
+- **The version this copy is.** The Updates page prints it above the check button, so a
+  report about a broken build starts with the number that identifies it.
+
+### Changed
+
+- **The settings are fewer pages.** *General* carries the shortcuts and the trigger rules
+  as well as the master switch — the three were read together anyway — and *Wordbook* moved
+  up into the features, where the rest of what Glossy does lives.
+- **Document translation is closed while it is rebuilt.** The entry is disabled and marked
+  *In development*, the page says so, and the commands behind it refuse instead of starting
+  a translation that cannot be finished yet. Settings already saved are untouched.
+
+### Removed
+
+- **The monthly ceiling on screen readings.** Recognition happens on the machine now, so
+  there is no allowance to stay inside: the screenshot page no longer reports how many
+  readings the month has left, and the app no longer reads a remaining-allowance figure out
+  of the shared server's answer.
+
+## [1.5.3] - 2026-09-26
+
+The release where replacing a selection actually lands on it, in every program it was
+asked to.
+
+### Fixed
+
+- **The replacement is written over the selection instead of next to it.** A paste goes to
+  whichever window is in front, and the card was in front because it had just been clicked,
+  so `Ctrl+Enter` could land in the popup or at the end of the line. The window the
+  selection was read from — remembered while the selection is still live — is put back in
+  front and given the keyboard before the paste, and keeps it until the paste has been
+  made.
+- **Clicking the badge no longer throws away the selection in WeChat.** WeChat clears the
+  text it has selected the moment it stops being the window in front, so the badge — whose
+  whole job is to be clicked — cost the very selection the translation was meant to
+  replace. The popup is shown without taking the foreground, and the style that does that
+  survives being shown, so the click lands on Glossy while the program behind it stays in
+  front and keeps the selection selected. The card's own original can still be corrected in
+  place: opening that field is what asks for the keyboard.
+
+## [1.5.2] - 2026-09-26
+
+The release where a translation can take the place of the text it came from, and where the
+Document page asks for everything it needs to know before it starts instead of after.
+
+### Added
+
+- **A translation can replace the text it was made from.** With the card up for a
+  selection, `Ctrl+Enter` — or the third button under the translation — writes the
+  translation over that selection in the program in front: select, read, replace, which is
+  what writing a reply or a paragraph in another language is actually made of. The key is
+  registered for exactly as long as a card holds the translation of a selection that is
+  still in place, so no other program loses `Ctrl+Enter` to Glossy, and a card brought back
+  from the history — which has no selection behind it — never takes it at all. The text
+  travels through the clipboard with a pasted `Ctrl+V`, so the clipboard is put back the way
+  the *restore clipboard* setting asks.
+- **The Document page asks for its languages and its options up front.** *Document* opens
+  on a box a file can be dropped onto or clicked to browse through, a source/target pair of
+  pickers above it, and an *Advanced settings* block: **Leave the pieces that hold no
+  letters as they are** keeps numbers, symbols and page furniture out of the bill,
+  **Save the translation as soon as it is finished** writes the file without a second
+  click, and **Longest piece sent in one request** caps how much goes into a single call.
+- **A translated document is saved where you say.** The page remembers a folder and shows
+  it next to the buttons, `Change…` opens the folder picker, and until one is chosen the
+  translation lands on the **Desktop** rather than in `Documents`.
+
+### Fixed
+
+- **Clicking the gear on a pinned card no longer throws the card away.** The settings
+  button was the one header button that still dismissed the card it was pressed on, so a
+  card the user had explicitly asked to stay disappeared exactly when it was needed.
+
+## [1.5.1] - 2026-09-26
+
+The release where the shared server stops relying on everyone's good manners, and where
+the rectangle that reads the screen can be drawn more than once. The OCR service behind
+that rectangle is metered by the month, so one installation can no longer spend the whole
+free allowance on its own, and the Screenshot translation page says how much of the month
+is left before a shortcut is pressed rather than after.
+
+### Added
+
+- **A monthly ceiling on screen readings, per device.** The OCR service behind the shared
+  server hands out a small free allowance every month, so `/v1/ocr` now counts how many
+  readings one install has used since the 1st and refuses the 101st with
+  `ocr_month_quota_exceeded` (`OCR_PER_CLIENT_MONTH`, `0` turns it off). It is a second,
+  monthly ledger next to the daily character one, kept in its own bucket per install, and
+  a reading that is refused or that the upstream fails is refunded - `GET /v1/quota` and
+  the `/v1/ocr` answer both report `ocrMonth` and `remainingOcrMonth`. Ordinary text
+  translation is untouched and still runs on the daily characters. The popup explains the
+  refusal in the reader's own words instead of showing the server's Chinese.
+- **The Screenshot translation page says what is left of the month.** Below the description
+  it now shows how many screen readings this device still has left this month, turning red
+  and naming the reset day once they are gone, and staying out of the way on a server that
+  sets no monthly limit.
+
+### Fixed
+
+- **The screen reading rectangle can be drawn again after the first one.** The `ocr`
+  window was missing from the capability file, and since app commands are not gated by it
+  but `core:event:listen` is, the page's `glossy://ocr` listener was refused: the flag that
+  says "this session already sent a rectangle" was never cleared, so every overlay after
+  the first ignored the pointer and the whole desktop had to be escaped with Task Manager.
+  The window is now allowed to listen, the listener reports a refusal instead of failing
+  silently, and a page that comes back to the front resets itself as a second line of
+  defence. A regression test now checks that every page which listens for an event is
+  covered by a capability.
+- **Drawing the rectangle no longer costs a translation.** The overlay was not part of what
+  counts as "the Glossy window", so the drag that marks a region was classified as a
+  selection drag and spent an allowance the user never asked for.
+
+## [1.5.0] - 2026-09-25
+
+The release where Glossy stops translating only what the mouse can reach. Three global
+shortcuts instead of one, a card that says what it was an answer to, and two ways of
+handing it text a selection cannot carry: a rectangle drawn over the screen, and a whole
+document. The mouse is still the default — a selection still waits for the icon to be
+clicked — but nothing about a translation has to start with the mouse any more.
+
+### Added
+
+- **Three global shortcuts, each one recorded and each one checked.** `hotkey` stays the
+  translate shortcut (`Ctrl+Alt+C`), `hotkey_settings` brings the window to the front
+  (`Ctrl+Alt+G`) and `hotkey_ocr` starts a screen reading (`Ctrl+Alt+Q`). `hotkey::Slot`
+  is what the hook reports, so the callback decides what a press means instead of
+  assuming every combination is a translation, and the settings page lists all three with
+  their own field, their own clash line and their own `Clear`. A slot left empty is not
+  registered at all, and one Windows refuses is reported without taking the others down.
+- **Reading text off the screen.** A screen shot of the whole desktop is taken behind a
+  frozen-looking overlay, a rectangle is dragged over the text, and what is inside it goes
+  to Glossy's server, which asks an OCR service and answers with the recognised text. That text
+  is then translated by the ordinary popup path — the same card, the same allowances, the
+  same history. `Esc`, a right click or a rectangle that selects nothing cancels without a
+  request; the overlay is a real window above everything, so the screenshot cannot capture
+  the overlay itself.
+- **Translating a document.** The **Document** page under *Features* takes a `.txt`, `.md`,
+  `.srt`, `.pdf` or `.docx` file and translates the parts of it that are prose: Markdown
+  keeps its code fences, its headings and its lists, and a subtitle file keeps its cue
+  numbers and time codes, so the result lines up with the original. Text is sent paragraph
+  by paragraph, capped at 1500 characters per request and 60 000 characters per document,
+  and the page reports how far along it is and can be cancelled between requests. **Save the
+  translation** writes `<name>.<target language>.<ext>` into `Documents` and never touches
+  the file that was read. A file that is not UTF-8 — a BOM, or the system code page — is
+  decoded rather than reported as unreadable, which is what `platform::windows::encoding`
+  is for.
+  A **PDF** is read into the words of its pages without a layout engine — wrapped lines are
+  joined back into paragraphs, a scanned page is refused before any allowance is spent on it
+  — and its translation is written as a `.txt`. A **Word** document is taken apart
+  paragraph by paragraph and the translation is written back into a copy of the same
+  `.docx`: the translated text takes the place of the first run of each paragraph, so the
+  styles, the tables, the pictures, the headers and the footers are the ones the reader
+  already knows. An older `.doc` has to be saved as `.docx` first. Both are read and written
+  in process, with no service and no network involved.
+- **The card shows what was translated.** Both shapes of card — the word card and the
+  sentence card — now open with the grey original text under the language row, not just the
+  sentence card as before, and that grey text can be edited in place: click it, correct the
+  selection Glossy was handed, and `Ctrl+Enter` or clicking away translates the corrected
+  text instead. Nothing is sent while the caret is still in the field, an empty or
+  unchanged text costs nothing, and `Esc` puts the translated text back without closing the
+  card.
+- **The Glossy mark closes the line that names the engine.** The row that says which
+  service answered ends with the translucent logo and the wordmark, so a result that came
+  through somebody else's endpoint still says whose window it is in.
+
+### Changed
+
+- **A shortcut is no longer assumed to mean "translate".** The hook passes the slot it
+  fired on, the tray and the screen reader are reached from the same thread the hotkey
+  already used, and the window a shortcut opens is raised whether it was hidden or
+  minimised.
+- **The selection path is unchanged on purpose.** A drag still costs nothing until the
+  icon is clicked: the icon appears under the selection, clicking it translates, and
+  clicking anywhere else makes it disappear. A shortcut, by contrast, translates at once —
+  there is nothing to click after it, which is the whole difference between the two.
+- **Screen reading reads pictures with Tencent Cloud, and Baidu is the fallback.** Baidu's
+  general text recognition now has to be paid for before it will answer at all, and a free
+  key that is refused with `error_code 6` is not something a self-hosted deployment should
+  hit on its first screenshot. `server/src/tencent-ocr.js` signs a `GeneralBasicOCR` call
+  with TC3-HMAC-SHA256, so a deployment holding a `TENCENT_SECRET_ID`/`TENCENT_SECRET_KEY`
+  pair gets the 1,000 calls that interface hands out free every month (reissued on the first
+  of each month and valid only for that month, so it never accumulates and a month that has
+  used it up is refused until the next one). Both pairs can be set at once:
+  Tencent is asked first and the request is only handed to Baidu when Tencent is
+  unreachable, out of quota or refusing the keys — a picture that simply holds no text is
+  not asked twice. `GET /v1/health` now reports which one a deployment will use as
+  `ocrVendor`, and a refusal answers with the vendor's own code in `upstream`, so an
+  account that is not set up can be told apart from a request that is malformed.
+
+### Fixed
+
+- **The screenshot overlay can always be put away.** The overlay covers a whole monitor,
+  sits above everything and is the window that receives the clicks and the keys, so a page
+  inside it that did not come up left the desktop covered by something that could not be
+  dismissed. `Esc` and the right button are now watched from the process as well, not only
+  from the page, the overlay closes itself after 30 seconds, and pressing `Ctrl+Alt+Q`
+  again while it is up puts it away instead of starting a second screenshot. The hint line
+  says all three. The page keeps cancelling on `Esc`, on a right click and on a click that
+  drags nothing, which is still the usual way out.
+
+## [1.4.1] - 2026-09-25
 The global hotkey stops being a text field. A combination has to be spelled the way the
 backend reads it back, and typing it by hand was the one place a working setup could be
 broken by a typo, so the field now records what is pressed instead of accepting what is

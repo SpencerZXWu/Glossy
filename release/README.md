@@ -40,18 +40,18 @@ The script takes the version from `scripts/version.ps1 -Get` and stops a running
 bundles, packs the portable zip from the release binary and the `WebView2Loader.dll`
 next to it, and stages all three under `release/v<version>/`. A bundle target that
 produced no file stops the script rather than staging an incomplete set: the NSIS
-installer and the MSI are both mandatory. `RELEASE_NOTES.md` is written in three languages
+installer and the MSI are both mandatory. `RELEASE_NOTES.md` is written in two languages
 unless the file is already there, so notes written by hand survive; `-ForceNotes`
-regenerates them and resets the translations.
+regenerates them and resets the translation.
 
 ## Releasing from CI
 
 Pushing the `vX.Y.Z` tag runs `.github/workflows/release.yml`: a Windows runner installs the
 GNU Rust toolchain, builds the same three artefacts, stages them with
-`scripts/release.ps1 -SkipBuild` — so `SHA256SUMS.txt` and the trilingual notes come out of
+`scripts/release.ps1 -SkipBuild` — so `SHA256SUMS.txt` and the bilingual notes come out of
 the same code path as a local release — and publishes the GitHub release through `gh`. The
-description is the `RELEASE_NOTES.md` committed under `release/vX.Y.Z/`, the file with all
-three translations in it, never a regenerated scaffold, and the run refuses to publish while
+description is the `RELEASE_NOTES.md` committed under `release/vX.Y.Z/`, the file with both
+translations in it, never a regenerated scaffold, and the run refuses to publish while
 that file still holds a `TODO: translate` placeholder.
 
 The workflow compares the tag with the version the tagged commit declares
@@ -97,14 +97,14 @@ leaves a run without `-Sign` byte-for-byte unchanged. Every artefact — the ins
 MSI and the `glossy.exe` unpacked from the portable zip — has to carry a valid,
 timestamped signature, or the script fails instead of staging a half-signed release.
 
-## Release notes in three languages
+## Release notes in two languages
 
-One `RELEASE_NOTES.md` carries English, Chinese and Spanish. A link line at the top
+One `RELEASE_NOTES.md` carries English and Chinese. A link line at the top
 jumps to the anchor that sits directly above each language's block, so a reader opens
 the release and switches language without leaving the page:
 
 ```markdown
-[English](#en) · [中文](#zh-cn) · [Español](#es)
+[English](#en) · [中文](#zh-cn)
 
 <a id="en"></a>
 
@@ -121,26 +121,18 @@ the release and switches language without leaving the page:
 ### 变更
 
 - ...
-
-<a id="es"></a>
-
-## Español
-
-### Cambios
-
-- ...
 ```
 
 `CHANGELOG.md` stays English-only, as Keep a Changelog expects. The script fills the
-English block from it and leaves the other two as `TODO` placeholders; it warns while
-any of those placeholders is still in the file, so an untranslated release is noticed
-before it is published. Google Translate is a fine starting point for the two
-translations, but read the result before shipping it. `RELEASE_NOTES.md` is UTF-8
+English block from it and leaves the other one as a `TODO` placeholder; it warns while
+that placeholder is still in the file, so an untranslated release is noticed
+before it is published. Google Translate is a fine starting point for the
+translation, but read the result before shipping it. `RELEASE_NOTES.md` is UTF-8
 without a BOM — GitHub renders the anchors and the `·` separators straight from it.
 
 `scripts/release.ps1` itself must stay saved as UTF-8 **with** a BOM: Windows
-PowerShell 5.1 decodes a BOM-less script as ANSI, which would replace the Chinese and
-Spanish labels with mojibake in the generated notes, so the script refuses to run
+PowerShell 5.1 decodes a BOM-less script as ANSI, which would replace the Chinese
+labels with mojibake in the generated notes, so the script refuses to run
 without one.
 
 ## Uploading
@@ -156,7 +148,7 @@ without one.
    tag.
 3. What the published release has to look like, whether CI or a workstation made it: titled
    `Glossy X.Y.Z` (the tag keeps the `v`, the title does not), described by
-   `release/vX.Y.Z/RELEASE_NOTES.md` with all three languages and the anchor links included,
+   `release/vX.Y.Z/RELEASE_NOTES.md` with both languages and the anchor links included,
    and carrying the installer, the MSI, the portable zip and `SHA256SUMS.txt`. Say in the
    description which download suits whom.
 4. Check that every artefact is the one **this version staged**, that its file name carries

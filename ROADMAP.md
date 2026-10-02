@@ -12,13 +12,13 @@ the milestone is closed and the tag is pushed.
 
 | Area | State |
 | --- | --- |
-| Version | `1.4.1`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
-| Size | ~23,000 lines: ~12,500 Rust, ~6,700 frontend (plain HTML/CSS/JS), ~1,700 frontend test lines and ~3,100 in `server/`, comments included |
-| Tests | 214 Rust tests, 202 frontend tests (`node --test`) and 86 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
+| Version | `2.0.0`. `src-tauri/tauri.conf.json` is authoritative; `scripts/version.ps1` keeps the five other locations in step and CI fails when one drifts |
+| Size | ~38,500 lines: ~21,000 Rust, ~11,200 frontend (plain HTML/CSS/JS), ~2,100 frontend test lines and ~4,200 in `server/`, comments included |
+| Tests | 338 Rust tests, 153 frontend tests (`node --test`) and 143 tests for `server/`; `cargo fmt`, `cargo clippy`, `cargo test` and the frontend suite run in CI on `windows-latest` |
 | Platform | Windows only, but no longer Windows-shaped: every OS-bound module sits in `src/platform/windows/` behind the neutral surface in `src/platform/mod.rs`, and any other target fails to compile with a message pointing at the layer |
 | Distribution | Three artefacts: the NSIS installer, an MSI package and a portable zip. Unsigned by default, with `scripts/release.ps1 -Sign` ready to sign and verify all three once a certificate or cloud signing credential exists; a self-update skeleton that stays inert until a signing key pair exists, optional start with Windows |
 | Backend | `server/` holds a translation proxy that keeps the provider credentials server side, so the app needs no key of its own; it runs on Cloudflare Workers and on Tencent Cloud SCF Web 函数, and one deployment is live. It speaks to an OpenAI-compatible model, to Baidu and to Youdao, and a request can name the one it wants |
-| Repository | MIT licensed, changelog and roadmap in place, every release from `v0.1.0` to `v1.2.0` tagged and published with its NSIS installer, and the staged installers kept in `release/vX.Y.Z/` |
+| Repository | MIT licensed, changelog and roadmap in place. Tagged and published through `v1.7.1` — the versions from `v1.7.2` onwards are staged in `release/vX.Y.Z/` and not published yet |
 
 No defect is carried into the plan below. The last one — API keys sitting in
 `%APPDATA%\com.glossy.translator\settings.json` as readable text — is fixed by the
@@ -215,18 +215,22 @@ impression.
 
 Estimated effort: 2–3 days.
 
-## v1.5.0 — Stability
+## v1.5.0 — Text from anywhere
 
-Goal: a tool that survives its own failures and can say what happened without asking
-anyone to trust it.
+Goal: a translation that does not have to start with the mouse. Three global shortcuts
+instead of one, a card that says what it was an answer to, and the two sources a selection
+cannot carry — a rectangle drawn over the screen, and a whole document.
 
 | Work item | Details | State |
 | --- | --- | --- |
-| Crash recovery | A failure in the hook or in the popup does not take the tray icon with it: the process keeps answering, and if it cannot, it writes the reason down before it goes | planned |
-| Error log | A rotating log next to `settings.json` holding the failures the app already prints, with a size cap and a button that opens the folder | planned |
-| Anonymous reporting | Optional, off by default, asked about on the first run, with the exact payload shown before it is sent and described in `PRIVACY.md` | planned |
+| Three global shortcuts | `Ctrl+Alt+C` translates, `Ctrl+Alt+G` brings the window to the front and `Ctrl+Alt+Q` starts a screen reading. Each one is recorded, each has its own identifier and its own line on the Shortcuts page, an empty field simply switches that one off, and a combination Windows refuses is reported without taking the others down | done — `platform/windows/hotkey.rs`, `Slot` |
+| The card shows the original | Both shapes of card — the word card and the sentence card — open with the grey original under the language row, and that text can be edited in place: `Ctrl+Enter` or leaving the field translates the correction, `Esc` puts the translated text back, and an empty or unchanged text costs nothing | done — `render.js` |
+| Reading text off the screen | The screen is captured behind an overlay, a rectangle is dragged over the text, Baidu OCR reads it on Glossy's own server, and the recognised text takes the ordinary popup path — the same card, the same allowances, the same history. `Esc`, a right click or an empty rectangle cancels without a request | done — `ocr.rs`, `platform/screen.rs`, `src/ocr.html` |
+| Document translation | A `.txt`, `.md`, `.srt`, `.pdf` or `.docx` file is translated a paragraph at a time, capped at 1500 characters per request, with progress, a cancel button and a save into the folder the page names — the `Desktop` unless another one is picked. Markdown keeps its code fences and headings and a subtitle file keeps its cue numbers and time codes, so the result lines up with the original. A PDF is read into the words of its pages locally and written out as text; a Word document keeps its styles, tables and pictures because the translation is written back into a copy of the same `.docx` | done — `document.rs`, `docx.rs`, `platform/windows/encoding.rs` |
+| The Glossy mark | The row that names the engine that answered ends with the translucent logo and the wordmark | done — `render.js` |
+| What did not change | A selection still costs nothing until the icon under it is clicked, and clicking anywhere else still makes the icon disappear. A shortcut is the opposite: it translates at once, because there is nothing left to click | done — the whole diff was written around this |
 
-Estimated effort: 2–4 days.
+Estimated effort: 6–8 days.
 
 ## v1.6.0 — Accessibility
 
@@ -235,12 +239,59 @@ theme.
 
 | Work item | Details | State |
 | --- | --- | --- |
-| Keyboard | Every control of both windows reachable and operable with Tab, Shift+Tab, Enter, Space and the arrow keys; the popup takes focus as its own window and gives it back when it closes | planned |
-| Focus order and labels | A focus order that follows the card top to bottom, `aria-label` on every icon-only button, and roles where the markup says nothing | planned |
-| High contrast | A theme built on the Windows high-contrast colours, selected through `prefers-contrast` rather than as another entry in the theme menu | planned |
-| A written pass | The keyboard and contrast passes added to the manual regression list in the README | planned |
+| Keyboard | Every control of both windows reachable and operable with Tab, Shift+Tab, Enter, Space and the arrow keys; the popup takes focus as its own window and gives it back when it closes | done — `popup.js` (`keyboardMenu`, the `:focus-visible` hand-over), `app.js` (`walkSidebar`, the confirm dialog's trap), `popup.rs` → `desktop::restore_focus_owner` |
+| Focus order and labels | A focus order that follows the card top to bottom, `aria-label` on every icon-only button, and roles where the markup says nothing | done — the card was built this way in v1.5.0; what v1.6.0 added is the keyboard reaching it, the icon-only buttons audited once more and the dialog and the menus given the roles their markup implies |
+| High contrast | A theme built on the Windows high-contrast colours, selected through `prefers-contrast` rather than as another entry in the theme menu | done — the `prefers-contrast` block in `tokens.css` maps every semantic token onto the system colours, the two surface sheets lift the opacity a contrast theme cannot read through, and `theme.js` stops a custom accent from overriding the system highlight while one is on |
+| A written pass | The keyboard and contrast passes added to the manual regression list in the README | done — items 33–35 |
 
 Estimated effort: 2–4 days.
+
+## v1.7.0 — Stability
+
+Goal: a tool that survives its own failures and can say what happened without asking
+anyone to trust it. These three items were planned as v1.5.0 and moved behind the
+OCR and document work.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Crash recovery | A failure in the hook or in the popup does not take the tray icon with it: the process keeps answering, and if it cannot, it writes the reason down before it goes | done, in `src-tauri/src/log.rs` and the guards in `input_hook.rs` / `selection.rs` |
+| Error log | A rotating log next to `settings.json` holding the failures the app already prints, with a size cap and a button that opens the folder | done, `glossy.log` (256 KB, rotated to `glossy.log.1`) shown under **Files and logs** |
+| Anonymous reporting | Optional, off by default, asked about on the first run, with the exact payload shown before it is sent and described in `PRIVACY.md` | not built, on purpose: `Export…` writes the log to Documents and `Copy` puts it on the clipboard, so whoever is asked for one gets it without anything leaving the machine — nothing is sent, so there is no payload to show and no new promise to write down |
+
+Estimated effort: 2–4 days.
+
+## v1.8.0 — Subtitles
+
+Goal: the second thing that needs no selection — a region of the screen read again and again,
+with its translation drawn where the user wants it. It is a feature that looks at the screen on
+its own, so it ships behind a switch rather than in the way of everyone else.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| Pick the two rectangles | The area the subtitles are in and the place the translation is drawn, both with the overlay the screenshot translation already has, which is told which of the two it is asking for | done — `ocr.rs` (`Pick`, `begin_pick`), `subtitle.rs` (`area_picked`) |
+| Read it again and again | One region, one recognition language, a tick every 700 ms, and a translation only when what was read changed | done — `subtitle.rs` (`read_forever`, `read_once`, `TICK`, `MIN_CHARS`), `ocr.rs` (`subtitle_pack`, `recognize_one`) |
+| Draw it where the box was | A window exactly over the second rectangle: transparent, always on top, no frame, and taking neither the mouse nor the keyboard, so a subtitle is never in the way of the video | done — `subtitle.html`, `styles/subtitle.css`, `js/subtitle.js` (`fit`), `subtitle.rs` (`place_window`), the `subtitle` window in `tauri.conf.json` |
+| Show the boxes, and move them | A faint dashed frame around both rectangles, neither of them taking a click, and an editor window that draws both over the video so they can be dragged and resized — from the page, or from the tray menu while the reading runs | done — `subtitle-area.html`, `styles/subtitle-frame.css`, `subtitle-edit.html`, `js/subtitle-edit.js`, `subtitle.rs` (`frames`, `begin_edit`, `edit_apply`, `CssBox`), `tray.rs` (`MENU_BOXES`) |
+| One recognition language | A pack of its own rather than the checked list, because the region is read every second and a subtitle is written in one language | done — `Settings::subtitle_pack`, `ocr::subtitle_pack`, the picker on the page |
+| Developer mode | The switch that reveals the page, turned on by typing a key on the **Updates** page; the key is compared in the process, and everything the mode hides is gone when it is off | done — `lib.rs` (`DEVELOPER_KEY`, `developer_unlock`, `developer_lock`), `Settings::developer_mode`, `app.js` (`applyDeveloperMode`) |
+
+Estimated effort: 3–5 days.
+
+## v1.8.3 — The fourth channel
+
+Goal: translating with no connection at all, by a model that runs on this machine — and
+only for the pair the reader actually needs, because a model that covers every language
+would be hundreds of megabytes for something the cloud does better.
+
+| Work item | Details | State |
+| --- | --- | --- |
+| One pack per direction | OPUS-MT's `opus-mt-en-zh` and `opus-mt-zh-en`, the int8 ONNX exports, each about 114 MB and downloaded on its own: a direction is a whole translator, so one way round never waits for the other. Apache-2.0 and CC-BY-4.0 respectively, named file by file in `THIRD_PARTY_NOTICES.md` | done — `offline.rs` (`PAIRS`, `RUNTIME`), the Resources page rows |
+| The ids the graphs expect | A Marian model reads ids, not text, and the joint 65,001-piece table is not the 32,000-piece `source.spm`/`target.spm` that sit beside it — those ids would look up the wrong rows of the embedding. The merged table is read from `tokenizer.json`, and the most likely reading of the text is computed here rather than taken from a tokenizer crate | done — `offline.rs` (`Vocabulary`, `mark`, `tidy`) |
+| A channel of its own | `offline` is the fourth entry of the translation service menu and is **not** in the fallback order: it is a choice the reader makes, not a substitution the app makes for them. The language bars narrow to the pair the installed packs translate | done — `settings.rs` (`Service::Offline`), `translate/languages.rs`, `app.js` (`SERVICES`) |
+| Downloaded where every other pack is | The same verified download the recognition engine uses: the digest of each file is checked before it is written, progress is published as it goes, and the rows can be removed one at a time | done — `offline.rs` (`install`, `remove`, `EVENT`) |
+| A sentence in about a second | Greedy decoding with the whole translation handed back at every step rather than a key/value cache: more arithmetic, but it does not depend on how a given export names its cache inputs | done — `offline.rs` (`Model::run`, `MAX_OUTPUT`) |
+
+Estimated effort: 2–3 days.
 
 ## v2.0.0 — The written promises
 
@@ -249,9 +300,10 @@ trusting it.
 
 | Work item | Details | State |
 | --- | --- | --- |
-| FAQ | The questions the README answers in passing, gathered in one place: why a selection needs a click, what is sent where, what happens when a provider quota runs out | planned |
-| Provider quotas and terms | A page per service: what is free, what it forbids, and what the app does when it is exhausted — the research is already in the README, and this is the part a user reads | planned |
-| Compatibility statement | What `2.x` reads (any settings file from `1.3.0` onwards), what it will not change (the contract), and what a future major release is allowed to break | planned |
+| FAQ | The questions the README answers in passing, gathered in one place: why a selection needs a click, what is sent where, what happens when a provider quota runs out | done — [`FAQ.md`](./FAQ.md) |
+| Provider quotas and terms | A page per service: what is free, what it forbids, and what the app does when it is exhausted — the research is already in the README, and this is the part a user reads | done — [`PROVIDERS.md`](./PROVIDERS.md) |
+| Compatibility statement | What `2.x` reads (any settings file from `1.3.0` onwards), what it will not change (the contract), and what a future major release is allowed to break | done — [`COMPATIBILITY.md`](./COMPATIBILITY.md) |
+| The contract break itself | The four fields naming the translation service — `channel`, `cloudProvider`, `cloudVendor`, `provider` — folded into one `service`; the address of the relay and the credential map dropped, along with the mode that took a key of the user's own, which no service in this build offers. `FORMAT_VERSION` moves to `2` and `migrate` carries every file from `1.3.0` onwards across | done — `settings.rs` (`FORMAT_VERSION`, `Service::from_legacy`, the `from < 2` step), `contract/contract.json`; the DPAPI module is gone with the keys it protected |
 
 Estimated effort: 1–2 days.
 
@@ -274,7 +326,7 @@ rather than investing in it early.
 | Antivirus flags the low-level mouse hook | Installs and runs get blocked | The README's note on the hook says what it does and why it is needed; `scripts/release.ps1 -Sign` is the mitigation and only waits for a certificate, since code signing is what actually removes the warning |
 | The portable zip is assembled outside Tauri | Tauri has no zip target, so the archive is packed by script, and an archive that loses `WebView2Loader.dll` unpacks into an app that cannot start | `scripts/release.ps1` stages the release binary and the loader together, puts both at the archive root, and checksums the archive next to the installers |
 | macOS and Linux permission models | The port costs more than expected | The contract is in place: a non-Windows target fails to compile and names the layer, so the port starts from one file. X11 first, Wayland explicitly unsupported |
-| Credential leakage | A readable API key on disk | Fixed for v0.2.0: keys are encrypted with DPAPI and unreadable outside the Windows login that entered them |
+| Credential leakage | A readable API key on disk | Not possible any more, and the storage that guarded against it went with it: the mode that took a key of the user's own was removed in `2.0.0`, because no service this build offers asks for one. A key left in an old settings file is dropped — unused, unsent — the next time the settings are saved |
 | Hand-built releases | Installers cannot be reproduced | Version check, format, lints and tests run in CI since v0.1.1; the installer, the MSI and the portable zip are built by `scripts/release.ps1`, which fails rather than staging an incomplete set, and pushing a release tag now builds and publishes them on a runner through `.github/workflows/release.yml`, so the artefacts stop depending on this machine |
 
 ## Release process
@@ -287,12 +339,12 @@ rather than investing in it early.
    the MSI and the portable zip, and stages all three in `release/vX.Y.Z/` with
    `SHA256SUMS.txt` and the text for the release description. It stops if a build was
    asked for a bundle target and produced none, and it verifies that the portable archive
-   carries the loader the binary needs. The notes it writes are trilingual: English from
-   `CHANGELOG.md`, then the same text translated into Chinese and Spanish, each behind
-   an anchor (`<a id="en">`, `<a id="zh-cn">`, `<a id="es">`) that the links at the top
-   jump to, so one file serves all three languages. A freshly generated file still
-   holds the translations as placeholders and the script warns about them; the two
-   translations are written by hand (Google Translate is fine as the starting point)
+   carries the loader the binary needs. The notes it writes are bilingual: English from
+   `CHANGELOG.md`, then the same text translated into Chinese, each behind
+   an anchor (`<a id="en">`, `<a id="zh-cn">`) that the links at the top
+   jump to, so one file serves both languages. A freshly generated file still
+   holds the translation as a placeholder and the script warns about it; the
+   translation is written by hand (Google Translate is fine as the starting point)
    before the release goes out.
    Adding `-Sign` signs the binary and both installers and verifies every staged
    artefact before writing the checksums. The credentials come from the environment,
@@ -312,7 +364,7 @@ rather than investing in it early.
    points at the wrong commit is caught instead of published.
 5. What the published release has to look like, whether CI or this machine built it: titled
    `Glossy X.Y.Z` — the tag carries the `v`, the title does not — with
-   `release/vX.Y.Z/RELEASE_NOTES.md` as the description, all three languages, anchors
+   `release/vX.Y.Z/RELEASE_NOTES.md` as the description, both languages, anchors
    included, and the installer, the MSI, the portable zip and `SHA256SUMS.txt` attached.
    Check that each artefact is the one this version staged, that its name carries the
    version, and that `SHA256SUMS.txt` lists it, and say in the description which download
@@ -327,10 +379,10 @@ rather than investing in it early.
 
 - Browser extensions and mobile apps. Glossy is a desktop utility, and the selection
   capture it relies on has no equivalent there.
-- OCR and screenshot translation. It shares the popup, but not the input path, and it
-  would double the surface area.
-- Bundling translation engines or models locally. It conflicts with the "lightweight"
-  goal; users who need it can point a provider at their own endpoint.
+- Bundling a *general* translation engine. One model per language pair is a pack the
+  user downloads when they want it (see v1.8.3); a model that translates every language
+  is hundreds of megabytes for something the cloud does better, which is the
+  "lightweight" goal this project is not willing to spend.
 
 <a id="zh-cn"></a>
 
@@ -343,13 +395,13 @@ rather than investing in it early.
 
 | 方面 | 状态 |
 | --- | --- |
-| 版本 | `1.4.1`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
-| 规模 | 约 23,000 行：Rust 约 12,500 行，前端约 6,700 行（纯 HTML/CSS/JS），前端测试约 1,700 行，`server/` 约 3,100 行，含注释 |
-| 测试 | Rust 214 个测试、前端 202 个测试（`node --test`）、`server/` 86 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
+| 版本 | `2.0.0`。以 `src-tauri/tauri.conf.json` 为准；`scripts/version.ps1` 让其余五个位置保持一致，任何一处走样 CI 都会失败 |
+| 规模 | 约 38,500 行：Rust 约 21,000 行，前端约 11,200 行（纯 HTML/CSS/JS），前端测试约 2,100 行，`server/` 约 4,200 行，含注释 |
+| 测试 | Rust 338 个测试、前端 153 个测试（`node --test`）、`server/` 143 个测试；CI 在 `windows-latest` 上跑 `cargo fmt`、`cargo clippy`、`cargo test` 和前端测试 |
 | 平台 | 仅 Windows，但不再是 Windows 的形状：所有与操作系统绑定的模块都放在 `src/platform/windows/`，由 `src/platform/mod.rs` 提供的中立接口隔开，其他目标会直接编译失败并提示去看这一层 |
 | 分发 | 三种产物：NSIS 安装包、MSI 包和便携 zip。默认不签名，但证书或云签名凭据一到位，`scripts/release.ps1 -Sign` 就能为三者签名并逐一校验；自更新框架在签名密钥对就位之前保持静默；可选开机自启 |
 | 后端 | `server/` 是一个翻译代理，把服务商凭据留在服务端，所以 app 自己不需要任何密钥；可跑在 Cloudflare Workers 和腾讯云 SCF Web 函数上，已有一处在线部署。它对接 OpenAI 兼容模型、百度和有道，请求里可以点名要用哪一个 |
-| 仓库 | MIT 许可，CHANGELOG 和路线图齐备，从 `v0.1.0` 到 `v1.2.4` 的每个版本都已打标签并连同 NSIS 安装包发布，暂存的安装包保存在 `release/vX.Y.Z/` |
+| 仓库 | MIT 许可，CHANGELOG 和路线图齐备。已打标签并发布到 `v1.7.1`；`v1.7.2` 起的版本都暂存在 `release/vX.Y.Z/`，尚未发布 |
 
 下面的计划里没有遗留缺陷。最后一个 —— API 密钥以明文躺在
 `%APPDATA%\com.glossy.translator\settings.json` 里 —— 由 v0.2.0 的第一项修复，
@@ -533,17 +585,20 @@ rather than investing in it early.
 
 预计工作量：2–3 天。
 
-## v1.5.0 —— 稳定性
+## v1.5.0 —— 文本从各处进来
 
-目标：一个能扛住自身故障的工具，并且不需要任何人「相信它」，自己就能说清发生了什么。
+目标：一次翻译不必再从鼠标开始。三个全局快捷键取代一个，卡片说清自己翻译的是什么，以及选区带不动的两种来源——屏幕上框出的一块，和一整份文档。
 
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
-| 崩溃恢复 | 钩子或弹窗里的失败不该把托盘图标一起带走：进程继续应答；实在不行，也要在退出前把原因写下来 | 计划中 |
-| 错误日志 | 在 `settings.json` 旁边写一份滚动日志，收录应用原本就打印的失败信息，带大小上限，以及一个打开所在文件夹的按钮 | 计划中 |
-| 匿名上报 | 可选、默认关闭、首次运行时询问；发送前展示将要发出的确切内容，并在 `PRIVACY.md` 里说明 | 计划中 |
+| 三个全局快捷键 | `Ctrl+Alt+C` 翻译、`Ctrl+Alt+G` 把窗口切到最前、`Ctrl+Alt+Q` 开始一次屏幕取字。三个都要录制，各有各的标识符、各有各的一行提示；字段留空就等于关掉这一个，某个组合被 Windows 拒绝也不会牵连另外两个 | 完成 —— `platform/windows/hotkey.rs` 的 `Slot` |
+| 卡片显示原文 | 两种卡片——单词卡和句子卡——都在语言栏下方以灰色显示原文，且这段文字可以就地编辑：`Ctrl+Enter` 或离开字段即翻译改过的文字，`Esc` 把译文的那段原文放回去，空文本或没改动的文本不产生任何请求 | 完成 —— `render.js` |
+| 读取屏幕文字 | 在遮罩之后截取整块屏幕，框选要识别的文字，由 Glossy 自己的服务器调用百度 OCR，识别结果走上普通的弹窗流程——同一张卡片、同一套额度、同一份历史。`Esc`、右键或空选区都会取消，并且不发出请求 | 完成 —— `ocr.rs`、`platform/screen.rs`、`src/ocr.html` |
+| 文档翻译 | `.txt`、`.md`、`.srt`、`.pdf`、`.docx` 按段落逐段翻译，单次请求上限 1500 字符，带进度、取消按钮，并保存到页面上写的那个文件夹（默认是桌面）。Markdown 保留代码块与标题，字幕文件保留序号与时间轴，因此译文与原文逐行对得上。PDF 在本地取出页面文字后按文本写出；Word 文档因为译文是写回同一份 `.docx` 的副本，样式、表格和图片都保持不变 | 完成 —— `document.rs`、`docx.rs`、`platform/windows/encoding.rs` |
+| Glossy 标识 | 写明由哪个引擎作答的那一行，末尾是半透明的 logo 与字标 | 完成 —— `render.js` |
+| 没有改变的部分 | 划选文字在点击图标前依然不产生任何开销，点击别处图标依然消失。快捷键正相反：按下即翻译，因为已经没有东西可点了 | 完成 —— 整个改动都是围绕这一点写的 |
 
-预计工作量：2–4 天。
+预计工作量：6–8 天。
 
 ## v1.6.0 —— 无障碍
 
@@ -551,12 +606,55 @@ rather than investing in it early.
 
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
-| 键盘 | 两个窗口的每个控件都能用 Tab、Shift+Tab、Enter、空格和方向键到达并操作；弹窗以自身窗口的身份获取焦点，关闭时把焦点还回去 | 计划中 |
-| 焦点顺序与标签 | 焦点顺序沿卡片自上而下；每个只有图标的按钮都带 `aria-label`；结构本身说明不了的地方补上 role | 计划中 |
-| 高对比 | 一套建立在 Windows 高对比配色上的主题，通过 `prefers-contrast` 选取，而不是在主题菜单里再加一项 | 计划中 |
-| 写成清单 | 键盘与对比度的梳理结果补进 README 的手工回归清单 | 计划中 |
+| 键盘 | 两个窗口的每个控件都能用 Tab、Shift+Tab、Enter、空格和方向键到达并操作；弹窗以自身窗口的身份获取焦点，关闭时把焦点还回去 | 完成 —— `popup.js`（`keyboardMenu`、`:focus-visible` 的索取前台）、`app.js`（`walkSidebar`、确认框的焦点圈定）、`popup.rs` → `desktop::restore_focus_owner` |
+| 焦点顺序与标签 | 焦点顺序沿卡片自上而下；每个只有图标的按钮都带 `aria-label`；结构本身说明不了的地方补上 role | 完成 —— 卡片在 v1.5.0 就是这么搭的；v1.6.0 补上的是键盘真的能走到它、又核了一遍只有图标的按钮，并给确认框和菜单补上它们结构所隐含的 role |
+| 高对比 | 一套建立在 Windows 高对比配色上的主题，通过 `prefers-contrast` 选取，而不是在主题菜单里再加一项 | 完成 —— `tokens.css` 里的 `prefers-contrast` 段落把每个语义 token 映射到系统颜色，两个界面样式表把高对比下读不了的透明度抬回来，`theme.js` 在高对比开启时不再让自定义强调色盖掉系统高亮色 |
+| 写成清单 | 键盘与对比度的梳理结果补进 README 的手工回归清单 | 完成 —— 第 33–35 条 |
 
 预计工作量：2–4 天。
+
+## v1.7.0 —— 稳定性
+
+目标：一个能扛住自身故障的工具，并且不需要任何人「相信它」，自己就能说清发生了什么。这三项原本排在 v1.5.0，现在挪到 OCR 与文档翻译之后。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 崩溃恢复 | 钩子或弹窗里的失败不该把托盘图标一起带走：进程继续应答；实在不行，也要在退出前把原因写下来 | 已完成，见 `src-tauri/src/log.rs`，以及 `input_hook.rs` / `selection.rs` 里的保护 |
+| 错误日志 | 在 `settings.json` 旁边写一份滚动日志，收录应用原本就打印的失败信息，带大小上限，以及一个打开所在文件夹的按钮 | 已完成，`glossy.log`（上限 256 KB，写满后轮换为 `glossy.log.1`），可在**文件与日志**里查看 |
+| 匿名上报 | 可选、默认关闭、首次运行时询问；发送前展示将要发出的确切内容，并在 `PRIVACY.md` 里说明 | 有意不做：`导出…` 会把日志写到「文档」，`复制` 会把它放进剪贴板，被问到日志的人由此就能拿到，而任何东西都不必离开这台机器——既然不发送，就没有需要展示的内容，也没有新的承诺要写下来 |
+
+预计工作量：2–4 天。
+
+## v1.8.0 —— 字幕
+
+目标：第二个不需要选中文字的功能 —— 一块屏幕区域被反复读取，译文画在用户指定的位置。
+这是一个会自己盯着屏幕看的功能，所以它藏在一个开关后面，而不是挡在所有人面前。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 框选两个矩形 | 字幕所在的区域，以及译文要画在哪里，都用截图翻译已有的那个遮罩来框，遮罩会被告知这次要的是哪一个 | 已完成 —— `ocr.rs`（`Pick`、`begin_pick`），`subtitle.rs`（`area_picked`） |
+| 反复读取 | 一块区域、一种识别语言、每 700 毫秒一次，并且只在读到的内容变化时才翻译 | 已完成 —— `subtitle.rs`（`read_forever`、`read_once`、`TICK`、`MIN_CHARS`），`ocr.rs`（`subtitle_pack`、`recognize_one`） |
+| 画在框选处 | 一个正好盖住第二个矩形的窗口：透明、置顶、无边框，并且不吃鼠标也不吃键盘，所以字幕永远不会挡住视频 | 已完成 —— `subtitle.html`、`styles/subtitle.css`、`js/subtitle.js`（`fit`）、`subtitle.rs`（`place_window`）、`tauri.conf.json` 里的 `subtitle` 窗口 |
+| 显示方框并移动它们 | 两个矩形各带一圈很淡的虚线，都不会吃掉点击；另有一个编辑器窗口把它们画在画面上，可以拖动和改大小——识别期间从托盘菜单也能进 | 已完成 —— `subtitle-area.html`、`styles/subtitle-frame.css`、`subtitle-edit.html`、`js/subtitle-edit.js`、`subtitle.rs`（`frames`、`begin_edit`、`edit_apply`、`CssBox`）、`tray.rs`（`MENU_BOXES`） |
+| 只用一种识别语言 | 它是独立的语言包而不是资源页上勾选的那一份，因为这块区域每秒都要读一次，而字幕只会用一种语言书写 | 已完成 —— `Settings::subtitle_pack`、`ocr::subtitle_pack`、页面上的选择框 |
+| 开发者模式 | 在**更新**页输入密钥即可显示这一页的开关；密钥在应用进程里比对，关掉后这个模式隐藏的东西全部消失 | 已完成 —— `lib.rs`（`DEVELOPER_KEY`、`developer_unlock`、`developer_lock`）、`Settings::developer_mode`、`app.js`（`applyDeveloperMode`） |
+
+预计工作量：3–5 天。
+
+## v1.8.3 —— 第四种渠道
+
+目标：完全不联网也能翻译，靠跑在这台机器上的模型——而且只为读者真正需要的那个语言方向
+准备模型，因为一个能翻所有语言的模型动辄几百 MB，而云端在这些语言上做得更好。
+
+| 工作项 | 细节 | 状态 |
+| --- | --- | --- |
+| 每个方向一个包 | OPUS-MT 的 `opus-mt-en-zh` 与 `opus-mt-zh-en`，即 int8 ONNX 导出，各约 114 MB，各下各的：一个方向本身就是一台完整的翻译器，所以选一个方向不必等另一个下完。许可分别为 Apache-2.0 与 CC-BY-4.0，`THIRD_PARTY_NOTICES.md` 里按文件逐一列出 | 完成 —— `offline.rs`（`PAIRS`、`RUNTIME`）、资源页的两行 |
+| 用图真正期待的 id | Marian 模型读的是 id 而不是文本，而那份 65,001 项的**合并**词表并不是旁边那两个 32,000 项的 `source.spm`/`target.spm`——用它们的 id 会查到嵌入矩阵里错误的行。合并词表从 `tokenizer.json` 读入，最可能的切分方式在这里自己算，而不是引入分词库 | 完成 —— `offline.rs`（`Vocabulary`、`mark`、`tidy`） |
+| 独立成一种渠道 | `offline` 是翻译服务菜单里的第四项，且**不进**兜底顺序：它是读者主动做的选择，不是 App 替他做的替换。语言栏收窄到已安装的包能翻的那个方向 | 完成 —— `settings.rs`（`Service::Offline`）、`translate/languages.rs`、`app.js`（`SERVICES`） |
+| 和别的包一样下载 | 与识别引擎同一套带校验的下载：每个文件写入前先核对摘要，下载进度随时发布，两行可以分别删除 | 完成 —— `offline.rs`（`install`、`remove`、`EVENT`） |
+| 一句话约一秒 | 贪心解码，每一步都把已生成的整段交回模型，而不用键值缓存：算得更多，但不依赖某个导出如何命名它的缓存输入 | 完成 —— `offline.rs`（`Model::run`、`MAX_OUTPUT`） |
+
+预计工作量：2–3 天。
 
 ## v2.0.0 —— 写下来的承诺
 
@@ -564,9 +662,10 @@ rather than investing in it early.
 
 | 工作项 | 细节 | 状态 |
 | --- | --- | --- |
-| FAQ | 把 README 里顺带回答过的问题收拢到一处：为什么选中之后还要点一下、会往哪里发送什么、服务商额度用尽时会怎样 | 计划中 |
-| 服务商配额与条款 | 每个服务一页：哪些是免费的、禁止什么、额度耗尽时应用怎么做 —— 调研其实已经在 README 里，这一项是写给用户看的那一版 | 计划中 |
-| 兼容性声明 | `2.x` 读得懂什么（`1.3.0` 及以后的任何设置文件）、不会改什么（那份契约），以及将来某个大版本被允许打破什么 | 计划中 |
+| FAQ | 把 README 里顺带回答过的问题收拢到一处：为什么选中之后还要点一下、会往哪里发送什么、服务商额度用尽时会怎样 | 已完成 —— [`FAQ.md`](./FAQ.md) |
+| 服务商配额与条款 | 每个服务一页：哪些是免费的、禁止什么、额度耗尽时应用怎么做 —— 调研其实已经在 README 里，这一项是写给用户看的那一版 | 已完成 —— [`PROVIDERS.md`](./PROVIDERS.md) |
+| 兼容性声明 | `2.x` 读得懂什么（`1.3.0` 及以后的任何设置文件）、不会改什么（那份契约），以及将来某个大版本被允许打破什么 | 已完成 —— [`COMPATIBILITY.md`](./COMPATIBILITY.md) |
+| 契约打破本身 | 命名翻译服务的四个字段——`channel`、`cloudProvider`、`cloudVendor`、`provider`——合并为一个 `service`；中转地址与凭据映射被删除，连同"自带密钥"这一模式一起消失，因为本构建提供的服务都不需要密钥。`FORMAT_VERSION` 升到 `2`，`migrate` 把 `1.3.0` 及以后的每个文件都带过来 | 已完成 —— `settings.rs`（`FORMAT_VERSION`、`Service::from_legacy`、`from < 2` 这一步）、`contract/contract.json`；DPAPI 模块随它保护的密钥一起删除 |
 
 预计工作量：1–2 天。
 
@@ -587,7 +686,7 @@ v1.2.0 的剩余部分**。
 | 杀毒软件拦截底层鼠标钩子 | 安装与运行被阻止 | README 里关于钩子的那节说明了它做什么、为什么需要；而真正能消掉警告的代码签名现在只差一张证书，落地入口是 `scripts/release.ps1 -Sign` |
 | 便携 zip 由 Tauri 之外拼装 | Tauri 没有 zip 目标，压缩包由脚本打包；一旦丢掉 `WebView2Loader.dll`，解压出来就是一个起不来的应用 | `scripts/release.ps1` 把发布二进制和这个 DLL 一起暂存、都放在压缩包根目录，并把该压缩包与安装包一起算校验和 |
 | macOS 与 Linux 的权限模型 | 移植成本超出预期 | 约定已经就位：非 Windows 目标会编译失败并点名那一层，移植只需从一个文件开始。先 X11，明确不支持 Wayland |
-| 凭据泄露 | 磁盘上有可读的 API 密钥 | v0.2.0 已修复：密钥用 DPAPI 加密，在输入它们的 Windows 登录之外不可读 |
+| 凭据泄露 | 磁盘上有可读的 API 密钥 | 已经不可能发生，而防它的那套存储方式也随之一并消失：`2.0.0` 删掉了"自带密钥"这一模式，因为本构建提供的服务都不需要密钥。旧设置文件里残留的密钥会在下次保存设置时被丢弃——不会被使用，也不会被发送 |
 | 手工构建的发布 | 安装包无法复现 | 自 v0.1.1 起版本检查、格式、lint 和测试都在 CI 里跑；安装包、MSI 与便携 zip 由 `scripts/release.ps1` 构建，产物不全时它会直接失败，而现在推送发布标签就会由 `.github/workflows/release.yml` 在 runner 上构建并发布，产物不再依赖这台机器 |
 
 ## 发布流程
@@ -631,7 +730,6 @@ v1.2.0 的剩余部分**。
 
 - 浏览器扩展和移动端 app。Glossy 是桌面工具，它依赖的选区捕捉在那些平台上没有对应
   能力。
-- OCR 与截图翻译。它们与弹窗共用同一套展示，但输入路径完全不同，而且会让接触面翻
-  一倍。
-- 在本地捆绑翻译引擎或模型。这与“轻量”的目标冲突；有需要的用户可以把自己的服务商
-  指向自建端点。
+- 捆绑**通用**翻译引擎。按语言方向打包、用户想要时自己下载的包不在此列（见 v1.8.3）；
+  一个能翻所有语言的模型动辄几百 MB，而云端在这些语言上做得更好，这正是本项目不愿
+  为之付出的"轻量"代价。

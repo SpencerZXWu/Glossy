@@ -42,10 +42,10 @@ sentence the word came from, and a pronunciation button) or a smooth sentence or
 paragraph translation, with the original and the translation paired sentence by
 sentence when the two do not divide the same way. The popup is a non-activating,
 always-on-top window: it never takes the keyboard focus from the application being
-read, it is kept inside the work area of the monitor the cursor is on, and it
-flips above the cursor when there is no room below. Select-and-read in any
-application is the part a browser extension or a dictionary website cannot
-truthfully copy.
+read unless the reader asks for it, it is kept inside the work area of the monitor
+the cursor is on, and it flips above the cursor when there is no room below.
+Select-and-read in any application is the part a browser extension or a dictionary
+website cannot truthfully copy.
 
 ## Operating Context
 
@@ -73,22 +73,27 @@ truthfully copy.
   short it is.
 - The interface of the settings window and the popup is maintained in English and
   简体中文 (`src/js/i18n.js` holds exactly those two tables). The documentation is
-  trilingual (English, 简体中文, Español), so Español is a documentation language
-  today, not an interface language. Adding a third interface language also means
-  extending `LANGUAGE_NAMES`, which currently only covers English and Chinese.
+  bilingual in the same two languages, so a third one — interface or documentation —
+  means extending both the tables and every user-facing document. Adding a third
+  interface language also means extending `LANGUAGE_NAMES`, which currently only
+  covers English and Chinese.
 
 ## Capabilities and Constraints
 
-- Three translation channels, every one of them usable without an account of the
-  user's own: `google` (a public endpoint) and two server-backed entries named
-  after the engine they translate with — **Baidu Translate** and **Youdao
-  Translate**.
+- Four translation services, every one of them usable without an account of the
+  user's own: `google` (a public endpoint), two server-backed entries named after
+  the engine they translate with — **Baidu Translate** and **Youdao Translate** —
+  and `offline`, the models that run on this machine.
 - The two server-backed entries are presented beside Google as ordinary
-  translation channels. The deployment that answers them is never named or shown
+  translation services. The deployment that answers them is never named or shown
   in the interface, and no deployment address appears anywhere in the product. A
   user never holds a vendor key: the app sends the text plus an install id, the
   credentials stay on the deployment, and it meters a daily allowance per device,
   per address and in total.
+- There is no field anywhere for a key of the user's own, in the app or in the
+  settings file. `2.0.0` removed the mode that took one, together with the stored
+  credential map, and the settings file stores the chosen service as one
+  `service` value.
 - The provider falls back to another engine when the chosen one cannot answer;
   the order is configurable.
 - Word cards are enriched for single words: phonetics and definitions come from
@@ -114,14 +119,14 @@ truthfully copy.
 - The name **Glossy**; the icon at `assets/icon.png` and the in-app logo at
   `src/images/logo.png`.
 - MIT licensed, © 2026 Spencer Wu.
-- Documentation is trilingual (English, 简体中文, Español) and that coverage is
+- Documentation is bilingual (English, 简体中文) and that coverage is
   expected to continue.
 - There is no account and no login, and no key for the user to fill in.
 - The Windows downloads are published unsigned, together with a checksum.
 
 ## Evidence on Hand
 
-- `README.md` — the trilingual user guide: install, usage, settings tables,
+- `README.md` — the bilingual user guide: install, usage, settings tables,
   providers and quotas, troubleshooting, how the selection is captured, layout,
   development and the manual regression checklist.
 - `ROADMAP.md` and `CHANGELOG.md` — delivered work and planned work, per version.
@@ -135,8 +140,12 @@ truthfully copy.
 
 1. The gesture lives where the reading happens — any Windows application, never
    only the browser.
-2. Reading is never interrupted: the popup does not take the keyboard focus, it
-   appears under the cursor, and a click outside dismisses it.
+2. Reading is never interrupted: the popup does not take the keyboard focus until the
+   reader asks it to — the caret going into its grey original, or a Tab once it holds the
+   keyboard — it appears under the cursor, a click outside dismisses it, and closing it
+   hands the keyboard back to the application the selection came from. Both windows can be
+   worked with the keyboard alone, and a Windows contrast theme is followed rather than
+   painted over.
 3. Answer the whole question the reader has about the selection — a word deserves
    a card, a paragraph deserves a smooth translation.
 4. Nothing to set up: no account, no login, no key.
@@ -147,6 +156,6 @@ truthfully copy.
 No product-specific accessibility standard has been agreed. The roadmap still
 carries an unfinished "Icons, motion and accessibility" item, so this is an open
 area rather than a settled requirement. What the product already owes its
-audience: trilingual interface and documentation, correct CJK and Latin
+audience: a bilingual interface and documentation, correct CJK and Latin
 typography side by side in the same card, and a reading surface that does not
 depend on a second, focused window being available.
