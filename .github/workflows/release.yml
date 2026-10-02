@@ -152,7 +152,7 @@ jobs:
             throw "$notes is missing; the release description would be empty."
           }
           if (Select-String -LiteralPath $notes -SimpleMatch 'TODO: translate' -Quiet) {
-            throw 'RELEASE_NOTES.md still has an untranslated section; all three languages have to be filled in before publishing.'
+            throw 'RELEASE_NOTES.md still has an untranslated section; both languages have to be filled in before publishing.'
           }
 
           $assets = @(Get-ChildItem -LiteralPath $stage -File |

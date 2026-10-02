@@ -114,6 +114,11 @@ class FakeNode {
     return handlers.length;
   }
 
+  /** The caret leaves the element, which is what the real one reports. */
+  blur() {
+    this.dispatch("blur", { type: "blur" });
+  }
+
   hasAttribute(attribute) {
     return Object.prototype.hasOwnProperty.call(this.dataset, datasetKey(attribute));
   }

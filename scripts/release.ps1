@@ -11,10 +11,10 @@
     number out of src-tauri/tauri.conf.json and refuses to continue when
     package.json, package-lock.json, Cargo.toml or Cargo.lock disagree.
 
-    RELEASE_NOTES.md is written in three languages behind anchors - English, Chinese
-    and Spanish - so the release description can be read without leaving the page and
+    RELEASE_NOTES.md is written in two languages behind anchors - English and
+    Chinese - so the release description can be read without leaving the page and
     switched with the links at the top. The English section comes from the matching
-    section of CHANGELOG.md, which stays English; the other two are filled in by hand
+    section of CHANGELOG.md, which stays English; the Chinese one is filled in by hand
     and a placeholder left behind is called out before the release is published.
 
     An existing RELEASE_NOTES.md is never overwritten without -ForceNotes.
@@ -66,7 +66,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Windows PowerShell 5.1 decodes a BOM-less script as ANSI, which would silently turn
-# the Chinese and Spanish labels in New-NotesScaffold into mojibake inside the notes.
+# the Chinese labels in New-NotesScaffold into mojibake inside the notes.
 $self = [IO.File]::ReadAllBytes($MyInvocation.MyCommand.Path)
 if ($self.Length -lt 3 -or $self[0] -ne 0xEF -or $self[1] -ne 0xBB -or $self[2] -ne 0xBF) {
     throw 'scripts\release.ps1 has to stay saved as UTF-8 with a BOM; re-save it that way.'
@@ -98,15 +98,15 @@ function Get-ChangelogSection {
 
 function New-NotesScaffold {
     <#
-        Builds the trilingual skeleton: a switcher line, then every language behind
+        Builds the bilingual skeleton: a switcher line, then every language behind
         its own anchor, in reading order. The English body comes from CHANGELOG.md;
-        the translations are left as placeholders that release.ps1 reports.
+        the translation is left as a placeholder that release.ps1 reports.
     #>
     param([string]$Section)
 
     $todo = '<!-- TODO: translate the English section above, then delete this comment. -->'
     $parts = @(
-        '[English](#en) · [中文](#zh-cn) · [Español](#es)',
+        '[English](#en) · [中文](#zh-cn)',
         '',
         '<a id="en"></a>',
         '',
@@ -117,12 +117,6 @@ function New-NotesScaffold {
         '<a id="zh-cn"></a>',
         '',
         '## 中文',
-        '',
-        $todo,
-        '',
-        '<a id="es"></a>',
-        '',
-        '## Español',
         '',
         $todo,
         '',
@@ -318,12 +312,23 @@ foreach ($msi in $msis) {
     Write-Host "Staged $($msi.Name)" -ForegroundColor Green
 }
 
-# The portable package is the release binary plus the loader it links against, and
-# nothing else: unzip it and double-click glossy.exe, no installer involved.
+# The portable package is the release binary plus the loader it links against and
+# the third-party notices, and nothing else: unzip it and double-click glossy.exe,
+# no installer involved.
 $releaseDir = Join-Path $root 'src-tauri\target\release'
 $exe = Join-Path $releaseDir 'glossy.exe'
 if (-not (Test-Path -LiteralPath $exe)) {
     throw "$exe is missing; the portable zip would ship an empty folder."
+}
+
+# The notices name the licences of what the app downloads, which is what those
+# licences ask of anyone who passes the files on: an archive without it would be
+# the one shape of release that does not carry them. It is taken from the repo
+# rather than from the build output, because it is the file the installer is
+# told to bundle and the two must be the same one.
+$notices = Join-Path $root 'THIRD_PARTY_NOTICES.md'
+if (-not (Test-Path -LiteralPath $notices)) {
+    throw "$notices is missing; the portable zip would drop the third-party notices."
 }
 
 $zip = Join-Path $stage ("Glossy_{0}_x64_portable.zip" -f $version)
@@ -332,6 +337,7 @@ New-Item -ItemType Directory -Path $portable -Force | Out-Null
 try {
     Copy-Item -LiteralPath $exe -Destination $portable
     Copy-Item -LiteralPath $loader -Destination $portable
+    Copy-Item -LiteralPath $notices -Destination $portable
     Compress-Archive -Path (Join-Path $portable '*') -DestinationPath $zip -Force
 } finally {
     Remove-Item -LiteralPath $portable -Recurse -Force -ErrorAction SilentlyContinue
@@ -390,8 +396,8 @@ if ((Test-Path -LiteralPath $notesPath) -and -not $ForceNotes) {
     } else {
         $notes = (New-NotesScaffold -Section $section) + $eol
         [IO.File]::WriteAllText($notesPath, $notes, (New-Object Text.UTF8Encoding($false)))
-        Write-Host 'Wrote the trilingual RELEASE_NOTES.md skeleton' -ForegroundColor Green
-        Write-Host '  translate the English section for the other two languages before publishing.' -ForegroundColor Yellow
+        Write-Host 'Wrote the bilingual RELEASE_NOTES.md skeleton' -ForegroundColor Green
+        Write-Host '  translate the English section for the Chinese one before publishing.' -ForegroundColor Yellow
     }
 }
 
@@ -426,7 +432,7 @@ function Publish-Release {
         throw "$notesPath is missing; the release description would be empty."
     }
     if (Select-String -LiteralPath $notesPath -SimpleMatch 'TODO: translate' -Quiet) {
-        throw 'RELEASE_NOTES.md still has an untranslated section; all three languages have to be filled in before publishing.'
+        throw 'RELEASE_NOTES.md still has an untranslated section; both languages have to be filled in before publishing.'
     }
 
     # gh and git report progress and failures on stderr, and PowerShell 5.1 turns
@@ -493,5 +499,5 @@ if ($Publish) {
     Write-Host 'then the release titled "Glossy X.Y.Z" (the tag keeps the v, the title does'
     Write-Host 'not), paste RELEASE_NOTES.md into the description and attach the installer,'
     Write-Host 'the MSI, the portable zip and SHA256SUMS.txt.'
-    Write-Host 'The notes switch language through the links at the top; keep all three translated.'
+    Write-Host 'The notes switch language through the links at the top; keep both translated.'
 }

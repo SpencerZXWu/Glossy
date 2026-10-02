@@ -8,7 +8,7 @@ const path = require("node:path");
 const { extractDictionaryKeys, readI18nSource } = require("./helpers/load-scripts.js");
 
 const SRC = path.resolve(__dirname, "..", "src");
-const PAGES = ["index.html", "popup.html", "notice.html"];
+const PAGES = ["index.html", "popup.html", "notice.html", "ocr.html"];
 const KEYS = new Set(extractDictionaryKeys(readI18nSource(), "ENGLISH"));
 
 function readPage(name) {

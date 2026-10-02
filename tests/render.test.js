@@ -39,6 +39,24 @@ function toolsOf(root) {
   return descendantsOf(root, []).filter((node) => node.className === "tools");
 }
 
+/** A key press that records what the handlers did with it. */
+function keyEvent(key, options) {
+  return {
+    key,
+    ctrlKey: false,
+    metaKey: false,
+    defaultPrevented: false,
+    stopped: false,
+    ...options,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
+    stopPropagation() {
+      this.stopped = true;
+    },
+  };
+}
+
 test("the module exports the render helpers the windows rely on", () => {
   assert.equal(typeof Glossy.languageName, "function");
   assert.equal(typeof Glossy.errorMessage, "function");
@@ -150,7 +168,7 @@ test("result renders a sentence with its original above the translation", () => 
   });
   assert.equal(findByClass(node, "original").textContent, "你好");
   assert.equal(findByClass(node, "translation").textContent, "Hello");
-  assert.equal(findByClass(node, "foot").textContent, "Google");
+  assert.equal(findByClass(node, "engine").textContent, "Google");
   assert.equal(findByClass(node, "phonetic"), null);
 });
 
@@ -171,11 +189,100 @@ test("result drops the original when there is no source text", () => {
   assert.equal(findByClass(node, "original"), null);
 });
 
-test("result never renders the original for a word", () => {
+test("result renders the original under a word card too", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", sourceText: "fox", translation: "狐狸" });
-  assert.equal(findByClass(node, "original"), null);
+  assert.equal(findByClass(node, "original").textContent, "fox");
   assert.equal(findByClass(node, "translation").textContent, "狐狸");
+});
+
+test("the original is plain text when the card cannot translate again", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "sentence", sourceText: "你好", translation: "Hello" });
+  const original = findByClass(node, "original");
+  assert.equal(original.getAttribute("contenteditable"), null);
+  assert.equal(original.getAttribute("role"), null);
+});
+
+test("the original is editable when the card can translate again", () => {
+  const node = target();
+  Glossy.render.result(
+    node,
+    { kind: "sentence", sourceText: "你好", translation: "Hello" },
+    { onRetranslate: () => {} },
+  );
+  const original = findByClass(node, "original");
+  assert.equal(original.getAttribute("contenteditable"), "plaintext-only");
+  assert.equal(original.getAttribute("spellcheck"), "false");
+  assert.equal(original.getAttribute("role"), "textbox");
+  assert.equal(original.getAttribute("aria-label"), "The text that was translated, editable");
+  assert.ok(original.getAttribute("title").includes("Ctrl+Enter"));
+});
+
+test("Ctrl+Enter in the original translates the corrected text once", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", sourceText: "fox", translation: "狐狸" },
+    { onRetranslate: (value) => asked.push(value) },
+  );
+  const original = findByClass(node, "original");
+  original.textContent = "  foxes  ";
+
+  const event = keyEvent("Enter", { ctrlKey: true });
+  original.dispatch("keydown", event);
+
+  // The block loses the caret after the edit, and the translation it already
+  // asked for must not be asked for a second time by that.
+  assert.ok(event.defaultPrevented, "the newline was not swallowed");
+  assert.deepEqual(asked, ["foxes"]);
+  assert.deepEqual(original.textContent, "foxes");
+});
+
+test("Escape in the original puts the text back and keeps the card open", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "sentence", sourceText: "你好", translation: "Hello" },
+    { onRetranslate: (value) => asked.push(value) },
+  );
+  const original = findByClass(node, "original");
+  original.textContent = "你好呀";
+
+  const event = keyEvent("Escape");
+  original.dispatch("keydown", event);
+
+  // The card is dismissed by Escape too, so the edit has to keep the key to
+  // itself while it holds the caret.
+  assert.ok(event.defaultPrevented);
+  assert.ok(event.stopped, "Escape would have reached the card");
+  assert.equal(original.textContent, "你好");
+  assert.deepEqual(asked, []);
+});
+
+test("leaving the original translates the edit, and nothing else", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", sourceText: "fox", translation: "狐狸" },
+    { onRetranslate: (value) => asked.push(value) },
+  );
+  const original = findByClass(node, "original");
+
+  // Leaving without touching anything, and leaving an emptied field, both mean
+  // the same text: nothing to translate and no reason to spend quota.
+  original.dispatch("blur");
+  original.textContent = "   ";
+  original.dispatch("blur");
+  assert.deepEqual(asked, []);
+  assert.equal(original.textContent, "fox");
+
+  original.textContent = "vixen";
+  original.dispatch("blur");
+  assert.deepEqual(asked, ["vixen"]);
 });
 
 test("result shows the empty-translation text when nothing came back", () => {
@@ -298,7 +405,7 @@ test("result shows a lookup placeholder for a word card that is still waiting", 
   assert.equal(findByClass(node, "phonetic"), null);
   // The translation and the footer are still drawn around it.
   assert.equal(findByClass(node, "translation").textContent, "狐狸");
-  assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
+  assert.equal(findByClass(node, "engine").textContent, "Baidu Translate");
 });
 
 test("result localizes the lookup placeholder", () => {
@@ -484,10 +591,10 @@ test("result writes unit conversions as text, not markup", () => {
 test("result localizes the provider footer", () => {
   const node = target();
   Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
-  assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
+  assert.equal(findByClass(node, "engine").textContent, "Baidu Translate");
   i18n.set("zh");
   Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
-  assert.equal(findByClass(node, "foot").textContent, "百度翻译");
+  assert.equal(findByClass(node, "engine").textContent, "百度翻译");
   i18n.set("en");
 });
 
@@ -504,10 +611,25 @@ test("result keeps the name of the engine on a footer row of its own", () => {
   Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
   const foot = findByClass(node, "foot");
   assert.equal(foot.parentNode, node);
-  assert.equal(foot.textContent, "Baidu Translate");
-  assert.deepEqual(classesOf(foot), ["engine"]);
+  assert.equal(findByClass(foot, "engine").textContent, "Baidu Translate");
+  assert.deepEqual(classesOf(foot), ["engine", "brand", "brand-logo", "brand-name"]);
   // The buttons belong to the text they act on, not to the footer.
   assert.deepEqual(toolsOf(foot), []);
+});
+
+test("result signs the card with the app mark at the right of the footer", () => {
+  const node = target();
+  Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
+  const foot = findByClass(node, "foot");
+  const brand = findByClass(foot, "brand");
+
+  // The mark closes the row that names the engine, and says nothing a reader
+  // needs, so its logo carries no alternative text.
+  assert.equal(foot.childNodes[foot.childNodes.length - 1], brand);
+  assert.equal(brand.textContent, "Glossy");
+  const logo = findByClass(brand, "brand-logo");
+  assert.ok(logo.src.includes("logo.png"));
+  assert.equal(logo.alt, "");
 });
 
 test("result writes translations, definitions and examples as text, not markup", () => {
@@ -584,6 +706,28 @@ test("error localizes its retry label", () => {
   assert.equal(findByClass(node, "message").textContent, "翻译失败。");
   assert.equal(findByClass(node, "ghost-button").textContent, "重试");
   i18n.set("en");
+});
+
+test("error names the engine that refused, and lets another be chosen", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.error(node, "boom", () => {}, {
+    provider: "baidu",
+    onChooseService: (button) => asked.push(button),
+  });
+
+  const choose = findByClass(node, "service");
+  assert.ok(choose, "the failure card offers another engine");
+  assert.equal(choose.textContent, "Baidu Translate");
+  choose.dispatch("click");
+  assert.equal(asked.length, 1);
+});
+
+test("error leaves the engine off a card that was not told one", () => {
+  const node = target();
+  Glossy.render.error(node, "boom", () => {});
+
+  assert.equal(findByClass(node, "foot"), null);
 });
 
 test("clear removes every child and is safe on an empty target", () => {
@@ -774,6 +918,7 @@ test("a word card puts the buttons of the original above the translation", () =>
   // The word itself stands in the header, so the row of the original opens the
   // body of the card, ahead of the translation.
   assert.deepEqual(classesOf(node), [
+    "original",
     "tools",
     "tool",
     "tool",
@@ -783,6 +928,9 @@ test("a word card puts the buttons of the original above the translation", () =>
     "tool",
     "foot",
     "engine",
+    "brand",
+    "brand-logo",
+    "brand-name",
   ]);
 });
 
@@ -805,6 +953,9 @@ test("the buttons of a side keep to their own side of the card", () => {
     "tool",
     "foot",
     "engine",
+    "brand",
+    "brand-logo",
+    "brand-name",
   ]);
 });
 
@@ -1014,6 +1165,102 @@ test("a copy that reached the clipboard tells the caller which side it was", () 
   assert.deepEqual(sides, ["translation"]);
 });
 
+test("a card that can be written back over offers the button on the translation side", () => {
+  const fresh = backend(() => Promise.resolve(true));
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(
+    node,
+    {
+      kind: "sentence",
+      sourceText: "Hello there.",
+      translation: "你好。",
+      sourceLang: "en",
+      targetLang: "zh-CN",
+    },
+    { overwrite: true },
+  );
+  const rows = toolsOf(node);
+
+  // The original has no place to be written into, so only the translation side
+  // carries the third button.
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].childNodes.length, 2);
+  assert.equal(rows[1].childNodes.length, 3);
+  assert.equal(
+    rows[1].childNodes[2].getAttribute("aria-label"),
+    "Replace the original text (Ctrl+Enter)",
+  );
+});
+
+test("a card with nothing behind it offers no button to write back", () => {
+  const fresh = backend(() => Promise.resolve(true));
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(node, {
+    kind: "sentence",
+    sourceText: "Hello there.",
+    translation: "你好。",
+    sourceLang: "en",
+    targetLang: "zh-CN",
+  });
+
+  assert.equal(toolsOf(node)[1].childNodes.length, 2);
+});
+
+test("pressing that button sends the translation to be written over the original", async () => {
+  const calls = [];
+  const fresh = backend((command, payload) => {
+    calls.push({ command, payload });
+    return Promise.resolve(true);
+  });
+  const node = fresh.document.createElement("div");
+  fresh.Glossy.render.result(
+    node,
+    {
+      kind: "sentence",
+      sourceText: "Hello there.",
+      translation: "你好。",
+      sourceLang: "en",
+      targetLang: "zh-CN",
+    },
+    { overwrite: true },
+  );
+  const button = toolsOf(node)[1].childNodes[2];
+
+  button.dispatch("click");
+  await Promise.resolve();
+
+  const written = calls.filter((call) => call.command === "replace_selection");
+  assert.equal(written.length, 1);
+  assert.equal(written[0].payload.text, "你好。");
+  assert.equal(button.dataset.state, "copied");
+  assert.equal(button.getAttribute("aria-label"), "Original replaced");
+});
+
+test("the accelerator writes the translation back without a button of its own", () => {
+  const calls = [];
+  const fresh = backend((command, payload) => {
+    calls.push({ command, payload });
+    return Promise.resolve(true);
+  });
+  fresh.Glossy.render.result(
+    fresh.document.createElement("div"),
+    {
+      kind: "sentence",
+      sourceText: "Hello there.",
+      translation: "你好。",
+      sourceLang: "en",
+      targetLang: "zh-CN",
+    },
+    { overwrite: true },
+  );
+
+  fresh.Glossy.render.overwrite("你好。");
+
+  const written = calls.filter((call) => call.command === "replace_selection");
+  assert.equal(written.length, 1);
+  assert.equal(written[0].payload.text, "你好。");
+});
+
 test("a card that is replaced takes the tick with it", () => {
   const fresh = backend(() => Promise.resolve(true));
   const buttons = cardCopyButtons(fresh);
@@ -1029,7 +1276,7 @@ test("a card that is replaced takes the tick with it", () => {
   assert.equal(fresh.timers.timeouts(), 0);
 });
 
-test("result names the service that answered after a fallback", () => {
+test("result names the service that did not answer, not the one that did", () => {
   const node = target();
   Glossy.render.result(node, {
     kind: "sentence",
@@ -1037,9 +1284,54 @@ test("result names the service that answered after a fallback", () => {
     provider: "Youdao",
     fallbackFrom: "Baidu",
   });
+  // The footer names the engine that answered; the line under it names the one
+  // that did not, which is the service the settings asked for.
+  assert.equal(findByClass(node, "foot fallback").textContent, "Baidu Translate did not answer");
+  assert.equal(findByClass(node, "engine").textContent, "Youdao Translate");
+});
+
+test("the line says why the engine stepped aside, when the relay told it", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    provider: "youdao",
+    fallbackFrom: "baidu",
+    fallbackCode: "upstream_limit",
+  });
   assert.equal(
     findByClass(node, "foot fallback").textContent,
-    "Answered by Baidu Translate after the chosen service failed",
+    "Baidu Translate did not answer — its allowance is used up",
+  );
+});
+
+test("a refusal code this build does not know adds nothing to the line", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    provider: "youdao",
+    fallbackFrom: "baidu",
+    fallbackCode: "something_new",
+  });
+  assert.equal(findByClass(node, "foot fallback").textContent, "Baidu Translate did not answer");
+});
+
+test("a relay that never answered says so on the line", () => {
+  // The app falls back by itself too, and the reason there is the relay's: the
+  // sentence has to be about the relay rather than about the engine named in
+  // the footer, which never got the request at all.
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "Hello.",
+    provider: "google",
+    fallbackFrom: "youdao",
+    fallbackCode: "relay_unreachable",
+  });
+  assert.equal(
+    findByClass(node, "foot fallback").textContent,
+    "Youdao Translate did not answer — the Glossy relay could not be reached",
   );
 });
 
@@ -1066,7 +1358,13 @@ test("the name of the engine is a button when the card can switch services", () 
   // reads out before the click.
   assert.equal(button.getAttribute("aria-expanded"), "false");
   assert.equal(button.getAttribute("title"), "Translation service");
-  assert.equal(findByClass(node, "foot").textContent, "Youdao Translate");
+  // The row holds the switchable name and the mark of the app, nothing else.
+  assert.deepEqual(classesOf(findByClass(node, "foot")), [
+    "service",
+    "brand",
+    "brand-logo",
+    "brand-name",
+  ]);
 
   button.dispatch("click");
   assert.equal(asked.length, 1);
@@ -1078,7 +1376,7 @@ test("the name of the engine stays plain text without a way to switch", () => {
   Glossy.render.result(node, { kind: "word", translation: "狐狸", provider: "baidu" });
 
   assert.equal(findByClass(node, "service"), null);
-  assert.equal(findByClass(node, "foot").textContent, "Baidu Translate");
+  assert.equal(findByClass(node, "engine").textContent, "Baidu Translate");
 });
 
 /** The codes of one table in the Rust module that decides them. */
