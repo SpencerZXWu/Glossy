@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossy</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/ocr.css" />
+  </head>
+  <body>
+    <!-- The dim cover is dropped while a band is up: the band carries the dim
+         itself, so the rectangle the user drew stays at full brightness. -->
+    <div class="layer" id="layer"></div>
+    <div class="band" id="band"></div>
+    <div class="size" id="size" hidden></div>
+    <div class="hint" id="hint" data-i18n="ocr.hint">Drag over the text to read it · Esc or a right click to cancel · the overlay closes itself after 30 s</div>
+    <script src="js/bridge.js"></script>
+    <script src="js/i18n.js"></script>
+    <script src="js/ocr.js"></script>
+  </body>
+</html>

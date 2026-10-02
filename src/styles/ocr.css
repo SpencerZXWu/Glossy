@@ -1,0 +1,78 @@
+/* The screenshot overlay: the screen goes dim, the user drags a rectangle, and
+   the part of the picture that was taken before the overlay came up is cut out
+   of that rectangle. The window is as big as the monitor and fully transparent,
+   so everything here is drawn by the page. */
+
+:root {
+  /* The dim seen outside the rectangle. The band paints the same colour, so
+     turning one off as the other comes on is not visible. */
+  --dim: rgba(14, 16, 20, 0.42);
+  --accent: var(--g-accent);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  cursor: crosshair;
+  font-family: var(--g-font-ui);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.layer {
+  position: fixed;
+  inset: 0;
+  background: var(--dim);
+}
+
+body.dragging .layer {
+  opacity: 0;
+}
+
+.band {
+  position: fixed;
+  display: none;
+  border: 1px solid var(--accent);
+  /* Everything outside the rectangle is dimmed by the band's own shadow, which
+     is why the layer above can go away while a band is up. */
+  box-shadow: 0 0 0 100vmax var(--dim);
+}
+
+body.dragging .band {
+  display: block;
+}
+
+.size {
+  position: fixed;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(14, 16, 20, 0.78);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(14, 16, 20, 0.78);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
