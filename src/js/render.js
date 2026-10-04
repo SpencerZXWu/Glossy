@@ -248,6 +248,16 @@
       // Leaving the field translates what is in it, so a correction is never
       // quietly dropped when the reader clicks elsewhere.
       block.addEventListener("blur", commit);
+
+      // Ctrl+Enter belongs to the field while the caret is in it, and to the
+      // card while it is not: the card's own is registered with Windows, so it
+      // reaches the card before the field the key was pressed in. The field
+      // therefore says when it holds the caret, and the card lets go of the
+      // accelerator for as long as it does.
+      if (typeof opts.onEditing === "function") {
+        block.addEventListener("focus", () => opts.onEditing(true));
+        block.addEventListener("blur", () => opts.onEditing(false));
+      }
     }
 
     target.appendChild(block);

@@ -262,6 +262,62 @@ test("Escape in the original puts the text back and keeps the card open", () => 
   assert.deepEqual(asked, []);
 });
 
+test("the original says when the caret is in it, so the card can let go of Ctrl+Enter", () => {
+  const node = target();
+  const edits = [];
+  Glossy.render.result(
+    node,
+    { kind: "sentence", sourceText: "你好", translation: "Hello" },
+    { onRetranslate: () => {}, onEditing: (value) => edits.push(value) },
+  );
+  const original = findByClass(node, "original");
+
+  original.dispatch("focus", { type: "focus" });
+  original.dispatch("blur", { type: "blur" });
+
+  assert.deepEqual(edits, [true, false]);
+});
+
+test("Ctrl+Enter in the original hands the card its key back", () => {
+  const node = target();
+  const asked = [];
+  const edits = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", sourceText: "fox", translation: "狐狸" },
+    {
+      onRetranslate: (value) => asked.push(value),
+      onEditing: (value) => edits.push(value),
+    },
+  );
+  const original = findByClass(node, "original");
+  original.dispatch("focus", { type: "focus" });
+  original.textContent = "vixen";
+  original.dispatch("keydown", keyEvent("Enter", { ctrlKey: true }));
+
+  // The field says it took the caret and that it gave it back, which is the
+  // pair the card turns into "register the card's accelerator, or let go of
+  // it"; the corrected text is translated by the field itself.
+  assert.deepEqual(asked, ["vixen"]);
+  assert.deepEqual(edits, [true, false]);
+});
+
+test("a card with no editable original has no edit to report", () => {
+  const node = target();
+  const edits = [];
+  Glossy.render.result(
+    node,
+    { kind: "sentence", sourceText: "你好", translation: "Hello" },
+    { onEditing: (value) => edits.push(value) },
+  );
+  const original = findByClass(node, "original");
+
+  original.dispatch("focus", { type: "focus" });
+
+  assert.equal(original.getAttribute("contenteditable"), null);
+  assert.deepEqual(edits, []);
+});
+
 test("leaving the original translates the edit, and nothing else", () => {
   const node = target();
   const asked = [];

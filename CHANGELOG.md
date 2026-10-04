@@ -45,6 +45,15 @@ allowed to take to put the settings file in one piece.
 
 ### Fixed
 
+- **Ctrl+Enter in the card's grey original replaced the text behind it instead of translating
+  the correction.** The card's write-back key is registered with Windows rather than with the
+  page, and a registered shortcut is delivered to Glossy before the window that has the caret —
+  so with the caret in the editable original, Ctrl+Enter never reached the field that promises to
+  translate what is typed in it. What happened instead was the translation being pasted back over
+  the original text in the program behind the card. The field now tells the card when it holds the
+  caret, and the card lets go of the accelerator for as long as it does, which is the pair the
+  field's own hint and the button's label already described: Ctrl+Enter translates the correction
+  inside the field, and writes the translation back anywhere else on the card.
 - **Choosing the offline channel in the settings window did not stick.** The list the window
   validates the stored service against held only the three services that go through a network,
   so `offline` was read as an unknown value and the dropdown fell back to Baidu the moment the

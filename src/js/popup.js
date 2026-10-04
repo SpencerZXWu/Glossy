@@ -61,16 +61,41 @@
       which is what a translation can be written back over. A card showing an
       old translation from the history has nothing behind it. */
   let canOverwrite = false;
+  /** True while the caret is in the card's editable original, where Ctrl+Enter
+      is the field's key rather than the card's. */
+  let editing = false;
 
   /**
-   * Records whether the card on screen can be written back over, and tells the
-   * backend so: Ctrl+Enter belongs to the card only while there is a translation
-   * of a selection still in place to write back, and it has to go back to the
-   * program in front the moment there is not.
+   * Arms or releases the card's accelerator, which is how the backend knows
+   * whether Ctrl+Enter is the card's to answer.
+   *
+   * It is the card's only while there is a translation of a selection still in
+   * place to write back over, and it is the field's while the caret is in the
+   * grey original — there the same key translates the correction, which is what
+   * the field's own hint promises. The key is registered with Windows rather
+   * than with the page, so only one of the two can hold it at a time.
+   */
+  function syncReplace() {
+    Glossy.invoke("popup_set_replace", { armed: canOverwrite && !editing }).catch(() => {});
+  }
+
+  /**
+   * Records whether the card on screen can be written back over.
+   *
+   * Whatever card is drawn next has no editable field in it, so an edit that
+   * was in progress ended with the card that held it.
    */
   function showWriteBack(value) {
     canOverwrite = value;
-    Glossy.invoke("popup_set_replace", { armed: value }).catch(() => {});
+    editing = false;
+    syncReplace();
+  }
+
+  /** Records whether the caret went into, or left, the card's editable original. */
+  function showEditing(value) {
+    if (editing === value) return;
+    editing = value;
+    syncReplace();
   }
   /** The selection the badge is holding, waiting for its click. */
   let waiting = "";
@@ -511,6 +536,7 @@
       pending: true,
       onChooseService: toggleServiceMenu,
       onCopied: cardCopied,
+      onEditing: showEditing,
       onRetranslate: run,
     });
     await place(false);
@@ -557,6 +583,7 @@
       overwrite: canOverwrite,
       onChooseService: toggleServiceMenu,
       onCopied: cardCopied,
+      onEditing: showEditing,
       onRetranslate: run,
     });
     readStar(result);
@@ -564,8 +591,8 @@
 
   /**
    * The engines the card can switch between, in the order the settings window
-   * lists them. The stored choice is spread over four fields, so the backend is
-   * asked which entry it adds up to instead of deriving it again here.
+   * lists them. Which one is chosen lives in the single `service` setting, so
+   * the backend is asked which entry that is instead of reading the file here.
    */
   const SERVICES = ["cloud-baidu", "cloud-youdao", "google", "offline"];
 
@@ -881,8 +908,12 @@
   // Ctrl+Enter writes the translation back over the text it came from. The
   // card holds the translation, so the accelerator only says that the key was
   // pressed, and the card answers with the same write its own button makes.
+  //
+  // The field holds the key while the caret is in the grey original — the card
+  // hands the accelerator over on focus — so a request that arrives anyway must
+  // not write over the text the reader is in the middle of correcting.
   Glossy.listen("glossy://replace", () => {
-    if (!canOverwrite || !current || !current.translation) return;
+    if (editing || !canOverwrite || !current || !current.translation) return;
     Glossy.render.overwrite(String(current.translation));
   });
 

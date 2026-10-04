@@ -716,7 +716,7 @@ none of them is covered by the automated tests.
 | 20 | Clear the `Ctrl+Alt+Q` field, restart, then set it again to a combination another program already owns | No shortcut is registered while the field is empty and the other two keep working; the refused one is reported under its own field and leaves the others alone |
 | 21 | Press `Ctrl+Alt+Q`, drag a rectangle over a paragraph, then repeat and cancel with `Esc` | The recognised text is translated in the popup in the first case; the second makes no request and charges nothing |
 | 22 | Translate a `.md` file with a code fence and a `.srt` file, cancel a run halfway, then run it again and save | Headings and code are untouched and the timings still line up; the cancel says how far it got and saves nothing; the saved file is `<name>.<target>.md` in the folder named on the page — the Desktop unless another one was picked — and the original is unchanged |
-| 23 | Select a short text, edit the grey original, press `Ctrl+Enter`, then press `Esc` while editing | The corrected text is translated and the card shows it; `Esc` in the field puts the translated text back without closing the card |
+| 23 | Select a short text, edit the grey original, press `Ctrl+Enter`, then press `Esc` while editing | The corrected text is translated and the card shows it — the card's own Ctrl+Enter is let go of while the caret is in the field, so the key translates instead of writing the translation back over the text behind; `Esc` in the field puts the translated text back without closing the card |
 | 24 | Translate a `.pdf` with text and a `.docx` with a bold word, a table, a picture and a header, then save both | The PDF says how many paragraphs it found and the saved file is `<name>.<target>.txt`; the `.docx` opens in Word with its styles, table, picture and header as they were and the body text translated; a scanned PDF and an old `.doc` are refused with a message and spend nothing |
 | 25 | Drag a `.txt` file onto the box on the document page, then drag a picture onto it | The page reports the pieces and the characters it would translate without a request in the first case; the second is refused with a message, and nothing is sent |
 | 26 | Pick a source language on the document page, press `⇄`, put the source back on *detect it* and press `⇄` again | The two lists trade places the first time; with the source back on *detect it* the swap does nothing at all |
@@ -1253,7 +1253,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 20 | 清空 `Ctrl+Alt+Q` 字段后重启，再重新录制一个已被其它程序占用的组合 | 字段为空时不会注册任何快捷键，另外两个照常可用；被拒绝的那个只在它自己的字段下报告，不影响另外两个 |
 | 21 | 按 `Ctrl+Alt+Q` 框选一段文字，然后再按一次并用 `Esc` 取消 | 第一种情况下识别出的文字在弹窗里翻译；第二种情况下不发出任何请求，也不扣额度 |
 | 22 | 翻译一个含代码块的 `.md` 文件和一个 `.srt` 文件，中途取消一次，再重新跑一次并保存 | 标题与代码原样保留，时间轴依然对得上；取消会说明翻到哪里，且什么都不保存；保存下来的是页面所示文件夹（默认桌面）里的 `<文件名>.<目标语言>.md`，原文件不变 |
-| 23 | 选中一段较短的文字，编辑灰色原文后按 `Ctrl+Enter`，然后在编辑状态下按 `Esc` | 改过的文字会被翻译，卡片显示新译文；字段里按 `Esc` 会把译文对应的原文放回去，且不关闭卡片 |
+| 23 | 选中一段较短的文字，编辑灰色原文后按 `Ctrl+Enter`，然后在编辑状态下按 `Esc` | 改过的文字会被翻译，卡片显示新译文——光标在字段里时卡片会先让出自己那个 `Ctrl+Enter`，所以这个键是去翻译，而不是把译文替换回后面的程序；字段里按 `Esc` 会把译文对应的原文放回去，且不关闭卡片 |
 | 24 | 翻译一个含文字的 `.pdf`，以及一个含加粗词、表格、图片和页眉的 `.docx`，然后都保存 | PDF 会告诉你找到多少段落，保存下来的是 `<文件名>.<目标语言>.txt`；`.docx` 能在 Word 里打开，样式、表格、图片和页眉都和原来一样，正文已翻译；扫描版 PDF 和旧的 `.doc` 会被拒绝并给出说明，不扣任何额度 |
 | 25 | 把一个 `.txt` 文件拖到文档页的方框上，再把一张图片拖上去 | 第一种情况页面在不发请求的情况下报出将翻译的段数和字符数；第二种被拒绝并给出说明，什么也不会发出去 |
 | 26 | 在文档页选一个源语言，按 `⇄`，把源语言改回*自动检测*后再按一次 `⇄` | 第一次两个列表互换；源语言回到*自动检测*时，交换什么都不做 |
