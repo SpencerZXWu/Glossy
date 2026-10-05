@@ -309,8 +309,8 @@
     "providerName.api-baidu": "Baidu Translate (your key)",
     "providerName.api-openai": "Your own API",
     "cloud.quota.checking": "Asking the server how much is left today…",
-    "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
-    "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
+    "cloud.quota.remaining": "Free quota today: {0} of {1} characters left (Baidu and Youdao share it)",
+    "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC (Baidu and Youdao share it)",
     "cloud.quota.retry": "Check again",
     "ocr.engine.title": "Text recognition on this machine",
     "ocr.engine.hint":
@@ -871,8 +871,8 @@
     "providerName.api-baidu": "百度翻译（自填密钥）",
     "providerName.api-openai": "自填 API",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
-    "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
-    "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
+    "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符（百度与有道共用这一份）",
+    "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复（百度与有道共用这一份）",
     "cloud.quota.retry": "重新查询",
     "ocr.engine.title": "本机文字识别",
     "ocr.engine.hint":

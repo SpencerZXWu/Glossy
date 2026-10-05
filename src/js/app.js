@@ -3616,7 +3616,16 @@
   // A translation made anywhere else — the popup, the hotkey — lands in the
   // history while this window may be open, so the list reloads on the signal
   // instead of waiting for the next start.
-  Glossy.listen("glossy://history", loadHistory);
+  // Every translation the app makes lands here, wherever it was started from —
+  // the card on this page, the floating popup, a screenshot — and one that went
+  // through Glossy's server spent part of the allowance shown above. A line that
+  // is only written when a page is drawn again reads as "nothing was spent" for
+  // as long as the window stays open, which is the one moment it has to be
+  // right.
+  Glossy.listen("glossy://history", () => {
+    loadHistory();
+    if (!document.hidden) syncChannelQuota();
+  });
   // A word kept from the card (or from the history) arrives here; the stars of
   // the history list are drawn from the same book, so that list follows.
   Glossy.listen("glossy://vocabulary", async () => {
@@ -3665,6 +3674,9 @@
     // the next save reads it.
     if (pending) {
       flushSave();
+      // Nothing below redrew the pages, so the allowance line still holds what
+      // it held when the window went away.
+      syncChannelQuota();
       return;
     }
     try {
@@ -3676,6 +3688,9 @@
   window.addEventListener("blur", flushSave);
   window.addEventListener("focus", () => {
     if (ocrEngineVisible()) refreshOcrEngine();
+    // Clicking back into the window is the other moment the allowance has to
+    // stop showing what it showed before the window was left.
+    syncChannelQuota();
   });
   window.addEventListener("pagehide", flushSave);
   window.addEventListener("beforeunload", flushSave);
