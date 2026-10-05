@@ -18,6 +18,7 @@
 //! | `input_hook` | the low level mouse hook and the message loop it runs on |
 //! | `instance` | one Glossy per login, and how a second start announces itself |
 //! | `screen` | a picture of part of the desktop, for the screenshot translation |
+//! | `secrets` | the DPAPI protection on the credentials in the settings file |
 //! | `speech` | read text aloud |
 //! | `uia` | whether there is a selection at all, and the text around it, from the accessibility API |
 //!
@@ -35,7 +36,8 @@ mod windows;
 
 #[cfg(windows)]
 pub use windows::{
-    clipboard, console, desktop, encoding, hotkey, input, input_hook, instance, speech, uia,
+    clipboard, console, desktop, encoding, hotkey, input, input_hook, instance, secrets, speech,
+    uia,
 };
 
 /// A picture of the desktop, and what is done with one. Taking the picture is

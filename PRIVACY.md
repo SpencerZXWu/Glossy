@@ -18,6 +18,12 @@ text you asked about.
   identified by an id derived from this computer and this Windows account (a hash of the two,
   so neither is sent), which is what keeps the daily allowance the same one after installing
   the app again.
+- **A service of your own** (`api-baidu`, `api-openai`) — only if you filled its credentials
+  in on the General page, and then the text goes from this machine **straight to that
+  service**: Baidu's `fanyi-api.baidu.com` with your own APP ID and key, or the address you
+  typed for the OpenAI compatible entry. The project's relay is not in the path, receives
+  nothing, and cannot count anything. That service sees the text under its own privacy
+  policy, as the account holder's request.
 - **Nothing at all** — `offline` translates on this machine, with the models downloaded from
   the Resources page. No request is made and there is no allowance to count.
 
@@ -50,12 +56,16 @@ a public rates endpoint, and carry a base currency code and nothing about you.
 `releases/latest` of this repository.
 
 **What is stored locally**, in `%APPDATA%\com.glossy.translator\`: `settings.json` (settings
-only — there is no key in it, because no service the app offers asks for one), `history.json`,
+and the credentials you filled in yourself, each of those encrypted with Windows `DPAPI` for
+this Windows login before it is written), `history.json`,
 a small `rates.json` cache, and `glossy.log` — the failures the app ran into, capped at
 256 KB, with the file before it kept as `glossy.log.1`. Nothing in that folder is uploaded;
-deleting it removes the settings, the history and the log. A settings file written by an older
-version may still hold a key that version asked for: it is dropped, unused, the next time the
-settings are saved.
+deleting it removes the settings, the history and the log. A key encrypted for another
+Windows login — a settings file copied from another machine, or from an older install — cannot
+be unlocked here and is dropped rather than kept. `Export…` writes the same protected shape
+into `Documents\glossy-settings.json`, so the exported file never carries a usable key. A
+settings file written by an older version may still hold a key that version asked for: it is
+dropped, unused, the next time the settings are saved.
 
 The services above receive what they are sent under their own privacy policies.
 
@@ -73,6 +83,10 @@ Glossy 没有账号、没有统计分析、没有遥测，也不会记录你选�
   Cloudflare Worker，按部署配置把文本转给百度、有道或智谱。它只按"每台设备 / 每个地址 / 每天"
   统计字符数，其余什么都不存：文本不写日志、不落盘。设备用一个由本机与当前 Windows 账户推导出的
   安装 ID 标识（两者哈希后的值，二者本身都不会被发送），这样重新安装应用后每日额度仍然是同一份额度。
+- **你自己的服务**（`api-baidu`、`api-openai`）—— 只有在「常规」页填过它的凭据时才会用到，此时文本
+  从本机**直接发往那个服务**：你自己的 APP ID 与密钥对应的百度 `fanyi-api.baidu.com`，或者你为兼容
+  OpenAI 的渠道填写的地址。项目自己的中转服务完全不在链路上，收不到任何东西，也无从统计。那个服务
+  按自己的隐私政策处理收到的文本，看到的是账号持有者本人的请求。
 - **什么都不发** —— `offline` 在本机翻译，用的是从「资源」页下载的模型。不发出任何请求，也没有额度可计。
 
 **截图（OCR 翻译）**在本机完成：识别也用本机——PP-OCRv4 跑在「资源」页下载的 ONNX Runtime 上，
@@ -94,10 +108,12 @@ Glossy 没有账号、没有统计分析、没有遥测，也不会记录你选�
 
 **更新检查**默认关闭。在设置里打开后，应用会向 GitHub 查询本仓库的 `releases/latest`。
 
-**本地存储**在 `%APPDATA%\com.glossy.translator\`：`settings.json`（只有各项设置——里面没有密钥，
-因为应用提供的服务都不需要密钥）、`history.json`、一个小的 `rates.json` 缓存，以及
-`glossy.log`——应用遇到过的失败，上限 256 KB，写满后旧的那份保留为 `glossy.log.1`。
-该目录的内容不会上传；删掉它就等于删掉了设置、历史和这份日志。旧版本写出的设置文件里可能还留着一个
-当时索要的密钥：它会在下次保存设置时被丢弃，且不会被使用。
+**本地存储**在 `%APPDATA%\com.glossy.translator\`：`settings.json`（各项设置，以及你自己填写的凭据——
+每一条在落盘前都用 Windows `DPAPI` 按当前 Windows 登录加密）、`history.json`、一个小的 `rates.json`
+缓存，以及 `glossy.log`——应用遇到过的失败，上限 256 KB，写满后旧的那份保留为 `glossy.log.1`。
+该目录的内容不会上传；删掉它就等于删掉了设置、历史和这份日志。为另一个 Windows 登录加密过的密钥——
+从别的机器或别的安装复制过来的设置文件——在这里解不开，会被丢弃而不是留着。`导出…` 写进
+`Documents\glossy-settings.json` 的也是同样的加密形状，所以导出的文件永远不会带走一把能用的密钥。
+旧版本写出的设置文件里可能还留着一个当时索要的密钥：它会在下次保存设置时被丢弃，且不会被使用。
 
 上述服务按照它们各自的隐私政策处理收到的内容。

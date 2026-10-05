@@ -160,6 +160,18 @@
     "pack.latin": "European languages (Latin script)",
     "pack.cyrillic": "Cyrillic languages (Russian and others)",
     "pack.ko": "Korean",
+    "panel.api": "Your own API",
+    "api.hint":
+      "A service you already have an account with. Fill a pair in and it joins the list of translation services, on the Language page and on the Translate page; leave it empty and it is not offered at all. The keys are kept on this machine, encrypted for this Windows login, and the text goes from here straight to the service.",
+    "field.apiBaiduAppId": "Baidu APP ID",
+    "field.apiBaiduKey": "Baidu key",
+    "api.baiduHint":
+      "Both halves come from the Baidu Translate developer console (通用文本翻译 API).",
+    "field.apiChatEndpoint": "API address",
+    "field.apiChatKey": "API key",
+    "field.apiChatModel": "Model",
+    "api.chatHint":
+      "Any service that speaks the OpenAI chat completions protocol: OpenAI, DeepSeek, Zhipu, a model server of your own. The address is what comes before /chat/completions.",
     "panel.shortcuts": "Shortcuts",
     "shortcuts.builtin": "Only in this window",
     "shortcuts.local":
@@ -294,6 +306,8 @@
     "providerName.baidu": "Baidu Translate",
     "providerName.youdao": "Youdao Translate",
     "providerName.offline": "Offline translation",
+    "providerName.api-baidu": "Baidu Translate (your key)",
+    "providerName.api-openai": "Your own API",
     "cloud.quota.checking": "Asking the server how much is left today…",
     "cloud.quota.remaining": "Free quota today: {0} of {1} characters left",
     "cloud.quota.used": "Free quota today: all {0} characters are used up, it resets at 00:00 UTC",
@@ -324,6 +338,8 @@
     "service.cloud-baidu": "Baidu Translate",
     "service.cloud-youdao": "Youdao Translate",
     "service.google": "Google",
+    "service.api-baidu": "Baidu Translate — your own key",
+    "service.api-openai": "OpenAI compatible — your own key",
     "service.offline": "Offline — on this machine",
 
     "panel.reading": "Reading",
@@ -711,6 +727,17 @@
     "pack.latin": "欧洲语言（拉丁字母）",
     "pack.cyrillic": "俄语等西里尔字母语言",
     "pack.ko": "韩语",
+    "panel.api": "自填 API",
+    "api.hint":
+      "填入你已有账号的服务，它就会加入翻译服务列表（语言页和翻译页都有）；不填则完全不显示。密钥保存在本机、用当前 Windows 账户加密，原文由本机直接发往该服务。",
+    "field.apiBaiduAppId": "百度 APP ID",
+    "field.apiBaiduKey": "百度密钥",
+    "api.baiduHint": "两者都在百度翻译开放平台的「通用文本翻译」里申请。",
+    "field.apiChatEndpoint": "API 地址",
+    "field.apiChatKey": "API 密钥",
+    "field.apiChatModel": "模型",
+    "api.chatHint":
+      "任何兼容 OpenAI chat completions 协议的服务：OpenAI、DeepSeek、智谱，或你自建的模型服务。地址填 /chat/completions 之前的部分。",
     "panel.shortcuts": "快捷键",
     "shortcuts.builtin": "仅本窗口有效",
     "shortcuts.local":
@@ -841,6 +868,8 @@
     "providerName.baidu": "百度翻译",
     "providerName.youdao": "有道翻译",
     "providerName.offline": "离线翻译",
+    "providerName.api-baidu": "百度翻译（自填密钥）",
+    "providerName.api-openai": "自填 API",
     "cloud.quota.checking": "正在向服务器查询今天还剩多少额度…",
     "cloud.quota.remaining": "今日免费额度：剩余 {0} / {1} 字符",
     "cloud.quota.used": "今日免费额度：{0} 字符已用完，UTC 时间 0 点恢复",
@@ -869,6 +898,8 @@
     "service.cloud-baidu": "百度翻译",
     "service.cloud-youdao": "有道翻译",
     "service.google": "Google",
+    "service.api-baidu": "百度翻译 — 自填密钥",
+    "service.api-openai": "自填 API（OpenAI 兼容）",
     "service.offline": "离线 — 本机翻译",
 
     "panel.reading": "阅读",

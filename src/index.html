@@ -320,6 +320,46 @@
             </div>
           </section>
           <section class="panel">
+            <h2 data-i18n="panel.api">Your own API</h2>
+            <p class="hint" data-i18n="api.hint">
+              A service you already have an account with. Fill a pair in and it joins the list of
+              translation services, on the Language page and on the Translate page; leave it empty
+              and it is not offered at all. The keys are kept on this machine, encrypted for this
+              Windows login, and the text goes from here straight to the service.
+            </p>
+            <div class="grid">
+              <div class="field">
+                <label for="apiBaiduAppId" data-i18n="field.apiBaiduAppId">Baidu APP ID</label>
+                <input type="text" id="apiBaiduAppId" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="field">
+                <label for="apiBaiduKey" data-i18n="field.apiBaiduKey">Baidu key</label>
+                <input type="password" id="apiBaiduKey" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+            <p class="hint" data-i18n="api.baiduHint">
+              Both halves come from the Baidu Translate developer console (通用文本翻译).
+            </p>
+            <div class="grid">
+              <div class="field">
+                <label for="apiChatEndpoint" data-i18n="field.apiChatEndpoint">API address</label>
+                <input type="text" id="apiChatEndpoint" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="field">
+                <label for="apiChatKey" data-i18n="field.apiChatKey">API key</label>
+                <input type="password" id="apiChatKey" autocomplete="off" spellcheck="false" />
+              </div>
+              <div class="field">
+                <label for="apiChatModel" data-i18n="field.apiChatModel">Model</label>
+                <input type="text" id="apiChatModel" autocomplete="off" spellcheck="false" />
+              </div>
+            </div>
+            <p class="hint" data-i18n="api.chatHint">
+              Any service that speaks the OpenAI chat completions protocol: OpenAI, DeepSeek, Zhipu,
+              a model server of your own. The address is what comes before /chat/completions.
+            </p>
+          </section>
+          <section class="panel">
             <h2 data-i18n="panel.shortcuts">Shortcuts</h2>
             <div class="field">
               <label for="hotkey" data-i18n="field.hotkey.translate">Translate the selection</label>
@@ -559,6 +599,10 @@
               </div>
               <div class="field">
                 <label for="service" data-i18n="field.service">Translation service</label>
+                <!-- The four entries that work with nothing filled in, so the
+                     control is a list even before the script has run. The script
+                     writes the whole list again, adding the entries of the
+                     reader's own when their credentials are filled in. -->
                 <select id="service">
                   <option value="cloud-baidu" data-i18n="service.cloud-baidu">Baidu Translate</option>
                   <option value="cloud-youdao" data-i18n="service.cloud-youdao">Youdao Translate</option>

@@ -130,7 +130,9 @@ website cannot truthfully copy.
 - MIT licensed, © 2026 Spencer Wu.
 - Documentation is bilingual (English, 简体中文) and that coverage is
   expected to continue.
-- There is no account and no login, and no key for the user to fill in.
+- There is no account and no login, and nothing to fill in: a fresh install translates
+  without a key. A key of the reader's own is optional, offered in one panel, and never
+  required.
 - The Windows downloads are published unsigned, together with a checksum.
 
 ## Evidence on Hand
@@ -157,7 +159,10 @@ website cannot truthfully copy.
    painted over.
 3. Answer the whole question the reader has about the selection — a word deserves
    a card, a paragraph deserves a smooth translation.
-4. Nothing to set up: no account, no login, no key.
+4. Nothing to set up: no account, no login, no key — and a key of the reader's own stays an
+   option rather than a step: it is filled in one panel, it is encrypted for the Windows
+   login that typed it, and the channel it unlocks appears in the list only while it is
+   filled in.
 5. A spare, quick card beats a rich but slow one, and the extras stay optional.
 
 ## Accessibility & Inclusion

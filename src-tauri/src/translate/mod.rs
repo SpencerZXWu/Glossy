@@ -1,5 +1,7 @@
 //! Translation providers and the orchestration that decides what to show.
 
+mod api_baidu;
+mod api_chat;
 mod cloud;
 mod dictionary;
 mod google;
@@ -12,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::classify::{self, Kind};
 use crate::log::note;
-use crate::settings::{Service, Settings};
+use crate::settings::{ApiCredentials, Service, Settings};
 
 pub use self::cloud::{
     new_install_id, quota as cloud_quota, rates as cloud_rates, Quota as CloudQuota,
@@ -627,6 +629,34 @@ async fn call_service(
             )
             .await
         }
+        // The two entries of the reader's own: the request goes straight from
+        // this machine to the service their account is with, and Glossy's relay
+        // is not in the path at all.
+        Service::ApiBaidu | Service::ApiOpenAi => match settings.api_credentials() {
+            Some(ApiCredentials::Baidu(credentials)) => {
+                api_baidu::translate(
+                    client,
+                    text,
+                    source,
+                    target,
+                    kind,
+                    &credentials.app_id,
+                    &credentials.api_key,
+                )
+                .await
+            }
+            Some(ApiCredentials::Chat(api)) => {
+                api_chat::translate(client, api, text, source, target, kind).await
+            }
+            // `sanitized` keeps the choice off a channel that has nothing
+            // behind it, so this is a file that was edited while the app was
+            // running rather than a state the window can produce.
+            None => Err(Failure::plain(
+                "This channel needs credentials of your own. Add them on the General page, or \
+                 choose another channel."
+                    .to_string(),
+            )),
+        },
         // The one service that is not a service: the text is translated on this
         // machine, which is a second of arithmetic rather than a request, so it
         // is put on a thread that is allowed to take it.

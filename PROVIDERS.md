@@ -11,22 +11,30 @@ Every fact here is taken from this repository: the README, [PRIVACY.md](./PRIVAC
 link to. Where the repository records no link to an upstream page, none is invented
 here.
 
-Last checked against this repository on 2026-10-02. The repository does not record the
+Last checked against this repository on 2026-10-05. The repository does not record the
 date its provider research was done. Free quotas and terms change without notice, and
 the numbers below are the ones the repository records rather than a live reading —
 check the upstream page before relying on any of them.
 
-## The four services
+## The services
 
-The build offers four entries, stored in the settings file's single `service` field
-under exactly these ids. A new install starts on `cloud-baidu`. There is no fifth
-entry, no way to add one, and no field anywhere for a provider key of the user's own.
+The build offers six entries, stored in the settings file's single `service` field under
+exactly these ids. A new install starts on `cloud-baidu`, and the four that need nothing
+filled in are always in the dropdown. The other two answer with an account of the user's
+own: they are in the dropdown only while the credentials on the **General** page are
+filled in, and a settings file that names one of them without those credentials reads as
+`cloud-baidu` instead — an entry that could only answer with an error is worse than an
+entry that is not offered. Those two keep their credentials on this machine, DPAPI
+protected for the Windows login that typed them, and send the text straight to the
+service they belong to; Glossy's relay is not in the path.
 
 | `service` | Who answers | What it costs the user | In the fallback order | Where the text goes |
 | --- | --- | --- | --- | --- |
 | `cloud-baidu` | Glossy's own relay, translating with Baidu (`vendor: "baidu"` on the wire) | nothing to set up | yes | the relay, then Baidu |
 | `cloud-youdao` | the same relay, translating with Youdao (`vendor: "youdao"`) | nothing to set up | yes | the relay, then Youdao |
 | `google` | Google's public `translate.googleapis.com` endpoint | free, no key | yes | Google |
+| `api-baidu` | Baidu's 通用文本翻译 API, with the user's own APP ID and key | the user's own Baidu quota | yes, once its credentials are filled in | Baidu, directly |
+| `api-openai` | whatever endpoint the user named, speaking the OpenAI chat completions protocol | the user's own account there | yes, once its credentials are filled in | that endpoint, directly |
 | `offline` | OPUS-MT models on this machine | one 244 MB download | no, deliberately | nowhere |
 
 ## `cloud-baidu`
@@ -123,6 +131,59 @@ is the one network entry in the list that does not pass through Glossy's own rel
 Only the text being translated is sent. Google receives it under its own privacy
 policy.
 
+## `api-baidu`
+
+**Who answers.** Baidu's own 通用文本翻译 API
+(`fanyi-api.baidu.com/api/trans/vip/translate`), called with an APP ID and a key the user
+obtained from the 百度翻译开放平台 console. The request is signed on this machine —
+`md5(appid + text + salt + key)` — and sent from here, so Glossy's relay is in the path
+neither for the text nor for the credential.
+
+**What it costs.** Nothing to the project, and whatever the user's own Baidu account costs:
+50k characters a month unverified, 1M personal-verified, 2M business-verified, QPS limited
+to 1 / 10 / 100. A standard account is offered the same 23 languages as `cloud-baidu`; the
+rest of Baidu's list answers with error `58001` unless the account is an enterprise
+尊享版, so they are not offered at all.
+
+**The terms that apply.** The same 翻译开放平台 服务协议 the relay entry is written against,
+but here the account holder is the user: the quota is theirs, and so is what the terms
+permit. As above, the terms forbid a *client program* from caching Baidu translation data
+and forbid resale; Glossy caches nothing, and offers no way to hand the credential or the
+quota to anybody else.
+
+**When it cannot answer.** Baidu answers HTTP 200 with an `error_code` for a missing field
+(`54000`), a bad signature (`54001`), a wrong APP ID (`52003`), a rate limit (`54003`) and
+an exhausted monthly quota (`54004`); each becomes a line that names what to check, and the
+fallback order moves on when it is on.
+
+**Where the text goes.** Straight to Baidu from this machine. Only the text being
+translated is sent, with the signature that authenticates the account.
+
+## `api-openai`
+
+**Who answers.** Whatever the user pointed the entry at: OpenAI, DeepSeek, Zhipu, or a model
+server on their own machine. One entry covers all of them because they share one protocol —
+the chat completions request — so the address, the key and the model are settings rather
+than a menu of vendors. The model is asked for a JSON object holding the translation and,
+for a single word, the phonetics, the meanings and an example sentence, so a word card is
+filled from one request. Every language Glossy offers is offered here, because a model is
+not limited by a vendor's table.
+
+**What it costs.** Whatever the user's account with that service costs. Glossy counts
+nothing for it and shows no allowance line.
+
+**The terms that apply.** The terms of the service the user pointed the entry at, which this
+project neither knows nor records.
+
+**When it cannot answer.** The status code and, after it, the service's own reason — an
+unknown model, a key without credit — are shown. `response_format` is deliberately not sent,
+because it is an OpenAI extension rather than part of the protocol every compatible server
+implements; a model that answers with prose instead of the JSON object it was asked for is
+reported as such rather than guessed at.
+
+**Where the text goes.** Straight to the address the user typed, from this machine, with the
+key in the `Authorization` header.
+
 ## `offline`
 
 **Who answers.** This machine. The entry runs OPUS-MT's `opus-mt-en-zh` and
@@ -216,8 +277,12 @@ account holder, which is why the two server-backed entries relay it that way.
   pays for, and fall back to Baidu credentials when no such account is configured, so
   what they make are paid calls and the terms above do not apply to them. No user ever
   sees or holds a vendor key: the app sends the text plus an install id, and the server
-  meters a daily allowance per device and address. There is no mode in this build where
-  the user enters a provider key of their own.
+  meters a daily allowance per device and address.
+- **`api-baidu` / `api-openai`** — the account is the user's own and so is the quota, and
+  the credential is used only by the copy of the app it was entered into: it is DPAPI
+  protected for that Windows login, the request is signed and sent from that machine, and
+  nothing in Glossy can hand the key or the quota to anybody else. The client caches no
+  translation, which is what the 服务协议 asks of a client program.
 
 ### Services Glossy does not ship
 
@@ -285,19 +350,25 @@ rather than take a summary on trust.
 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)，以及这些文件链接到的上游页面。仓库没有记录
 上游链接的地方，本文也不会凭空补一个。
 
-最后核对于 2026-10-02，依据本仓库。本仓库并未记录其调研日期。免费额度与条款随时可能变化，下文
+最后核对于 2026-10-05，依据本仓库。本仓库并未记录其调研日期。免费额度与条款随时可能变化，下文
 的数字是仓库记录下来的，而不是实时读数——在依赖其中任何一个之前，请先查上游页面。
 
-## 四项服务
+## 服务
 
-本构建提供四个条目，存在设置文件唯一的 `service` 字段里，用的就是下面这些 id。全新安装从
-`cloud-baidu` 开始。没有第五个条目，没有办法添加，也没有任何地方可以填入用户自己的服务商密钥。
+本构建提供六个条目，存在设置文件唯一的 `service` 字段里，用的就是下面这些 id。全新安装从
+`cloud-baidu` 开始；四个不需要填写任何东西的条目始终在下拉框里。另外两个用用户自己的账号作答：
+只有在**常规**页把凭据填好之后它们才会出现在下拉框里，而一份点名了它们、却没有这些凭据的设置文件
+会被读成 `cloud-baidu`——一个只能报错的条目，比一个根本不提供的条目更糟。这两个条目的凭据保存在
+本机、用 `DPAPI` 按输入它的那个 Windows 登录加密，文字从本机直接发往它所属的那个服务，Glossy 的
+中转服务完全不在链路上。
 
 | `service` | 由谁作答 | 用户要付出什么 | 是否在回退顺序里 | 文字发往何处 |
 | --- | --- | --- | --- | --- |
 | `cloud-baidu` | Glossy 自己的中转服务，用百度来译（协议上是 `vendor: "baidu"`） | 无需填写 | 是 | 中转服务，再到百度 |
 | `cloud-youdao` | 同一台中转服务，用有道来译（`vendor: "youdao"`） | 无需填写 | 是 | 中转服务，再到有道 |
 | `google` | Google 公开的 `translate.googleapis.com` 接口 | 免费，无需密钥 | 是 | Google |
+| `api-baidu` | 百度自家的通用文本翻译接口，用用户自己的 APP ID 与密钥 | 用户自己百度账号的额度 | 是，凭据填好之后 | 直接发往百度 |
+| `api-openai` | 用户指定的任何兼容 OpenAI chat completions 协议的接口 | 用户在那个服务上的账号 | 是，凭据填好之后 | 直接发往那个接口 |
 | `offline` | 本机的 OPUS-MT 模型 | 一次 244 MB 的下载 | 否，刻意如此 | 不发往任何地方 |
 
 ## `cloud-baidu`
@@ -363,6 +434,44 @@ ROADMAP 记录的其使用条款并不明确。它随时可能开始限流或改
 
 **文字发往何处。** 直接发到 `translate.googleapis.com`，不再转发：这是列表里唯一不经过 Glossy
 自己中转服务的联网条目。只发送被翻译的文字。Google 按其自己的隐私政策接收它。
+
+## `api-baidu`
+
+**由谁作答。** 百度自家的通用文本翻译接口（`fanyi-api.baidu.com/api/trans/vip/translate`），
+用用户在百度翻译开放平台申请来的 APP ID 与密钥调用。请求在本机签名——`md5(appid + 原文 + salt + 密钥)`
+——也从本机发出，所以无论原文还是凭据，都不经过 Glossy 的中转服务。
+
+**要花什么代价。** 对项目而言不花什么，代价就是用户自己百度账号的那份额度：未认证每月 50k 字符、
+个人认证 1M、企业认证 2M，QPS 限制 1 / 10 / 100。普通账号与 `cloud-baidu` 一样提供那 23 种语言；
+百度列表里其余的语言在非企业尊享版账号上会返回 `58001`，所以压根不提供。
+
+**适用什么条款。** 和走中转服务的那个条目依据同一份翻译开放平台服务协议，但这里的账号持有者是用户
+本人：额度是他的，条款允许什么也由他决定。同上，该协议禁止*客户端程序*缓存百度翻译数据，也禁止转售；
+Glossy 不缓存任何内容，也没有任何把凭据或额度转手给别人的途径。
+
+**答不上来时。** 字段缺失（`54000`）、签名不对（`54001`）、APP ID 不对（`52003`）、被限流
+（`54003`）以及当月额度用尽（`54004`）时，百度都以 HTTP 200 加 `error_code` 返回；每一种都会被
+翻译成一行说明该检查什么，回退开关打开时会继续试下一项。
+
+**文字发往何处。** 从本机直接发往百度。发送的只有被翻译的原文，以及用于认证账号的签名。
+
+## `api-openai`
+
+**由谁作答。** 用户把这个条目指向谁就是谁：OpenAI、DeepSeek、智谱，或他本机的模型服务。一个条目能
+覆盖它们全部，是因为它们共用同一套协议——chat completions 请求——所以地址、密钥和模型是设置项，
+而不是一份厂商菜单。模型被要求只回一个 JSON 对象，其中包含译文；如果选中的是单个单词，还要给出音标、
+释义和例句，因此一张单词卡一次请求就能凑齐。这里提供 Glossy 支持的全部语言，因为模型不受某家厂商
+的语言表限制。
+
+**要花什么代价。** 就是用户在那个服务上的账号代价。Glossy 不做任何计量，也不显示额度行。
+
+**适用什么条款。** 用户指向的那个服务自己的条款，本项目既不知道也不记录。
+
+**答不上来时。** 状态码之后会带上该服务自己的原因——模型名不存在、密钥没有余额。`response_format`
+是刻意不发的，因为它是 OpenAI 的扩展而不是所有兼容服务都实现的协议内容；如果模型回了一段散文而不是
+被要求的 JSON 对象，应用会如实报告，而不是去猜。
+
+**文字发往何处。** 从本机直接发往用户填写的地址，密钥放在 `Authorization` 头里。
 
 ## `offline`
 
@@ -434,8 +543,10 @@ ROADMAP 记录的其使用条款并不明确。它随时可能开始限流或改
 
 - **`cloud-baidu` / `cloud-youdao`** —— 它们走的是本项目付费的 LLM 账号；没有配置该账号时则退回
   百度凭据，因此发出的是付费调用，上面的条款对它不适用。任何用户都看不到也拿不到厂商密钥：应用只
-  发送文本和一个安装 id，服务器按设备和地址计算每日额度。本构建没有任何让用户填入自己服务商密钥的
-  模式。
+  发送文本和一个安装 id，服务器按设备和地址计算每日额度。
+- **`api-baidu` / `api-openai`** —— 账号是用户自己的，额度也是他自己的，而且这份凭据只被填过它的
+  那一份客户端使用：它按当前 Windows 登录用 `DPAPI` 加密，请求在那台机器上签名并发出，Glossy 里
+  没有任何东西可以把密钥或额度转手给别人。客户端不缓存任何译文，这也正是服务协议对客户端程序的要求。
 
 ### Glossy 并未内置的服务
 
@@ -452,7 +563,8 @@ ROADMAP 记录的其使用条款并不明确。它随时可能开始限流或改
   所以不要指望它。
 - **百度翻译开放平台** —— 未认证 50k 字符/月，个人认证 1M，企业认证 2M。其条款对商业使用只字未提，
   但服务协议禁止*客户端程序*缓存百度翻译数据，也禁止转售。Glossy 不缓存任何内容，所以这不会造成
-  影响；某个加了缓存的分支则需要重新审视这一点。额度受 QPS 限制为 1 / 10 / 100。
+  影响；某个加了缓存的分支则需要重新审视这一点。额度受 QPS 限制为 1 / 10 / 100。这套凭据在构建里
+  仍然没有内置，但用户可以自己填——见上面的 `api-baidu`，那里的账号持有者就是用户本人。
 - **火山引擎** —— 每月 2M 字符，但开通需要签订销售合同。
 - **小牛翻译** —— 注册后每天 200k 字符；商业条款未公开。
 - **SiliconFlow** —— `tencent/Hunyuan-MT-7B` 免费，但平台条款对免费模型只字未提，且只限于企业内部

@@ -17,5 +17,6 @@ pub mod input;
 pub mod input_hook;
 pub mod instance;
 pub mod screen;
+pub mod secrets;
 pub mod speech;
 pub mod uia;

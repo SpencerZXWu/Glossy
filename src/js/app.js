@@ -79,6 +79,11 @@
     fallbackList: $("fallbackList"),
     targetLang: $("targetLang"),
     service: $("service"),
+    apiBaiduAppId: $("apiBaiduAppId"),
+    apiBaiduKey: $("apiBaiduKey"),
+    apiChatEndpoint: $("apiChatEndpoint"),
+    apiChatKey: $("apiChatKey"),
+    apiChatModel: $("apiChatModel"),
     cloudBlock: $("cloudBlock"),
     cloudQuota: $("cloudQuota"),
     cloudQuotaRefresh: $("cloudQuotaRefresh"),
@@ -879,24 +884,56 @@
   }
 
   /**
-   * Puts the same list of engines on the Translate page.
+   * Offers, or stops offering, the two entries of the reader's own.
    *
-   * It is copied rather than written twice: the entries and the keys that name
-   * them live in the markup of the Language page, and two hand-kept lists that
-   * have to agree eventually do not.
+   * What they need is typed on the General page, and an entry is only in the
+   * dropdown once it is filled in, so the list is rebuilt as the field is typed
+   * into. The rebuild only happens when the set of engines really changed: a
+   * keystroke into a key that does not make an entry appear has nothing to
+   * redraw, and the debounced save is what carries the key to the file.
+   */
+  async function setCredentials() {
+    const before = offeredServices().join();
+    readCredentials();
+    const after = offeredServices().join();
+    if (before !== after) {
+      const chosen = els.service.value;
+      fillServiceOptions();
+      // The chosen engine may have just lost its credentials, and it cannot stay
+      // the choice: the same path a change of the dropdown takes is what settles
+      // the languages, the fallback list and the card.
+      if (els.service.value !== chosen) {
+        await chooseService(els.service.value);
+        return;
+      }
+      syncService();
+    }
+    scheduleSave();
+  }
+
+  /**
+   * Fills the two dropdowns of engines, both from one list.
+   *
+   * The Language page offers it and the Translate page shows the same entries, so
+   * one list is what builds both rather than two hand-kept ones: lists that have
+   * to agree eventually do not. An entry that needs credentials of the reader's
+   * own is only in the list while those are filled in, which is the other reason
+   * the entries are built here instead of being written in the markup.
    */
   function fillServiceOptions() {
-    els.demoService.innerHTML = "";
-    Array.from(els.service.options).forEach((option) => {
-      els.demoService.appendChild(new Option(option.textContent, option.value));
-    });
-    els.demoService.value = els.service.value;
+    const offered = offeredServices();
+    const chosen = offered.indexOf(els.service.value) === -1 ? offered[0] : els.service.value;
+    for (const select of [els.service, els.demoService]) {
+      select.innerHTML = "";
+      for (const id of offered) select.appendChild(new Option(serviceLabel(id), id));
+      select.value = chosen;
+    }
   }
 
   /** The dropdown value that matches what the settings file holds. */
   function serviceOf(stored) {
     const wanted = String(stored.service || "");
-    return SERVICES.indexOf(wanted) === -1 ? "cloud-baidu" : wanted;
+    return offeredServices().indexOf(wanted) === -1 ? "cloud-baidu" : wanted;
   }
 
   /**
@@ -1690,7 +1727,35 @@
   }
 
   /** The services of the dropdown, in the order it offers them. */
-  const SERVICES = ["cloud-baidu", "cloud-youdao", "google", "offline"];
+  const SERVICES = ["cloud-baidu", "cloud-youdao", "google", "api-baidu", "api-openai", "offline"];
+
+  /**
+   * The services that only exist once the reader has filled something in.
+   *
+   * Their credentials live on the General page, and one that has not been filled
+   * in is not an engine to offer: it is a name that would answer with an error,
+   * which is worse than not being in the list. The backend applies the same rule
+   * to the settings file, so the list and the translation cannot disagree.
+   */
+  const CREDENTIAL_SERVICES = ["api-baidu", "api-openai"];
+
+  /** Whether each of those is filled in, as the fields on the General page say. */
+  const credentials = {};
+
+  /** Reads the General page's fields, which is what makes an entry appear. */
+  function readCredentials() {
+    credentials["api-baidu"] = Boolean(
+      els.apiBaiduAppId.value.trim() && els.apiBaiduKey.value.trim(),
+    );
+    credentials["api-openai"] = Boolean(
+      els.apiChatKey.value.trim() && els.apiChatModel.value.trim(),
+    );
+  }
+
+  /** The services the reader may choose from, in the order the dropdown shows them. */
+  function offeredServices() {
+    return SERVICES.filter((id) => CREDENTIAL_SERVICES.indexOf(id) === -1 || credentials[id]);
+  }
 
   /**
    * The services the list under the chosen one may hold.
@@ -1700,13 +1765,16 @@
    * and a file that names it there has it dropped on the next save — which is
    * what the backend's `service_order` is written to expect.
    */
-  const FALLBACK_SERVICES = SERVICES.filter((id) => id !== "offline");
+  function fallbackServices() {
+    return offeredServices().filter((id) => id !== "offline");
+  }
 
   /** Keeps every service once, and drops anything this build does not offer. */
   function normalizeFallbackOrder(list) {
+    const offered = fallbackServices();
     const seen = Object.create(null);
     return (Array.isArray(list) ? list : []).filter((service) => {
-      if (FALLBACK_SERVICES.indexOf(service) === -1 || seen[service]) return false;
+      if (offered.indexOf(service) === -1 || seen[service]) return false;
       seen[service] = true;
       return true;
     });
@@ -1724,7 +1792,7 @@
    */
   function fallbackFor(service) {
     const known = normalizeFallbackOrder(fallbackOrder);
-    const others = FALLBACK_SERVICES.filter((id) => id !== service);
+    const others = fallbackServices().filter((id) => id !== service);
     return others
       .filter((id) => known.indexOf(id) !== -1)
       .concat(others.filter((id) => known.indexOf(id) === -1));
@@ -2280,8 +2348,8 @@
   function applyLanguage() {
     Glossy.i18n.apply(document);
     syncShortcutHints();
-    // The channel list is copied from the one in the markup, so it is filled
-    // after the entries themselves have their language back.
+    // The channel list is built from the dictionary, so it is filled after the
+    // table it reads its entries from has the new language.
     fillServiceOptions();
     renderGuide();
     renderIgnored();
@@ -2330,6 +2398,17 @@
     // written back any more.
     pickedService = false;
     pickedTarget = false;
+    // The reader's own credentials come first: whether an entry of theirs is
+    // filled in decides whether it is in the dropdown at all, and everything
+    // that follows from the list of engines reads that.
+    const api = next.apiBaidu || {};
+    const chat = next.apiOpenai || {};
+    els.apiBaiduAppId.value = api.appId || "";
+    els.apiBaiduKey.value = api.apiKey || "";
+    els.apiChatEndpoint.value = chat.endpoint || "";
+    els.apiChatKey.value = chat.apiKey || "";
+    els.apiChatModel.value = chat.model || "";
+    readCredentials();
     els.enabled.checked = !!next.enabled;
     els.triggerOnDrag.checked = !!next.triggerOnDrag;
     els.triggerOnDoubleClick.checked = !!next.triggerOnDoubleClick;
@@ -2434,6 +2513,17 @@
       subtitleFontSize: Math.min(40, Math.max(13, numberOr(els.subtitleFontSize.value, stored.subtitleFontSize || 26))),
       targetLang: pickedTarget ? els.targetLang.value : String(stored.targetLang || ""),
       uiLang: els.uiLang.value,
+      // The credentials of the two entries of the reader's own, as the fields on
+      // the General page hold them. The backend protects what it writes.
+      apiBaidu: {
+        appId: els.apiBaiduAppId.value.trim(),
+        apiKey: els.apiBaiduKey.value.trim(),
+      },
+      apiOpenai: {
+        endpoint: els.apiChatEndpoint.value.trim(),
+        apiKey: els.apiChatKey.value.trim(),
+        model: els.apiChatModel.value.trim(),
+      },
       guideSeen,
     };
   }
@@ -2960,6 +3050,15 @@
     applyTheme(els.theme.value);
     scheduleSave();
   });
+  // The two entries of the reader's own: what they need is typed here, and an
+  // entry joins the list of engines the moment it is complete.
+  [
+    els.apiBaiduAppId,
+    els.apiBaiduKey,
+    els.apiChatEndpoint,
+    els.apiChatKey,
+    els.apiChatModel,
+  ].forEach((field) => field.addEventListener("input", () => setCredentials()));
   const accentCustom = $("accentCustom");
   if (accentCustom) {
     // The system's picker fires `input` while it is being dragged, so a colour

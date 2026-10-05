@@ -16,14 +16,14 @@ pub const MIN_SELECTION_LEN: usize = 2;
 /// `contract/contract.json` publishes this number next to the keys this build
 /// writes and the IPC commands it answers to, and a test fails when the file and
 /// the code disagree. The number only moves when the stored shape changes in a
-/// way `parse` cannot absorb on its own — a key that is renamed or removed, or
+/// way `parse` cannot absorb on its own â€” a key that is renamed or removed, or
 /// one that changes meaning. Added keys come from `#[serde(default)]` and leave
 /// the number alone. When it does move, `migrate` carries every file written
 /// before it up to it, so a settings file from any `1.3.0` or later release
 /// keeps loading.
 ///
 /// Version 2 is the release that folds the four fields naming the translation
-/// service — `channel`, `cloudProvider`, `cloudVendor` and `provider` — into the
+/// service â€” `channel`, `cloudProvider`, `cloudVendor` and `provider` â€” into the
 /// single `service` this build writes, and drops the two fields nothing has read
 /// for years: the address of the relay, which the build carries, and the
 /// credential map, which no service in this build asks for. Everything a file
@@ -53,6 +53,15 @@ pub enum Service {
     CloudYoudao,
     /// The free public Google endpoint.
     Google,
+    /// Baidu, on the APP ID and key the reader filled in themselves. The same
+    /// engine the relay asks, on somebody else's account: which one paid is
+    /// what the two entries are named for.
+    #[serde(rename = "api-baidu")]
+    ApiBaidu,
+    /// An OpenAI compatible endpoint the reader named, which is one entry
+    /// because one entry covers every service that speaks that protocol.
+    #[serde(rename = "api-openai")]
+    ApiOpenAi,
     /// The models on this machine, which translate Chinese and English and
     /// nothing else.
     Offline,
@@ -62,11 +71,16 @@ impl Service {
     /// Every entry, in the order the dropdown shows them.
     ///
     /// The window builds its dropdown from the markup, so what walks this list
-    /// is [`Service::from_id`] and the tests.
-    pub const ALL: [Service; 4] = [
+    /// is [`Service::from_id`] and the tests. The two entries that need
+    /// credentials of the reader's own are in it as well: what keeps them off
+    /// the dropdown until they are filled in is the window and
+    /// [`Settings::sanitized`], not this list.
+    pub const ALL: [Service; 6] = [
         Service::CloudBaidu,
         Service::CloudYoudao,
         Service::Google,
+        Service::ApiBaidu,
+        Service::ApiOpenAi,
         Service::Offline,
     ];
 
@@ -76,22 +90,34 @@ impl Service {
             Service::CloudBaidu => "cloud-baidu",
             Service::CloudYoudao => "cloud-youdao",
             Service::Google => "google",
+            Service::ApiBaidu => "api-baidu",
+            Service::ApiOpenAi => "api-openai",
             Service::Offline => "offline",
         }
     }
 
     /// The name of the engine that answers, the way a result carries it.
     ///
-    /// The two cloud entries are one relay in front of two engines, so `id` —
-    /// which names the *entry* — is not what a card should show: what answered
-    /// is Baidu or Youdao.
+    /// The two cloud entries are one relay in front of two engines, so `id` â€”
+    /// which names the *entry* â€” is not what a card should show: what answered
+    /// is Baidu or Youdao. The two entries of the reader's own are named after
+    /// the protocol for the same reason: the endpoint behind `api-openai` is
+    /// whatever they pointed it at, and which account paid is the one thing the
+    /// card can say for certain.
     pub fn provider(self) -> &'static str {
         match self {
             Service::CloudBaidu => "baidu",
             Service::CloudYoudao => "youdao",
             Service::Google => "google",
+            Service::ApiBaidu => "api-baidu",
+            Service::ApiOpenAi => "api-openai",
             Service::Offline => "offline",
         }
+    }
+
+    /// Whether the entry only exists once the reader has filled something in.
+    pub fn needs_credentials(self) -> bool {
+        matches!(self, Service::ApiBaidu | Service::ApiOpenAi)
     }
 
     /// The entry an id names; the inverse of [`Service::id`].
@@ -110,7 +136,7 @@ impl Service {
     ///
     /// A `1.x` file spread the choice over `channel`, `cloudProvider`,
     /// `cloudVendor` and `provider`, and named entries this build no longer
-    /// offers — a provider that wanted the user's own key, a vendor the server
+    /// offers â€” a provider that wanted the user's own key, a vendor the server
     /// dropped, a model reached over an OpenAI-compatible endpoint. All of them
     /// read as the entry that is nearest to what they meant, so a window always
     /// has something to show and the first save writes the current shape.
@@ -156,6 +182,109 @@ impl Service {
         }
         Service::CloudBaidu
     }
+}
+
+/// The pair of credentials Baidu hands out, both of which it needs.
+///
+/// The values are the reader's own: what is in memory is the key, and what
+/// reaches the disk is DPAPI protected (see `platform::secrets`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Credentials {
+    /// Baidu only: the public half of the credential pair.
+    pub app_id: String,
+    /// API key, or Baidu's secret half.
+    pub api_key: String,
+}
+
+impl Credentials {
+    /// Whether either half is empty, which is what "not filled in yet" means.
+    pub fn is_empty(&self) -> bool {
+        self.app_id.trim().is_empty() || self.api_key.trim().is_empty()
+    }
+
+    fn trimmed(&self) -> Credentials {
+        Credentials {
+            app_id: self.app_id.trim().to_string(),
+            api_key: self.api_key.trim().to_string(),
+        }
+    }
+
+    /// The two fields under the names they carry in the JSON file, so the
+    /// protect-and-reveal pass does not have to name them twice.
+    fn fields(&mut self) -> [(&'static str, &mut String); 2] {
+        [("appId", &mut self.app_id), ("apiKey", &mut self.api_key)]
+    }
+}
+
+/// An OpenAI compatible endpoint the reader named, and the key it takes.
+///
+/// One entry covers every service that speaks the chat completions protocol:
+/// OpenAI, DeepSeek, Zhipu, a model server on this machine. The address is kept
+/// as the reader wrote it, with the path up to the version (`â€¦/v1`); the
+/// completion path is added to it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChatApi {
+    pub endpoint: String,
+    pub api_key: String,
+    pub model: String,
+}
+
+/// Address a fresh install points the OpenAI compatible entry at.
+pub const DEFAULT_CHAT_ENDPOINT: &str = "https://api.openai.com/v1";
+
+impl Default for ChatApi {
+    fn default() -> Self {
+        ChatApi {
+            endpoint: DEFAULT_CHAT_ENDPOINT.to_string(),
+            api_key: String::new(),
+            model: String::new(),
+        }
+    }
+}
+
+impl ChatApi {
+    /// Whether this entry is filled in enough to be offered.
+    ///
+    /// The key and the model are what it takes: the address has a default, and
+    /// a model the reader has not named is a request that cannot be made.
+    pub fn is_empty(&self) -> bool {
+        self.api_key.trim().is_empty() || self.model.trim().is_empty()
+    }
+
+    fn trimmed(&self) -> ChatApi {
+        ChatApi {
+            endpoint: self.endpoint.trim().trim_end_matches('/').to_string(),
+            api_key: self.api_key.trim().to_string(),
+            model: self.model.trim().to_string(),
+        }
+    }
+
+    /// The completion URL this entry asks, which the client builds and the
+    /// panel shows, so both mean the same request.
+    pub fn completion_url(&self) -> String {
+        format!("{}/chat/completions", self.endpoint.trim_end_matches('/'))
+    }
+
+    /// The one field of this entry that is a secret.
+    ///
+    /// The address and the model are configuration rather than credentials:
+    /// protecting them would only make the file unreadable to the person who
+    /// needs to see which service it points at.
+    fn fields(&mut self) -> [(&'static str, &mut String); 1] {
+        [("apiKey", &mut self.api_key)]
+    }
+}
+
+/// The credentials the chosen entry translates with.
+///
+/// Borrowed rather than cloned: a caller that needs them is on the way to make
+/// a request, and a key copied about the process is a key in more places than it
+/// has to be.
+pub enum ApiCredentials<'a> {
+    Baidu(&'a Credentials),
+    Chat(&'a ChatApi),
 }
 
 /// Language the interface itself is drawn in.
@@ -241,7 +370,7 @@ pub enum Theme {
 ///
 /// `Theme` decides light or dark; this decides the hues. The default is the
 /// WinUI palette the stylesheet carries in `:root`, and every other entry is a
-/// block of the same semantic tokens in `tokens.css` — so a palette changes the
+/// block of the same semantic tokens in `tokens.css` â€” so a palette changes the
 /// colours and never the layering. Each one states both halves, which is why
 /// the two settings are separate rather than one list of twelve.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -399,6 +528,15 @@ pub struct Settings {
     /// `cloudProvider`, `cloudVendor` and `provider`, which `migrate` folds
     /// into this.
     pub service: Service,
+    /// Baidu credentials the reader filled in themselves.
+    ///
+    /// Empty until they do, and the entry that uses them is not offered until
+    /// then: see [`Service::needs_credentials`].
+    #[serde(default)]
+    pub api_baidu: Credentials,
+    /// The OpenAI compatible endpoint the reader named, on the same terms.
+    #[serde(default)]
+    pub api_openai: ChatApi,
     /// Random identifier of this installation, so the proxy can count the daily
     /// characters of one device. Derived from the machine rather than drawn at
     /// random, so installing the app again does not land on a new allowance.
@@ -522,6 +660,8 @@ impl Default for Settings {
             // A fresh install asks Glossy's own server, which needs nothing
             // filled in and works from mainland China.
             service: Service::CloudBaidu,
+            api_baidu: Credentials::default(),
+            api_openai: ChatApi::default(),
             cloud_id: crate::translate::new_install_id(),
             restore_clipboard: true,
             show_original: true,
@@ -575,6 +715,104 @@ impl Settings {
     /// `migrate` before anything reads it.
     pub fn set_service(&mut self, service: Service) {
         self.service = service;
+    }
+
+    /// Whether the credentials an entry needs have been filled in.
+    ///
+    /// The entries that need none are always ready. This is what decides whether
+    /// the two of the reader's own are offered at all, and the window applies
+    /// the same rule to its dropdown, so the list and the translation never
+    /// disagree.
+    pub fn credentials_filled(&self, service: Service) -> bool {
+        match service {
+            Service::ApiBaidu => !self.api_baidu.is_empty(),
+            Service::ApiOpenAi => !self.api_openai.is_empty(),
+            _ => true,
+        }
+    }
+
+    /// The credentials the chosen entry translates with, or nothing when the
+    /// choice needs none.
+    pub fn api_credentials(&self) -> Option<ApiCredentials<'_>> {
+        match self.service {
+            Service::ApiBaidu if !self.api_baidu.is_empty() => {
+                Some(ApiCredentials::Baidu(&self.api_baidu))
+            }
+            Service::ApiOpenAi if !self.api_openai.is_empty() => {
+                Some(ApiCredentials::Chat(&self.api_openai))
+            }
+            _ => None,
+        }
+    }
+
+    /// Replaces every protected credential with the key it protects.
+    ///
+    /// Answers whether the file has to be written again, which it has when a
+    /// value was still plain text (an older file) or could not be unlocked at
+    /// all â€” a key protected for another Windows login is a key this one cannot
+    /// use, and leaving the unusable blob in the file would only mislead the
+    /// next read. A key that is dropped takes its entry with it: the choice
+    /// falls back on what needs nothing, which is what `sanitized` enforces.
+    fn reveal_credentials(&mut self) -> bool {
+        let mut rewrite = false;
+        for (name, field, value) in self.stored_credentials() {
+            if value.is_empty() {
+                continue;
+            }
+            if !crate::platform::secrets::is_protected(value) {
+                rewrite = true;
+                continue;
+            }
+            match crate::platform::secrets::reveal(value) {
+                Some(plain) => *value = plain,
+                None => {
+                    note!(
+                        "glossy: the {field} of `{name}` was protected for another Windows \
+                         login, so it has to be entered again"
+                    );
+                    *value = String::new();
+                    rewrite = true;
+                }
+            }
+        }
+        // `parse` sanitized the blob it read, so the trimming and the fallback it
+        // decides were applied to a protected value rather than to the key. Now
+        // that the keys are plain text it is run again, which is also what turns a
+        // key that could not be unlocked into the fallback it takes with it.
+        *self = std::mem::take(self).sanitized();
+        rewrite
+    }
+
+    /// The copy that goes to disk â€” and to an export, which is the same shape
+    /// for the same reason: neither is a place to leave a key in the open.
+    pub fn protected_for_storage(&self) -> Settings {
+        let mut stored = self.clone();
+        for (name, field, value) in stored.stored_credentials() {
+            if value.is_empty() || crate::platform::secrets::is_protected(value) {
+                continue;
+            }
+            match crate::platform::secrets::protect(value) {
+                Ok(protected) => *value = protected,
+                // Storing the key unprotected beats losing it; DPAPI is part of
+                // Windows, so this only happens in a broken environment.
+                Err(error) => {
+                    note!("glossy: cannot protect the {field} of `{name}`: {error}")
+                }
+            }
+        }
+        stored
+    }
+
+    /// Every credential field, with the name it is reported under.
+    fn stored_credentials(&mut self) -> Vec<(&'static str, &'static str, &mut String)> {
+        let mut fields = Vec::new();
+        for (field, value) in self.api_baidu.fields() {
+            fields.push(("baidu", field, value));
+        }
+        for (field, value) in self.api_openai.fields() {
+            fields.push(("openai", field, value));
+        }
+        fields
     }
 
     /// The services a translation may be asked of, the chosen one first.
@@ -633,6 +871,12 @@ impl Settings {
                     settings.cloud_id = crate::translate::new_install_id();
                     rewrite = true;
                 }
+                // The keys belong to this Windows login, which `parse` cannot
+                // know: what it read is the protected blob, and what the rest of
+                // the application needs is the key itself.
+                if settings.reveal_credentials() {
+                    rewrite = true;
+                }
                 if rewrite {
                     // The file was missing something this build computes, so
                     // write the result back; failing to do so only means the
@@ -650,8 +894,8 @@ impl Settings {
     /// Whether a stored file is in a shape this build cannot read, which means
     /// the defaults are used instead.
     ///
-    /// Two cases. A file that is not a JSON object at all — a hand edit that
-    /// broke it, or half a file after a crash — and one written by a *newer*
+    /// Two cases. A file that is not a JSON object at all â€” a hand edit that
+    /// broke it, or half a file after a crash â€” and one written by a *newer*
     /// format, whose settings this build would only misread: a key that means
     /// something else there would be taken as the value it used to have. A file
     /// that names no version is the one written before the freeze, which is
@@ -712,8 +956,8 @@ impl Settings {
             // removed: a key left behind would be merged back in by `parse` as
             // a value nothing reads.
             //
-            // A version 0 file names only a provider, and one of those — the
-            // free endpoint — is an entry of its own, which `from_legacy` knows.
+            // A version 0 file names only a provider, and one of those â€” the
+            // free endpoint â€” is an entry of its own, which `from_legacy` knows.
             //
             // A file that already names `service` is left as it is: it is a
             // hand edit or a file whose version says nothing, and reading the
@@ -837,7 +1081,14 @@ impl Settings {
         if !known {
             return Err("this file holds no Glossy setting".to_string());
         }
-        Ok(Self::parse(text))
+        let settings = Self::parse(text);
+        // The file was written by `export_settings`, which protects the keys the
+        // same way the settings file does, so they are unlocked here. A key that
+        // belongs to another Windows login cannot be unlocked, and what is left
+        // of it is dropped rather than stored as a blob nothing can read.
+        let mut settings = settings;
+        settings.reveal_credentials();
+        Ok(settings.sanitized())
     }
 
     pub fn save(&self, app: &AppHandle) -> Result<(), String> {
@@ -845,7 +1096,8 @@ impl Settings {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        let json = serde_json::to_string_pretty(&self.protected_for_storage())
+            .map_err(|e| e.to_string())?;
         std::fs::write(&path, json).map_err(|e| e.to_string())
     }
 
@@ -911,6 +1163,19 @@ impl Settings {
         if !self.trigger_on_drag && !self.trigger_on_double_click {
             self.trigger_on_drag = true;
         }
+        // The reader's own credentials: trimmed here so nothing downstream has
+        // to, and held against the same rule the window uses to decide whether
+        // the entry is worth offering.
+        self.api_baidu = self.api_baidu.trimmed();
+        self.api_openai = self.api_openai.trimmed();
+        // An entry that needs credentials is not offered without them, and a
+        // file that names one anyway â€” a hand edit, or a key that belonged to
+        // another Windows login â€” reads as the entry that needs nothing. The
+        // window applies the same rule to its dropdown, so what it shows and
+        // what translates are never two different engines.
+        if self.service.needs_credentials() && !self.credentials_filled(self.service) {
+            self.service = Service::CloudBaidu;
+        }
         // The order is a list the window lets the user shuffle, so a hand edit
         // is as likely as a click; a duplicate would only be tried twice.
         //
@@ -919,9 +1184,21 @@ impl Settings {
         // them, and a fallback that quietly reaches for a 244 MB download is not
         // what turning the switch on asks for. A file that names it there loses
         // it the next time the settings are written.
+        //
+        // An entry of the reader's own goes the same way when its credentials
+        // are not filled in: a fallback is a substitution the app makes, and one
+        // that cannot be made is worse than none.
+        let baidu = !self.api_baidu.is_empty();
+        let chat = !self.api_openai.is_empty();
         let mut seen: Vec<Service> = Vec::new();
         self.fallback_order.retain(|service| {
-            if *service == Service::Offline || seen.contains(service) {
+            let usable = match service {
+                Service::Offline => false,
+                Service::ApiBaidu => baidu,
+                Service::ApiOpenAi => chat,
+                _ => true,
+            };
+            if !usable || seen.contains(service) {
                 false
             } else {
                 seen.push(*service);
@@ -1007,7 +1284,7 @@ mod tests {
 
     #[test]
     fn one_unreadable_setting_keeps_the_rest_of_the_file() {
-        // A file that names a credential map — one this build no longer has —
+        // A file that names a credential map â€” one this build no longer has â€”
         // and one setting written by hand as a word: the map is dropped, and
         // only that setting falls back to its default.
         let settings = Settings::parse(
@@ -1144,8 +1421,8 @@ mod tests {
 
     #[test]
     fn the_languages_that_are_read_with_survive_a_settings_file() {
-        // A name this build does not know — a hand edit, or a language a later
-        // build dropped — is dropped from the list instead of being carried
+        // A name this build does not know â€” a hand edit, or a language a later
+        // build dropped â€” is dropped from the list instead of being carried
         // into a download of a model that does not exist, and a list that is
         // left with nothing is the language that was always there.
         let packs = |values: &[&str]| {
@@ -1172,7 +1449,7 @@ mod tests {
         // read as Chinese and English instead.
         let settings = Settings::parse("{\"ocrPack\":\"ja\"}");
         assert_eq!(settings.ocr_packs, vec!["ja"]);
-        // A file that names both — a hand edit — is read as the newer key.
+        // A file that names both â€” a hand edit â€” is read as the newer key.
         let settings = Settings::parse("{\"ocrPack\":\"ja\",\"ocrPacks\":[\"cht\"]}");
         assert_eq!(settings.ocr_packs, vec!["cht"]);
     }
@@ -1473,11 +1750,28 @@ mod tests {
     #[test]
     fn a_one_field_file_is_read_as_the_service_it_names() {
         for service in Service::ALL {
-            let written = serde_json::to_string(&Settings {
-                service,
-                ..Settings::default()
-            })
-            .unwrap();
+            // The two entries of the reader's own only exist with credentials
+            // behind them, so a file that names one has to carry them too.
+            let filled = match service {
+                Service::ApiBaidu => Settings {
+                    api_baidu: Credentials {
+                        app_id: "2024".to_string(),
+                        api_key: "key".to_string(),
+                    },
+                    ..Settings::default()
+                },
+                Service::ApiOpenAi => Settings {
+                    api_openai: ChatApi {
+                        api_key: "sk-x".to_string(),
+                        model: "gpt-4o-mini".to_string(),
+                        ..ChatApi::default()
+                    },
+                    ..Settings::default()
+                },
+                _ => Settings::default(),
+            };
+
+            let written = serde_json::to_string(&Settings { service, ..filled }).unwrap();
 
             assert_eq!(
                 Settings::parse(&written).service(),
@@ -1535,6 +1829,146 @@ mod tests {
         for gone in ["cloudEndpoint", "credentials", "apiKey", "appId"] {
             assert!(written.get(gone).is_none(), "{gone} survived");
         }
+    }
+
+    #[test]
+    fn an_entry_with_nothing_behind_it_is_not_offered() {
+        // The rule the dropdown and the engine share: an entry of the reader's
+        // own exists only once its credentials do.
+        let empty = Settings::default();
+        assert!(!empty.credentials_filled(Service::ApiBaidu));
+        assert!(!empty.credentials_filled(Service::ApiOpenAi));
+        // One half of a Baidu pair is not a credential.
+        let half = Settings {
+            api_baidu: Credentials {
+                app_id: "2024".to_string(),
+                api_key: String::new(),
+            },
+            ..Settings::default()
+        };
+        assert!(!half.credentials_filled(Service::ApiBaidu));
+        // The key and the model are what an OpenAI compatible entry needs; the
+        // address has a default.
+        let keyed = Settings {
+            api_openai: ChatApi {
+                api_key: "sk-x".to_string(),
+                model: "gpt-4o-mini".to_string(),
+                ..ChatApi::default()
+            },
+            ..Settings::default()
+        };
+        assert!(keyed.credentials_filled(Service::ApiOpenAi));
+        // And the four that need nothing are always ready.
+        for service in Service::ALL {
+            if !service.needs_credentials() {
+                assert!(empty.credentials_filled(service), "{}", service.id());
+            }
+        }
+    }
+
+    #[test]
+    fn a_choice_of_an_unfilled_entry_reads_as_the_entry_that_needs_nothing() {
+        // A hand edited file, or a key that belonged to another Windows login:
+        // the choice cannot stand, and the engine that answers is the one the
+        // window can show.
+        let settings = Settings::parse("{\"service\":\"api-baidu\"}");
+        assert_eq!(settings.service(), Service::CloudBaidu);
+        assert!(settings.api_credentials().is_none());
+
+        // With the credentials in the file it stands.
+        let filled = Settings::parse(
+            "{\"service\":\"api-openai\",\"apiOpenai\":\
+             {\"apiKey\":\"sk-x\",\"model\":\"gpt-4o-mini\"}}",
+        );
+        assert_eq!(filled.service(), Service::ApiOpenAi);
+        assert!(matches!(
+            filled.api_credentials(),
+            Some(ApiCredentials::Chat(_))
+        ));
+    }
+
+    #[test]
+    fn an_unfilled_entry_is_dropped_from_the_fallback_order() {
+        let settings = Settings::parse(
+            "{\"fallbackEnabled\":true,\
+             \"fallbackOrder\":[\"google\",\"api-baidu\",\"api-openai\",\"offline\"]}",
+        );
+
+        assert_eq!(settings.fallback_order, vec![Service::Google]);
+    }
+
+    #[test]
+    fn the_key_reaches_the_disk_protected_and_comes_back_plain() {
+        let settings = Settings {
+            api_baidu: Credentials {
+                app_id: " 2024 ".to_string(),
+                api_key: "baidu-secret".to_string(),
+            },
+            api_openai: ChatApi {
+                endpoint: "https://api.deepseek.com/v1/".to_string(),
+                api_key: "sk-secret".to_string(),
+                model: "deepseek-chat".to_string(),
+            },
+            ..Settings::default()
+        };
+
+        // What `save` writes, and what an export writes with it.
+        let raw = serde_json::to_string(&settings.protected_for_storage())
+            .expect("the settings serialize");
+        assert!(!raw.contains("baidu-secret"), "{raw}");
+        assert!(!raw.contains("sk-secret"), "{raw}");
+        // The address and the model are not secrets and stay readable, so a
+        // reader of the file can see which service it points at.
+        assert!(raw.contains("https://api.deepseek.com/v1"), "{raw}");
+        assert!(raw.contains("deepseek-chat"), "{raw}");
+
+        // What `load` and `import` do to it. Everything in the file was already
+        // protected, so nothing has to be written again.
+        let mut read = Settings::parse(&raw);
+        assert!(!read.reveal_credentials(), "the file is left alone");
+        assert_eq!(read.api_baidu.app_id, "2024");
+        assert_eq!(read.api_baidu.api_key, "baidu-secret");
+        assert_eq!(read.api_openai.api_key, "sk-secret");
+        assert_eq!(
+            read.api_openai.completion_url(),
+            "https://api.deepseek.com/v1/chat/completions"
+        );
+
+        // A value that is already protected is left exactly as it is, so a save
+        // of an unmodified file does not re-encrypt it: the blob is stable and
+        // the file is not rewritten on every launch.
+        let stored = settings.protected_for_storage();
+        let again = stored.protected_for_storage();
+        assert_eq!(again.api_openai.api_key, stored.api_openai.api_key);
+        assert_eq!(again.api_baidu.api_key, stored.api_baidu.api_key);
+
+        // A revealed key is protected again, because that is what the object it
+        // sits in holds from then on.
+        let revealed = Settings::parse(&raw);
+        let re_protected = revealed.protected_for_storage();
+        assert!(crate::platform::secrets::is_protected(
+            &re_protected.api_openai.api_key
+        ));
+    }
+    #[test]
+    fn a_key_from_another_windows_login_is_dropped_with_its_entry() {
+        // A blob only `CryptUnprotectData` of the login that made it can open.
+        // Nothing else in the app can do anything with it, so the entry goes
+        // and the choice falls back on one that needs nothing.
+        let mut settings = Settings {
+            service: Service::ApiOpenAi,
+            api_openai: ChatApi {
+                api_key: "dpapi:AQAA-not-a-blob".to_string(),
+                model: "gpt-4o-mini".to_string(),
+                ..ChatApi::default()
+            },
+            ..Settings::default()
+        };
+
+        assert!(settings.reveal_credentials(), "the file is written again");
+        assert!(settings.api_openai.api_key.is_empty());
+        assert_eq!(settings.service(), Service::CloudBaidu);
+        assert!(settings.api_credentials().is_none());
     }
 
     #[test]

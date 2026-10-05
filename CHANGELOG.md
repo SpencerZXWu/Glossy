@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [Unreleased]
+
+### Added
+
+- **Two translation channels that answer with an account of your own.** The **General**
+  page has a **Your own API** panel: a Baidu APP ID and key from the 翻译开放平台 console,
+  and the address, key and model of any service that speaks the OpenAI chat completions
+  protocol. Each pair unlocks an entry in the **Translation service** dropdown —
+  `api-baidu` and `api-openai` — and the entry is only there while its fields are filled
+  in: emptying them takes it out of the list again, settles the two language lists on the
+  engine that still works, and falls the choice back on `cloud-baidu`. The rule is applied
+  in the window and in the backend, so the list that is shown and the engine that answers
+  can never disagree. The credentials are DPAPI protected for the Windows login that typed
+  them before they reach the disk, an export carries the same protected shape, and a key
+  encrypted for another login is dropped rather than kept. Both channels send the text from
+  this machine straight to the service, so Glossy's relay is not in the path at all.
+- **The channel is chosen on the page the text is typed on.** The **Translate text** page
+  now carries the same **Translation service** list as the **Language** page, filled from
+  the same entries, so switching from a service that is failing to one that is not takes one
+  click from the box the text is in.
+
+### Changed
+
+- **The Paste button is gone from the Translate text page.** It was a second way to do what
+  Ctrl+V does, and the channel list deserves the room more than the button did.
+- **Exporting the settings carries the credentials, protected.** `Export…` used to write a
+  file with no key in it at all; it now writes the credentials as DPAPI blobs, which keeps
+  the file readable, and keeps it safe to hand to somebody, without handing over a key that
+  works. An import unlocks what it can and drops a key that belongs to another Windows login.
+
 ## [2.1.0] - 2026-10-05
 
 The release that lets the window be something other than grey, that opens with a

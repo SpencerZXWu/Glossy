@@ -45,6 +45,10 @@ pub fn served(service: Service) -> &'static [&'static str] {
         Service::CloudBaidu => &BAIDU,
         Service::CloudYoudao => &YOUDAO,
         Service::Google => &ALL,
+        // Baidu's own API takes the same list as Baidu's relay.
+        Service::ApiBaidu => &BAIDU,
+        // An OpenAI-compatible model is not limited by a vendor table.
+        Service::ApiOpenAi => &ALL,
         Service::Offline => &OFFLINE,
     }
 }

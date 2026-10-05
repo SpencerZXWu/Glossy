@@ -204,7 +204,13 @@ fn save_settings(
 }
 
 /// Writes the settings to `Documents\glossy-settings.json` and answers with the
-/// path it used. The file is plain JSON, so nothing secret ever goes into it.
+/// path it used.
+///
+/// The file is meant to be read, mailed and pasted into a forum post, so the
+/// credentials go in DPAPI protected — the same shape the settings file holds.
+/// A key protected for this Windows login is a key nobody else can use, and one
+/// that cannot be unlocked on the machine it is imported to is dropped rather
+/// than stored.
 #[tauri::command]
 fn export_settings(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<String, String> {
     let settings = state.settings();
@@ -213,14 +219,18 @@ fn export_settings(app: AppHandle, state: State<'_, Arc<AppState>>) -> Result<St
         .document_dir()
         .map_err(|error| format!("the Documents folder is not available: {error}"))?
         .join("glossy-settings.json");
-    let json = serde_json::to_string_pretty(&settings).map_err(|error| error.to_string())?;
+    let json = serde_json::to_string_pretty(&settings.protected_for_storage())
+        .map_err(|error| error.to_string())?;
     std::fs::write(&path, json)
         .map_err(|error| format!("could not write {}: {error}", path.display()))?;
     Ok(path.display().to_string())
 }
 
-/// Replaces the current settings with those of an exported file. The file holds
-/// unprotected keys, so saving it again is what gets them encrypted.
+/// Replaces the current settings with those of an exported file.
+///
+/// Both shapes are accepted: the protected keys an export holds are unlocked on
+/// the way in, and a file somebody typed by hand with plain text keys is
+/// protected on the way out, by the same save that stores it.
 #[tauri::command]
 fn import_settings(
     app: AppHandle,

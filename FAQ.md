@@ -18,12 +18,16 @@ front.)
 
 ### Do I need an account, an API key or a credit card?
 
-No. Every entry in the service dropdown works without an account of your own: `google` asks
-a public endpoint, `offline` asks this machine, and `cloud-baidu` and `cloud-youdao` are
-answered by a Glossy relay that holds the vendor account, so no key is entered into or
-stored by the app. Since 2.0.0 the settings file has no credential fields at all and there
-is no way to paste a provider key of your own; `cloud-baidu`, `cloud-youdao`, `google` and
-`offline` are the four choices, and none of them asks for anything.
+No. Four of the entries in the service dropdown work without an account of your own:
+`google` asks a public endpoint, `offline` asks this machine, and `cloud-baidu` and
+`cloud-youdao` are answered by a Glossy relay that holds the vendor account, so no key is
+entered into or stored by the app. You can go further if you want to: since 2.1.0 the
+**General** page has a **Your own API** panel where you may fill in an APP ID and key from
+Baidu's 翻译开放平台, or the address, key and model of any service that speaks the OpenAI
+chat completions protocol. Those two channels — `api-baidu` and `api-openai` — only appear
+in the dropdown while their fields are filled in, the request goes from this machine
+straight to the service, and the keys are encrypted for this Windows login before they
+reach the disk. Nothing has to be filled in, and nothing is asked for on a fresh install.
 
 ### What is sent where?
 
@@ -34,6 +38,8 @@ Only the text you asked about leaves the machine, and only to the service you pi
 | `cloud-baidu` | the text, the language pair, the vendor name and the install id | the project's relay (deployed from `server/`), which forwards the text to Baidu |
 | `cloud-youdao` | the same | the same relay, which forwards the text to Youdao |
 | `google` | the text | `translate.googleapis.com`, a public Google endpoint |
+| `api-baidu` | the text and a signature made from your APP ID and key | Baidu directly, with your own account |
+| `api-openai` | the text, and the key in the `Authorization` header | the address you typed, directly |
 | `offline` | nothing | nothing — the models run on this machine |
 
 The other calls Glossy makes over the network are:
@@ -147,8 +153,11 @@ fine for commercial use.
 
 On the **Files and logs** page, **Export…** writes your choices to
 `Documents\glossy-settings.json`; on the other machine, **Import…** reads that file back
-into Glossy. The export is plain JSON and holds the choices only — since 2.0.0 there is no
-key or credential field left anywhere, so there is nothing secret in it. An import is
+into Glossy. The export is plain JSON and holds the choices plus the credentials you filled
+in yourself — and those go in **encrypted** (`DPAPI`, for the Windows login that entered
+them), so the file is safe to mail: it never carries a directly usable key. On the other
+machine the key cannot be unlocked and is dropped there, while the rest of the settings are
+applied as they are. An import is
 validated before it is applied, and a file that holds no Glossy setting at all is refused
 rather than wiping the current setup.
 
@@ -210,11 +219,13 @@ Glossy 会监听鼠标的拖动或双击，确认这个手势真的选中了文�
 
 ### 我需要账号、API 密钥或者信用卡吗？
 
-都不需要。服务下拉框里的每一项都不需要你自己的账号：`google` 访问一个公共端点，`offline`
+都不需要。服务下拉框里靠前的四项都不需要你自己的账号：`google` 访问一个公共端点，`offline`
 用这台机器，而 `cloud-baidu` 和 `cloud-youdao` 由 Glossy 自己的中转服务作答，厂商账号保存在
-服务端，因此应用既不需要输入、也不会保存任何密钥。从 2.0.0 起，设置文件里已经没有凭据字段，
-也没有任何地方可以填你自己的厂商密钥；`cloud-baidu`、`cloud-youdao`、`google` 和 `offline`
-就是四个选项，没有一个需要你填东西。
+服务端，因此应用既不需要输入、也不会保存任何密钥。如果你想更进一步，从 2.1.0 起**常规**页多了
+一块**自填 API**：可以填百度翻译开放平台的 APP ID 与密钥，也可以填任何兼容 OpenAI chat
+completions 协议的服务地址、密钥和模型名。这两个渠道——`api-baidu` 和 `api-openai`——只在
+字段填好之后才出现在下拉框里，请求从本机直接发往那个服务，而密钥在落盘前会按当前 Windows
+登录加密。全新安装不填任何东西，也不会被要求填。
 
 ### 什么内容会被发到哪里？
 
@@ -225,6 +236,8 @@ Glossy 会监听鼠标的拖动或双击，确认这个手势真的选中了文�
 | `cloud-baidu` | 文字、语言对、厂商名和安装 ID | 项目自己的中转服务（由 `server/` 部署），它把文字转给百度 |
 | `cloud-youdao` | 同上 | 同一个中转服务，它把文字转给有道 |
 | `google` | 文字 | `translate.googleapis.com`，Google 的公共端点 |
+| `api-baidu` | 文字，以及用你的 APP ID 和密钥算出的签名 | 直接发往百度，用你自己的账号 |
+| `api-openai` | 文字，以及放在 `Authorization` 头里的密钥 | 直接发往你填写的地址 |
 | `offline` | 什么都不发 | 什么都不发——模型在这台机器上运行 |
 
 Glossy 其它会联网的地方还有：
@@ -318,9 +331,10 @@ Glossy 不会就此停下：它会按设置里排好的顺序去试其它引擎�
 ### 我怎么把设置搬到另一台机器？
 
 在**文件与日志**页，**导出…**会把你的选择写到 `Documents\glossy-settings.json`；在另一台
-机器上用**导入…**把那个文件读回 Glossy。导出的是普通 JSON，只包含各项选择——从 2.0.0 起哪里
-都没有密钥或凭据字段，所以里面没有任何机密。导入会先校验再应用，如果一个 Glossy 设置都没有的
-文件会被拒绝，而不是把现有配置清空。
+机器上用**导入…**把那个文件读回 Glossy。导出的是普通 JSON，包含各项设置，以及你自己填写的凭据——
+而凭据是加密后写进去的（`DPAPI`，按当前 Windows 登录），所以导出的文件可以放心地发出去，
+里面没有一把能直接用的密钥；在另一台机器上，属于原来那个 Windows 登录的密钥解不开，会被丢弃，
+其余设置照常应用。导入会先校验再应用，如果一个 Glossy 设置都没有的文件会被拒绝，而不是把现有配置清空。
 
 ### 旧版本写出的设置文件会怎样？
 
