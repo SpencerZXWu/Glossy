@@ -6,7 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
-## [Unreleased]
+## [2.1.0] - 2026-10-05
+
+The release that lets the window be something other than grey, that opens with a
+guided tour of what it does, that gives Ctrl+Enter back to the field it is typed in,
+and that lets the text be translated with an account of your own.
 
 ### Added
 
@@ -26,23 +30,6 @@ See [ROADMAP.md](./ROADMAP.md) for what is planned next.
   now carries the same **Translation service** list as the **Language** page, filled from
   the same entries, so switching from a service that is failing to one that is not takes one
   click from the box the text is in.
-
-### Changed
-
-- **The Paste button is gone from the Translate text page.** It was a second way to do what
-  Ctrl+V does, and the channel list deserves the room more than the button did.
-- **Exporting the settings carries the credentials, protected.** `Export…` used to write a
-  file with no key in it at all; it now writes the credentials as DPAPI blobs, which keeps
-  the file readable, and keeps it safe to hand to somebody, without handing over a key that
-  works. An import unlocks what it can and drops a key that belongs to another Windows login.
-
-## [2.1.0] - 2026-10-05
-
-The release that lets the window be something other than grey, that opens with a
-guided tour of what it does, and that gives Ctrl+Enter back to the field it is typed in.
-
-### Added
-
 - **A guided tour on the first launch.** The window that only ever opens once now
   explains itself: four steps — selecting a text, typing or pasting one, reading a
   screenshot, and downloading what has to be on this machine — each with its own
@@ -78,6 +65,12 @@ guided tour of what it does, and that gives Ctrl+Enter back to the field it is t
 
 ### Changed
 
+- **The Paste button is gone from the Translate text page.** It was a second way to do what
+  Ctrl+V does, and the channel list deserves the room more than the button did.
+- **Exporting the settings carries the credentials, protected.** `Export…` used to write a
+  file with no key in it at all; it now writes the credentials as DPAPI blobs, which keeps
+  the file readable, and keeps it safe to hand to somebody, without handing over a key that
+  works. An import unlocks what it can and drops a key that belongs to another Windows login.
 - **The interface language moved to the Language page.** It was a select in the title bar,
   where it sat next to the state of the capture and read as a translation setting rather than
   one of the window's own; it now has a labelled row on the page that is named after it, in
