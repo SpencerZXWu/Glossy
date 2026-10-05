@@ -44,6 +44,43 @@ pub fn text_of(unit: Unit) -> Option<String> {
     text
 }
 
+/// Whether the focused element holds a text selection right now.
+///
+/// `Some(true)` and `Some(false)` are answers; `None` means the element exposes
+/// no text at all to ask — a canvas, a custom-drawn list, a picture viewer — and
+/// the caller has to fall back on what it did before.
+///
+/// Read-only, and cheap next to what it saves: pressing the copy shortcut to find
+/// out what is selected *does* change things, and this is the question that
+/// avoids asking it.
+pub fn has_selection() -> Option<bool> {
+    let started = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok();
+    let answer = unsafe { read_selection_state() };
+    if started {
+        unsafe { CoUninitialize() };
+    }
+    answer
+}
+
+unsafe fn read_selection_state() -> Option<bool> {
+    let automation: IUIAutomation = CoCreateInstance(&CUIAutomation8, None, CLSCTX_ALL).ok()?;
+    let element = automation.GetFocusedElement().ok()?;
+    let pattern: IUIAutomationTextPattern = element.GetCurrentPatternAs(UIA_TextPatternId).ok()?;
+    let ranges: IUIAutomationTextRangeArray = pattern.GetSelection().ok()?;
+    // A provider reports "nothing selected" either as an empty array or as one
+    // collapsed range, and both read as empty text.
+    for index in 0..ranges.Length().unwrap_or(0).max(0) {
+        if let Ok(range) = ranges.GetElement(index) {
+            if let Ok(text) = range.GetText(-1) {
+                if !text.to_string().trim().is_empty() {
+                    return Some(true);
+                }
+            }
+        }
+    }
+    Some(false)
+}
+
 unsafe fn read_enclosing(unit: Unit) -> Option<String> {
     let automation: IUIAutomation = CoCreateInstance(&CUIAutomation8, None, CLSCTX_ALL).ok()?;
     let element = automation.GetFocusedElement().ok()?;

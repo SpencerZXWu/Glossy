@@ -13,6 +13,13 @@ back to the field it is typed in.
 
 ### Added
 
+- **The state in the title bar is a switch.** *Listening* used to be a label that only said
+  what the app was doing; it now takes a click and turns the selection capture off and on
+  from wherever the window is, and a second click brings it back. It is the same setting the
+  master switch on **General** drives — the label, the dot's colour and the switch itself
+  never disagree, whichever of the two is used — and it is named as the switch it is, so a
+  screen reader reads its state rather than a colour.
+
 - **Six palettes, and an accent colour of your own.** The **Colours** page used to offer one
   choice — follow Windows, always light, always dark — and now offers three: the mode, the
   palette, and the accent. The palettes are **WinUI** (what the app has always used), **warm
@@ -31,6 +38,10 @@ back to the field it is typed in.
 
 ### Changed
 
+- **The interface language moved to the Language page.** It was a select in the title bar,
+  where it sat next to the state of the capture and read as a translation setting rather than
+  one of the window's own; it now has a labelled row on the page that is named after it, in
+  both languages.
 - **The palette layer is one layer of the token system.** Every colour in a palette lives in
   `tokens.css` beside the two the app already had, and a palette states only the colours that
   carry meaning — the three opaque surfaces, the four text tiers, the strokes, the accent and
@@ -45,6 +56,15 @@ back to the field it is typed in.
 
 ### Fixed
 
+- **Dragging across a picture no longer copied it and threw the selection away.** A drag was
+  taken as *the user has selected text* without asking whether anything had been selected, so
+  dragging across images to pick several of them in WeChat — or in any program that lets a
+  drag move or select something that is not text — had Glossy press Ctrl+C into the program,
+  copying the picture and cancelling the gesture the user was in the middle of. A drag or a
+  double click now asks the focused element through UI Automation whether it has a text
+  selection at all, and only presses the shortcut when the answer is yes or when the element
+  cannot say: a control with text and nothing selected is left alone entirely, while the
+  selection shortcut is never affected, because the user pressed it on purpose.
 - **A Windows contrast theme is no longer painted over.** The `prefers-contrast` block was
   stated on `:root` alone, which every `:root[data-theme="dark"]` rule outranked — so a
   contrast scheme with a dark Windows theme behind it had its palette replaced by the app's

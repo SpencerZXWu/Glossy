@@ -19,7 +19,7 @@
 //! | `instance` | one Glossy per login, and how a second start announces itself |
 //! | `screen` | a picture of part of the desktop, for the screenshot translation |
 //! | `speech` | read text aloud |
-//! | `uia` | the text around the current selection, from the accessibility API |
+//! | `uia` | whether there is a selection at all, and the text around it, from the accessibility API |
 //!
 //! Portable work that used to share a file with a platform call stays with the
 //! behaviour that owns it (`context::sentence_in` narrows a paragraph to one

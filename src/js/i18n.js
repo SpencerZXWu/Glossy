@@ -11,7 +11,6 @@
  */
 (function (Glossy) {
   const ENGLISH = {
-    "ui.lang": "Interface language",
     "ui.system": "Follow Windows",
     "ui.zh": "简体中文",
     "ui.en": "English",
@@ -53,6 +52,8 @@
     "status.unavailable": "Unavailable",
     "status.hook": "Hook unavailable",
     "status.hook.title": "The global mouse hook is not running.",
+    "status.switch": "Selection translation",
+    "status.switch.title": "Click to pause or resume",
 
     "master.title": "Enable text selection translation",
     "master.hint": "A selection shows the Glossy icon; click it to translate.",
@@ -246,6 +247,8 @@
     "units.hint": "A measurement or an amount of money that reads the way the source language writes it is shown again the way the target language writes it, with the conversion rate. Currency rates are looked up live.",
 
     "panel.language": "Language",
+    "panel.interface": "Interface",
+    "field.uiLang": "Language of the interface",
     "field.targetLang": "Translate into",
     "field.service": "Translation service",
     "providerName.google": "Google",
@@ -528,7 +531,6 @@
   };
 
   const CHINESE = {
-    "ui.lang": "界面语言",
     "ui.system": "跟随系统",
     "ui.zh": "简体中文",
     "ui.en": "English",
@@ -548,6 +550,8 @@
     "status.unavailable": "不可用",
     "status.hook": "钩子不可用",
     "status.hook.title": "全局鼠标钩子没有运行。",
+    "status.switch": "划词翻译",
+    "status.switch.title": "点击可暂停或继续",
 
     "master.title": "开启划词翻译",
     "master.hint": "选中文字后显示 Glossy 图标，点击图标才会翻译。",
@@ -756,6 +760,8 @@
     "units.hint": "原文中按源语言习惯书写、而译文语言不常用的计量或货币，会按译文语言的习惯再写一遍并注明换算率，货币汇率实时查询。",
 
     "panel.language": "语言",
+    "panel.interface": "界面",
+    "field.uiLang": "界面语言",
     "field.targetLang": "翻译为",
     "field.service": "翻译渠道",
     "providerName.google": "Google",

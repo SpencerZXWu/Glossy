@@ -390,6 +390,9 @@ fn on_trigger(app: &AppHandle, state: &AppState, x: i32, y: i32, trigger: Trigge
     if platform::desktop::copy_target_is_shell() {
         return;
     }
+    if !mouse_trigger_may_copy(trigger, platform::uia::has_selection()) {
+        return;
+    }
 
     let (capture, pending) = clipboard::capture_selection(settings.restore_clipboard);
     let Capture::Text(text) = capture else {
@@ -499,6 +502,25 @@ fn preferred_text(selection: Capture, clipboard_text: Option<String>) -> Option<
     clipboard_text.filter(|text| !text.trim().is_empty())
 }
 
+/// True when a mouse trigger may go as far as pressing the copy shortcut.
+///
+/// A drag that selected a picture, a row of chat messages or a file in a list is
+/// not a text selection, and finding that out by pressing Ctrl+C is not
+/// harmless: the copy commits whatever the program was in the middle of — in a
+/// chat client it ends a multi-select — and puts an image on the clipboard until
+/// the restore reaches it. So the focused element is asked first whether it
+/// holds a selection at all, and a program that exposes no text to ask (a
+/// canvas, a custom-drawn list) is left to the copy exactly as before.
+///
+/// The hotkey is not gated: there the user pressed a key that means "translate
+/// what I have selected", and the copy is the only way to serve a program that
+/// keeps its text to itself.
+fn mouse_trigger_may_copy(trigger: Trigger, selection: Option<bool>) -> bool {
+    match trigger {
+        Trigger::Drag | Trigger::DoubleClick => selection != Some(false),
+    }
+}
+
 fn allows(settings: &Settings, trigger: Trigger) -> bool {
     if !settings.enabled {
         return false;
@@ -556,6 +578,20 @@ mod tests {
             service: Service::Google,
             ..Settings::default()
         }
+    }
+
+    #[test]
+    fn a_drag_that_selected_no_text_never_presses_the_copy_shortcut() {
+        // The reported case: dragging over pictures in a chat client to pick
+        // several of them. The focused element says it holds no selection, so no
+        // copy is sent and the program's own multi-select is left alone.
+        assert!(!mouse_trigger_may_copy(Trigger::Drag, Some(false)));
+        assert!(!mouse_trigger_may_copy(Trigger::DoubleClick, Some(false)));
+        // A selection, or a program that exposes no text to ask, is copied as it
+        // always was.
+        assert!(mouse_trigger_may_copy(Trigger::Drag, Some(true)));
+        assert!(mouse_trigger_may_copy(Trigger::DoubleClick, Some(true)));
+        assert!(mouse_trigger_may_copy(Trigger::Drag, None));
     }
 
     #[test]

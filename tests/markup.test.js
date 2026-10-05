@@ -36,16 +36,30 @@ function tagOf(html, id) {
 }
 
 test("a control named only by an attribute carries that name in both directions", () => {
-  // The visible text of these two is nothing at all, so the tooltip and the
+  // The visible text of this one is nothing at all, so the tooltip and the
   // accessible name are the whole label and both have to follow the interface
   // language. The static English value is what shows before the script runs.
-  const uiLang = tagOf(readPage("index.html"), "uiLang");
-  assert.ok(uiLang.includes('title="Interface language"'), uiLang);
-  assert.ok(uiLang.includes('data-i18n-title="ui.lang"'), uiLang);
-  assert.ok(uiLang.includes('data-i18n-aria-label="ui.lang"'), uiLang);
-
   const close = tagOf(readPage("notice.html"), "close");
   assert.ok(close.includes('title="Dismiss"'), close);
   assert.ok(close.includes('data-i18n-title="notice.close"'), close);
   assert.ok(close.includes('data-i18n-aria-label="notice.close"'), close);
+
+  // The switch in the title bar is read out as the switch it is: the state comes
+  // from `aria-checked` and the name from the attribute, which therefore needs
+  // the same English fallback.
+  const status = tagOf(readPage("index.html"), "status");
+  assert.ok(status.includes('role="switch"'), status);
+  assert.ok(status.includes('aria-checked="true"'), status);
+  assert.ok(status.includes('aria-label="Selection translation"'), status);
+  assert.ok(status.includes('data-i18n-aria-label="status.switch"'), status);
+});
+
+test("every control of a page is named, by a label or by an attribute", () => {
+  // The interface language moved into the settings window, where it has a
+  // visible label of its own rather than a tooltip in the title bar.
+  const html = readPage("index.html");
+  const label = /<label for="uiLang"[^>]*data-i18n="field\.uiLang"/.exec(html);
+
+  assert.ok(label, "the interface language has no visible label");
+  assert.ok(!/data-i18n-title="ui\.lang"/.test(html), "the tooltip is doing the label's work");
 });

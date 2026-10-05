@@ -194,8 +194,8 @@ installer puts next to the app.
 
 | Option | Meaning |
 | --- | --- |
-| Interface language | `Follow Windows`, `简体中文` or `English`. Switches the settings window and the popup immediately. |
-| Enable selection translation | Master switch. Turning it off pauses the global selection capture immediately. |
+| Interface language | On the **Language** page. `Follow Windows`, `简体中文` or `English`. Switches the settings window and the popup immediately. |
+| Enable selection translation | Master switch. Turning it off pauses the global selection capture immediately. The same switch sits in the title bar's state, which reads *Listening* or *Paused* and toggles the capture on a click. |
 | Start Glossy with Windows | Adds a `--autostart` entry to `HKCU\...\Run`, so Glossy is already waiting in the notification area after a login. Started that way it does not show the "Glossy is running" card. |
 | Translate when the mouse drags across text | Enables the drag gesture. |
 | Translate a word on double click | Enables the double-click gesture. |
@@ -754,6 +754,8 @@ none of them is covered by the automated tests.
 | 56 | On the Colours section, walk the palette cards with the arrow keys, take each one with `Space`, and switch between light and dark on each | Every card takes the arrow keys and keeps a visible ring; choosing one repaints both windows at once — sidebar, panels, the buttons in the demo card and their text — while the card's own preview never moves, because each previews itself rather than the window; the title bar and the frame follow the palette, and both go back to the system's own when WinUI is chosen again |
 | 57 | On the Colours section, take each accent swatch in turn, then the last one with a colour that is none of the eight, then `let the palette decide` | The chosen swatch carries the ring and the line under the row names it; the app repaints the moment a colour is picked, including a selection made in the demo box and the caret; the system's colour picker opens for the last swatch and its colour is stored as `#rrggbb` in `accent`; `let the palette decide` brings the palette's own colour back and stores an empty `accent` |
 | 58 | Turn on a Windows contrast theme with a palette and a custom accent chosen, look at both windows, then turn it off | The contrast scheme wins over both — no palette colour and no custom accent survives in it — and both come back exactly as they were once the theme is off |
+| 59 | Click the state in the title bar, select some text in another program, then click it again and select again, and reopen the settings window | The click pauses the capture straight away — the label reads *Paused*, the dot goes grey and the setting's own switch follows — so nothing is translated and nothing is charged while it is off; the second click brings it back, the choice matches the master switch on **General**, and it is still there after the window is closed and reopened |
+| 60 | Drag across an image in a browser or in WeChat to select more than one picture, then drag across a paragraph of text | Holding and dragging where there is no text leaves the keyboard alone: the pictures keep their selection and nothing is copied; dragging over the paragraph still translates it, and so does a double click on a word — the check only ever answers for elements that have text of their own |
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -972,8 +974,8 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 | 选项 | 含义 |
 | --- | --- |
-| 界面语言 | `跟随系统`、`简体中文` 或 `English`。会立即切换设置窗口和弹窗。 |
-| 开启划词翻译 | 总开关。关闭后立即暂停全局划词捕获。 |
+| 界面语言 | 在**语言**页。`跟随系统`、`简体中文` 或 `English`。会立即切换设置窗口和弹窗。 |
+| 开启划词翻译 | 总开关。关闭后立即暂停全局划词捕获。标题栏里的状态是同一个开关：显示"监听中"或"已暂停"，点一下即可开启或关闭。 |
 | 随 Windows 启动 | 在 `HKCU\...\Run` 中写入一条 `--autostart` 项，这样登录后 Glossy 就已经在通知区域待命。这样启动时不会显示"Glossy 已在后台运行"卡片。 |
 | 拖动鼠标划过文字时翻译 | 启用拖动划词手势。 |
 | 双击单词时翻译 | 启用双击手势。 |
@@ -1296,6 +1298,8 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 56 | 在「配色」页用方向键走一遍配色卡片，每张都按 `Space` 选中，并且每张都把模式在浅色与深色之间切一次 | 每张卡片都能用方向键选中且焦点环可见；选中后两个窗口立刻重绘——侧边栏、面板、演示卡片里的按钮和文字——而卡片自己的预览不动，因为每张预览的是它自己而不是当前窗口；标题栏和边框跟着配色走，选回 WinUI 时两者都交还给系统 |
 | 57 | 在「配色」页逐个点强调色色块，再点最后一个并选一个不属于前八个的颜色，最后点 `跟随配色方案` | 选中的色块带外圈，下面那行会写出它是什么；一选就立刻重绘，包括在演示框里选中的文字和光标；最后一个会打开系统取色器，颜色以 `#rrggbb` 存进 `accent`；点 `跟随配色方案` 会回到配色自带的强调色，并把 `accent` 存成空 |
 | 58 | 在高对比主题打开的情况下选一套配色和一个自定义强调色，看看两个窗口，然后关掉高对比 | 高对比方案压过两者——配色颜色和自定义强调色都不生效——关掉之后两者都原样回来 |
+| 59 | 点击标题栏里的状态，在别的程序里选中一段文字，再点一次并重新选中，最后关掉设置窗口再打开 | 点一下就立刻暂停捕获——文字变成"已暂停"、圆点变灰，「常规」页的总开关也跟着变——暂停期间的选中不翻译也不扣额度；再点一次恢复，两处开关始终一致，窗口关掉再打开也还是这个状态 |
+| 60 | 在浏览器或微信里拖选多张图片，然后再拖选一段文字 | 在没有文字的地方按住拖动不碰键盘：图片的选中状态留着，也没有任何内容被复制；拖选那段文字照常翻译，双击取词也照常——这个判断只对那些自身带文字的控件给出结论 |
 
 ### 工具链说明（Windows，GNU 工具链）
 

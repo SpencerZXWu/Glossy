@@ -619,6 +619,21 @@
     els.status.title = title || text;
   }
 
+  /**
+   * Turns selection translation on or off, from either of the two controls that
+   * show it: the switch in the title bar and the master switch on **General**.
+   * Both are read from the same stored setting, so they cannot disagree.
+   */
+  function setEnabled(value) {
+    els.enabled.checked = value;
+    els.options.dataset.disabled = String(!value);
+    els.status.setAttribute("aria-checked", String(value));
+    scheduleSave();
+    // The switch is the state the dot is showing, so it is redrawn at once
+    // rather than on the next poll of the capture status.
+    refreshStatus();
+  }
+
   function showToast(message) {
     els.toast.textContent = message;
     els.toast.hidden = false;
@@ -2303,15 +2318,24 @@
     }
     lastStatus = status;
     showHotkeys(status);
+    // The switch says whether selection translation is on and the dot says
+    // whether the hook behind it is running: a switch that is on with a hook
+    // that is not is exactly the state worth seeing from the title bar.
+    els.status.setAttribute("aria-checked", String(els.enabled.checked));
+    const switchHint = Glossy.i18n.t("status.switch.title");
     if (!els.enabled.checked) {
-      setStatus("off", Glossy.i18n.t("status.paused"), Glossy.i18n.t("status.paused.title"));
+      setStatus("off", Glossy.i18n.t("status.paused"), `${Glossy.i18n.t("status.paused.title")} · ${switchHint}`);
     } else if (status && status.hooked) {
-      setStatus("ok", Glossy.i18n.t("status.listening"), Glossy.i18n.t("status.listening.title"));
+      setStatus(
+        "ok",
+        Glossy.i18n.t("status.listening"),
+        `${Glossy.i18n.t("status.listening.title")} · ${switchHint}`,
+      );
     } else {
       setStatus(
         "bad",
         Glossy.i18n.t("status.hook"),
-        (status && status.error) || Glossy.i18n.t("status.hook.title"),
+        `${(status && status.error) || Glossy.i18n.t("status.hook.title")} · ${switchHint}`,
       );
     }
   }
@@ -2695,10 +2719,8 @@
   }
 
   els.options.addEventListener("change", scheduleSave);
-  els.enabled.addEventListener("change", () => {
-    els.options.dataset.disabled = String(!els.enabled.checked);
-    scheduleSave();
-  });
+  els.enabled.addEventListener("change", () => setEnabled(els.enabled.checked));
+  els.status.addEventListener("click", () => setEnabled(!els.enabled.checked));
   els.uiLang.addEventListener("change", () => {
     Glossy.i18n.set(els.uiLang.value);
     applyLanguage();

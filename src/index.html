@@ -20,15 +20,10 @@
           </div>
         </div>
         <div class="topbar-tools">
-          <select id="uiLang" aria-label="Interface language" title="Interface language" data-i18n-aria-label="ui.lang" data-i18n-title="ui.lang">
-            <option value="system" data-i18n="ui.system">Follow Windows</option>
-            <option value="zh" data-i18n="ui.zh">简体中文</option>
-            <option value="en" data-i18n="ui.en">English</option>
-          </select>
-          <div class="status" id="status" data-tone="ok">
-            <span class="dot"></span>
+          <button type="button" class="status" id="status" data-tone="ok" role="switch" aria-checked="true" aria-label="Selection translation" data-i18n-aria-label="status.switch">
+            <span class="dot" aria-hidden="true"></span>
             <span id="statusText" data-i18n="status.listening">Listening</span>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -535,6 +530,19 @@
           </section>
         </section>
         <section class="page" id="page-language" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.interface">Interface</h2>
+            <div class="grid">
+              <div class="field">
+                <label for="uiLang" data-i18n="field.uiLang">Language of the interface</label>
+                <select id="uiLang">
+                  <option value="system" data-i18n="ui.system">Follow Windows</option>
+                  <option value="zh" data-i18n="ui.zh">简体中文</option>
+                  <option value="en" data-i18n="ui.en">English</option>
+                </select>
+              </div>
+            </div>
+          </section>
           <section class="panel">
             <h2 data-i18n="panel.language">Language</h2>
             <div class="grid">
