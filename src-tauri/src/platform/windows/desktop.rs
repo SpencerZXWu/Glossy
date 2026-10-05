@@ -13,6 +13,9 @@ use crate::platform::ScreenRect;
 use windows::core::{BOOL, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT};
 use windows::Win32::Globalization::GetUserDefaultLocaleName;
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_CAPTION_COLOR, DWMWA_COLOR_DEFAULT,
+};
 use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
@@ -690,6 +693,34 @@ pub fn open_folder(path: &Path) -> Result<(), String> {
         .spawn()
         .map(|_| ())
         .map_err(|error| format!("File Explorer could not be opened: {error}"))
+}
+
+/// Paints the title bar of a window, or gives it back to Windows.
+///
+/// The caption is drawn by the window manager rather than by the page, so a
+/// palette that states its own window colour has to reach it through DWM or the
+/// window keeps a bar the colour of the scheme it is not in. `None` clears the
+/// override (`DWMWA_COLOR_DEFAULT`), which is what the default palette wants: it
+/// is the WinUI scheme, and its own caption is what belongs there.
+///
+/// Needs Windows 11 build 22000 or newer; an older build refuses the attribute
+/// and this reports false, leaving the caption as it was.
+pub fn set_caption_color(handle: Handle, colour: Option<(u8, u8, u8)>) -> bool {
+    if handle.is_null() {
+        return false;
+    }
+    let value: u32 = match colour {
+        Some((red, green, blue)) => (blue as u32) << 16 | (green as u32) << 8 | red as u32,
+        None => DWMWA_COLOR_DEFAULT,
+    };
+    let hwnd = handle.to_hwnd();
+    let pointer = &value as *const u32 as *const c_void;
+    let size = std::mem::size_of::<u32>() as u32;
+    let caption = unsafe { DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, pointer, size) };
+    // The frame around the window follows the caption, or a palette leaves a
+    // one-pixel line of the previous scheme around the whole window.
+    let border = unsafe { DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, pointer, size) };
+    caption.is_ok() && border.is_ok()
 }
 
 /// Opens a web address in whatever program the user reads the web with.

@@ -575,16 +575,38 @@
         </section>
         <section class="page" id="page-appearance" hidden>
           <section class="panel">
-            <h2 data-i18n="panel.popup">Popup</h2>
+            <h2 data-i18n="panel.colours">Colours</h2>
             <div class="grid">
               <div class="field">
-                <label for="theme" data-i18n="field.theme">Colours</label>
+                <label for="theme" data-i18n="field.theme">Light or dark</label>
                 <select id="theme">
                   <option value="system" data-i18n="theme.system">Follow Windows</option>
                   <option value="light" data-i18n="theme.light">Always light</option>
                   <option value="dark" data-i18n="theme.dark">Always dark</option>
                 </select>
               </div>
+            </div>
+            <div class="field">
+              <span class="field-label" id="paletteLabel" data-i18n="field.palette">Palette</span>
+              <div class="palettes" id="paletteList" role="radiogroup" aria-labelledby="paletteLabel"></div>
+            </div>
+            <div class="field">
+              <span class="field-label" id="accentLabel" data-i18n="field.accent">Accent</span>
+              <div class="accents">
+                <div class="accents__presets" id="accentList" role="radiogroup" aria-labelledby="accentLabel"></div>
+                <label class="accent-custom" id="accentCustomLabel">
+                  <input type="color" id="accentCustom" value="#2f6fd0" data-i18n-title="accent.custom" data-i18n-aria-label="accent.custom" />
+                  <span class="accent-custom__mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                  </span>
+                </label>
+              </div>
+              <p class="hint" id="accentHint"></p>
+            </div>
+          </section>
+          <section class="panel">
+            <h2 data-i18n="panel.popup">Popup</h2>
+            <div class="grid">
               <div class="field">
                 <label for="fontScale" data-i18n="field.fontScale">Text size</label>
                 <select id="fontScale">

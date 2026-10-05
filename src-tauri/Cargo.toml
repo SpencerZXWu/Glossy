@@ -1,6 +1,6 @@
 [package]
 name = "glossy"
-version = "2.0.1"
+version = "2.1.0"
 description = "Glossy - a lightweight select-to-translate desktop app"
 authors = ["Glossy"]
 edition = "2021"
@@ -47,6 +47,8 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Globalization",
     "Win32_Graphics_Gdi",
+    # `DwmSetWindowAttribute` colours the title bar to match the palette.
+    "Win32_Graphics_Dwm",
     # `CreateMutexW` names a `SECURITY_ATTRIBUTES` parameter it never uses here.
     "Win32_Security",
     "Win32_System_DataExchange",

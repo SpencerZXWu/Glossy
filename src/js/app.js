@@ -90,6 +90,9 @@
     confirmOk: $("confirmOk"),
     confirmCancel: $("confirmCancel"),
     uiLang: $("uiLang"),
+    paletteList: $("paletteList"),
+    accentList: $("accentList"),
+    accentHint: $("accentHint"),
     status: $("status"),
     statusText: $("statusText"),
     demoText: $("demoText"),
@@ -356,23 +359,222 @@
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.4l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z"/></svg>';
 
   /**
+   * The palettes the picker offers, in the order it shows them.
+   *
+   * The first entry is the WinUI palette the app has always used, and it is a
+   * block in `tokens.css` like the others so that every card previews the same
+   * way. `tests/tokens.test.js` reads this list and fails when it and the
+   * stylesheet disagree, in either direction.
+   */
+  const PALETTES = ["default", "sepia", "nord", "solarized", "dracula", "amoled"];
+
+  /** The accent colours the row offers, each naming a token in `tokens.css`. */
+  const ACCENTS = ["blue", "teal", "green", "amber", "coral", "violet", "pink", "slate"];
+
+  /**
    * Applies the chosen colour scheme. "system" is resolved against the OS
-   * setting by js/theme.js, which is the only place that touches
-   * `data-theme`.
+   * setting by js/theme.js, which is the only place that touches `data-theme`.
    */
   function applyTheme(theme) {
     const next = themeOr(theme);
-    GlossyTheme.apply({ theme: next, backdrop });
-    // Windows draws the title bar itself, so it needs telling separately.
+    GlossyTheme.apply({
+      theme: next,
+      palette: paletteOr(settings && settings.palette),
+      accent: accentOr(settings && settings.accent),
+      backdrop,
+    });
+    // Windows draws the title bar itself, so it needs telling separately - and
+    // a palette has a window colour of its own, which also decides whether the
+    // window keeps the system backdrop at all.
     if (Glossy.live) {
       Glossy.invoke("set_window_theme", { label: "main", theme: next }).catch((error) => {
         console.warn("Glossy could not restyle its title bar:", error);
       });
+      Glossy.invoke("set_window_surface", {
+        label: "main",
+        colour: surfaceColour(),
+      }).catch((error) => {
+        console.warn("Glossy could not colour its window frame:", error);
+      });
     }
+  }
+
+  /** The palette the file names, or the WinUI one it fell back to. */
+  function paletteOr(palette) {
+    return PALETTES.indexOf(palette) === -1 ? "default" : palette;
+  }
+
+  /** The accent the file names, or nothing at all for "let the palette decide". */
+  function accentOr(accent) {
+    return /^#[0-9a-f]{6}$/i.test(String(accent || "")) ? String(accent).toLowerCase() : "";
+  }
+
+  /**
+   * The window colour the page is painting, for the title bar and the frame.
+   *
+   * Read out of the document rather than kept in a second table here: the
+   * palette is defined in `tokens.css`, and the default one is the one case
+   * where Windows should keep drawing its own frame and its own backdrop.
+   */
+  function surfaceColour() {
+    if (paletteOr(settings && settings.palette) === "default") return null;
+    const value = getComputedStyle(document.documentElement)
+      .getPropertyValue("--g-surface-window")
+      .trim();
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : null;
   }
 
   function themeOr(theme) {
     return theme === "light" || theme === "dark" ? theme : "system";
+  }
+
+  /** A colour the stylesheet states, read back out of the document. */
+  function tokenColour(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  /**
+   * Draws the palette cards.
+   *
+   * Each card carries the palette's own tokens on its two halves, so what it
+   * shows is what choosing it does, and a palette cannot drift from its preview:
+   * the light half states `data-theme="light"` and the dark one `"dark"` rather
+   * than inheriting the window's, because both halves are worth seeing whichever
+   * mode the window happens to be in.
+   */
+  function renderPalettes() {
+    const list = els.paletteList;
+    if (!list) return;
+    const chosen = paletteOr(settings && settings.palette);
+    list.textContent = "";
+
+    for (const id of PALETTES) {
+      const card = document.createElement("label");
+      card.className = "palette-card";
+      card.dataset.paletteId = id;
+      card.dataset.selected = String(id === chosen);
+
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "palette";
+      input.value = id;
+      input.checked = id === chosen;
+      input.addEventListener("change", () => {
+        if (input.checked) choosePalette(id);
+      });
+
+      const preview = document.createElement("span");
+      preview.className = "palette-card__preview";
+      for (const mode of ["light", "dark"]) {
+        const page = document.createElement("span");
+        page.className = "swatch-page";
+        page.dataset.palette = id;
+        page.dataset.theme = mode;
+        page.setAttribute("aria-hidden", "true");
+        const line = document.createElement("span");
+        line.className = "swatch-page__line";
+        const soft = document.createElement("span");
+        soft.className = "swatch-page__line swatch-page__line--soft";
+        const dot = document.createElement("span");
+        dot.className = "swatch-page__dot";
+        page.append(line, soft, dot);
+        preview.appendChild(page);
+      }
+
+      const name = document.createElement("span");
+      name.className = "palette-card__name";
+      name.textContent = Glossy.i18n.t(`palette.${id}`);
+
+      const use = document.createElement("span");
+      use.className = "palette-card__use";
+      use.textContent = Glossy.i18n.t(`palette.${id}.use`);
+
+      card.append(input, preview, name, use);
+      list.appendChild(card);
+    }
+  }
+
+  /**
+   * Draws the accent row: hand the choice back to the palette, or name eight
+   * colours, with the system's own picker after them for anything else.
+   */
+  function renderAccents() {
+    const list = els.accentList;
+    if (!list) return;
+    const chosen = accentOr(settings && settings.accent);
+    list.textContent = "";
+
+    const options = [{ id: "follow", colour: "" }].concat(
+      ACCENTS.map((id) => ({ id, colour: tokenColour(`--g-accent-${id}`) })),
+    );
+
+    for (const option of options) {
+      const label = document.createElement("label");
+      label.className = "accent-option";
+
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = "accent";
+      input.value = option.id;
+      input.className = "visually-hidden";
+      input.setAttribute("aria-label", Glossy.i18n.t(`accent.${option.id}`));
+      input.checked =
+        option.id === "follow" ? !chosen : Boolean(chosen) && chosen === option.colour;
+      input.addEventListener("change", () => {
+        if (input.checked) chooseAccent(option.colour);
+      });
+
+      const dot = document.createElement("span");
+      dot.className = "accent-dot";
+      dot.dataset.choice = option.id;
+      if (option.id === "follow") dot.dataset.follow = "true";
+      dot.dataset.selected = String(input.checked);
+      dot.setAttribute("aria-hidden", "true");
+
+      label.append(input, dot);
+      list.appendChild(label);
+    }
+
+    // The picker of the system is one more swatch: it belongs to the row, so it
+    // carries the same selected ring when the colour in it is the one in force.
+    const custom = $("accentCustom");
+    const isCustom =
+      Boolean(chosen) && ACCENTS.every((id) => tokenColour(`--g-accent-${id}`) !== chosen);
+    if (custom) {
+      if (isCustom) custom.value = chosen;
+      custom.dataset.selected = String(isCustom);
+    }
+
+    if (els.accentHint) {
+      // Three states, and the line says which: the palette decides, one of the
+      // eight is in force (named), or a colour from the system's picker is.
+      const preset = ACCENTS.find((id) => tokenColour(`--g-accent-${id}`) === chosen);
+      els.accentHint.textContent = !chosen
+        ? Glossy.i18n.t("accent.followHint")
+        : Glossy.i18n
+            .t("accent.chosenHint")
+            .replace("{0}", preset ? Glossy.i18n.t(`accent.${preset}`) : chosen);
+    }
+  }
+
+  /** Takes a palette; it repaints both windows, so it is saved like a setting. */
+  function choosePalette(id) {
+    const next = paletteOr(id);
+    if (paletteOr(settings && settings.palette) === next) return;
+    settings = { ...settings, palette: next };
+    applyTheme(els.theme.value);
+    renderPalettes();
+    scheduleSave();
+  }
+
+  /** Takes an accent colour, or nothing at all for "let the palette decide". */
+  function chooseAccent(colour) {
+    const next = accentOr(colour);
+    if (accentOr(settings && settings.accent) === next) return;
+    settings = { ...settings, accent: next };
+    applyTheme(els.theme.value);
+    renderAccents();
+    scheduleSave();
   }
 
   /**
@@ -1988,6 +2190,8 @@
       els.subtitleFontSize.value = String(Math.min(40, Math.max(13, Number(next.subtitleFontSize || 26))));
     }
     applyTheme(els.theme.value);
+    renderPalettes();
+    renderAccents();
     // The engine comes first: the two language lists are the languages it
     // takes, so what they offer depends on it.
     els.service.value = serviceOf(next);
@@ -2025,6 +2229,8 @@
       ignoredApps: ignored,
       sourceLangs: sourceLangs,
       theme: els.theme.value,
+      palette: paletteOr(settings && settings.palette),
+      accent: accentOr(settings && settings.accent),
       fontScale: numberOr(els.fontScale.value, 100),
       popupWidth: numberOr(els.popupWidth.value, 356),
       popupOpacity: numberOr(els.popupOpacity.value, 100),
@@ -2573,6 +2779,13 @@
     applyTheme(els.theme.value);
     scheduleSave();
   });
+  const accentCustom = $("accentCustom");
+  if (accentCustom) {
+    // The system's picker fires `input` while it is being dragged, so a colour
+    // is previewed live and only the last one is written, by the same debounced
+    // save every other setting uses.
+    accentCustom.addEventListener("input", () => chooseAccent(accentCustom.value));
+  }
   // The engine and the target language can be picked from the card as well, so
   // a change made here is recorded as this screen's own choice.
   els.targetLang.addEventListener("change", () => {

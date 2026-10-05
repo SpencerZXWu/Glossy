@@ -11,8 +11,12 @@
  */
 (() => {
   const CACHE_KEY = "glossy.theme";
+  const PALETTE_KEY = "glossy.palette";
   const ACCENT_KEY = "glossy.accent";
   const DENSITY_KEY = "glossy.density";
+
+  /** The palette whose colours the stylesheet already carries in `:root`. */
+  const DEFAULT_PALETTE = "default";
 
   const media = window.matchMedia("(prefers-color-scheme: dark)");
   /** Windows is asking for a contrast theme rather than for a light palette. */
@@ -57,6 +61,25 @@
     return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
   }
 
+  /**
+   * The colour a label takes on top of `accent`.
+   *
+   * Whichever of the two reads better, rather than "a dark accent gets white":
+   * the crossover is a luminance of about 0.179, and picking 0.5 leaves every
+   * mid-tone accent - amber, sky, coral - with white text at about 2:1 on it.
+   */
+  function readableOn(accent) {
+    const linear = (value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance =
+      0.2126 * linear(channel(accent, 0)) +
+      0.7152 * linear(channel(accent, 1)) +
+      0.0722 * linear(channel(accent, 2));
+    return luminance + 0.05 >= 1.05 / (luminance + 0.05) ? "#000000" : "#ffffff";
+  }
+
   /** Paints a custom accent, or clears the overrides so the token layer wins. */
   function applyAccent(accent, theme) {
     const style = root.style;
@@ -72,8 +95,6 @@
     }
 
     const dark = theme === "dark";
-    const luminance =
-      (0.2126 * channel(accent, 0) + 0.7152 * channel(accent, 1) + 0.0722 * channel(accent, 2)) / 255;
     style.setProperty("--g-accent", accent);
     style.setProperty(
       "--g-accent-hover",
@@ -84,7 +105,7 @@
       "--g-accent-soft",
       `rgba(${channel(accent, 0)}, ${channel(accent, 1)}, ${channel(accent, 2)}, ${dark ? 0.16 : 0.1})`,
     );
-    style.setProperty("--g-on-accent", luminance > 0.5 ? "#000000" : "#ffffff");
+    style.setProperty("--g-on-accent", readableOn(accent));
   }
 
   function apply(options = {}) {
@@ -92,10 +113,19 @@
     lastBackdrop = options.backdrop || "none";
     root.dataset.theme = theme;
     root.dataset.backdrop = lastBackdrop;
+    // Every palette is a block of its own, the default one included, so the
+    // attribute is always set. A caller that names no palette keeps the one in
+    // force rather than dropping the window back to the default: the toast, for
+    // instance, only knows the mode, and it must not repaint the palette away.
+    root.dataset.palette = options.palette || root.dataset.palette || DEFAULT_PALETTE;
     if (options.density) root.dataset.density = options.density;
     else delete root.dataset.density;
-    applyAccent(options.accent, theme);
+    // A caller that names no accent at all keeps the one in force, the way it
+    // keeps the palette; clearing it is an empty string, which a caller that
+    // means "let the palette decide" passes.
+    applyAccent(options.accent === undefined ? read(ACCENT_KEY) : options.accent, theme);
     write(CACHE_KEY, options.theme || "system");
+    write(PALETTE_KEY, root.dataset.palette);
     write(ACCENT_KEY, options.accent || "default");
     write(DENSITY_KEY, options.density || "comfortable");
   }
@@ -104,6 +134,7 @@
   function reapply() {
     apply({
       theme: read(CACHE_KEY),
+      palette: read(PALETTE_KEY),
       accent: read(ACCENT_KEY),
       density: read(DENSITY_KEY),
       backdrop: lastBackdrop,
@@ -122,6 +153,7 @@
 
   const boot = {
     theme: read(CACHE_KEY),
+    palette: read(PALETTE_KEY),
     accent: read(ACCENT_KEY),
     density: read(DENSITY_KEY),
   };
@@ -131,8 +163,9 @@
   } else {
     root.dataset.theme = resolve("system");
   }
+  if (boot.palette) root.dataset.palette = boot.palette;
+  else root.dataset.palette = DEFAULT_PALETTE;
   if (boot.density) root.dataset.density = boot.density;
   applyAccent(boot.accent, root.dataset.theme);
-
-  window.GlossyTheme = { apply, resolve };
+  window.GlossyTheme = { apply, resolve, DEFAULT_PALETTE };
 })();

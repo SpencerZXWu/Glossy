@@ -175,7 +175,11 @@
   function applyAppearance() {
     const root = document.documentElement;
 
-    GlossyTheme.apply({ theme: preferences.theme });
+    GlossyTheme.apply({
+      theme: preferences.theme,
+      palette: preferences.palette,
+      accent: preferences.accent,
+    });
 
     const scale = Number(preferences.fontScale);
     root.style.setProperty("--popup-font", String((Number.isFinite(scale) && scale > 0 ? scale : 100) / 100));

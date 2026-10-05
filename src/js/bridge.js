@@ -41,6 +41,8 @@
     triggerOnDoubleClick: true,
     targetLang: "zh-CN",
     service: "cloud-baidu",
+    palette: "default",
+    accent: "",
     restoreClipboard: true,
     showOriginal: true,
     minSelectionLen: 2,
@@ -604,6 +606,7 @@
       case "popup_close":
       case "popup_set_pinned":
       case "popup_set_replace":
+      case "set_window_surface":
       case "show_popup":
       case "open_settings":
         return null;

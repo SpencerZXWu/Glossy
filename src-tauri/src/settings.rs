@@ -237,6 +237,31 @@ pub enum Theme {
     Dark,
 }
 
+/// Which colours the two windows are drawn in.
+///
+/// `Theme` decides light or dark; this decides the hues. The default is the
+/// WinUI palette the stylesheet carries in `:root`, and every other entry is a
+/// block of the same semantic tokens in `tokens.css` — so a palette changes the
+/// colours and never the layering. Each one states both halves, which is why
+/// the two settings are separate rather than one list of twelve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum Palette {
+    /// The WinUI colours, and the one the app has always used.
+    #[default]
+    Default,
+    /// Warm paper, for reading under a lamp.
+    Sepia,
+    /// Cool blue-grey, for a bright office screen.
+    Nord,
+    /// The low-glare Solarized scheme.
+    Solarized,
+    /// The night scheme, purple where the accent goes.
+    Dracula,
+    /// True black, for an OLED panel.
+    Amoled,
+}
+
 /// Default popup card width in CSS pixels, kept in sync with `popup.css`.
 const DEFAULT_POPUP_WIDTH: u32 = 356;
 
@@ -406,6 +431,12 @@ pub struct Settings {
     pub first_run: bool,
     /// Colour scheme for both windows.
     pub theme: Theme,
+    /// Which palette those colours come from; `theme` still decides whether the
+    /// light or the dark half of it is used.
+    pub palette: Palette,
+    /// Accent colour the palette's own is replaced with, as `#rrggbb`. Empty
+    /// means the palette decides, which is what a new install has.
+    pub accent: String,
     /// Popup text size as a percentage of the default.
     pub font_scale: u32,
     /// Popup card width in CSS pixels.
@@ -494,6 +525,8 @@ impl Default for Settings {
             ui_lang: UiLanguage::default(),
             first_run: true,
             theme: Theme::default(),
+            palette: Palette::default(),
+            accent: String::new(),
             font_scale: 100,
             popup_width: DEFAULT_POPUP_WIDTH,
             popup_opacity: DEFAULT_POPUP_OPACITY,
@@ -818,6 +851,15 @@ impl Settings {
             self.target_lang = crate::translate::normalize_lang_code(&self.target_lang);
         }
         self.min_selection_len = self.min_selection_len.clamp(1, 40);
+        // An accent is a colour or nothing: a half-typed or hand-edited value
+        // would be set as an invalid custom property, which the stylesheet then
+        // quietly ignores, and the picker would show a swatch that colours
+        // nothing.
+        let accent = self.accent.trim().to_ascii_lowercase();
+        let is_colour = accent.len() == 7
+            && accent.starts_with('#')
+            && accent[1..].bytes().all(|byte| byte.is_ascii_hexdigit());
+        self.accent = if is_colour { accent } else { String::new() };
         self.ignored_apps = ignored_processes(&self.ignored_apps);
         self.source_langs = language_codes(&self.source_langs);
         self.font_scale = self.font_scale.clamp(80, 160);
@@ -1260,6 +1302,58 @@ mod tests {
             settings.service_order(),
             vec![Service::CloudBaidu, Service::Google]
         );
+    }
+
+    #[test]
+    fn an_accent_is_a_colour_or_nothing_at_all() {
+        for (stored, wanted) in [
+            ("#0f6cbd", "#0f6cbd"),
+            ("  #ABCDEF  ", "#abcdef"),
+            ("", ""),
+            ("   ", ""),
+            ("blue", ""),
+            ("#12345", ""),
+            ("#12345g", ""),
+            ("0f6cbd", ""),
+            ("#0f6cbd00", ""),
+        ] {
+            let settings = Settings {
+                accent: stored.to_string(),
+                ..Settings::default()
+            }
+            .sanitized();
+
+            assert_eq!(settings.accent, wanted, "{stored:?}");
+        }
+    }
+
+    #[test]
+    fn a_palette_and_an_accent_survive_a_file_and_an_older_one_still_loads() {
+        let settings = Settings {
+            palette: Palette::Nord,
+            accent: "#4c6a92".to_string(),
+            ..Settings::default()
+        }
+        .sanitized();
+        let json = serde_json::to_string(&settings).expect("settings serialize");
+        let reloaded = Settings::parse(&json);
+
+        assert_eq!(reloaded.palette, Palette::Nord);
+        assert_eq!(reloaded.accent, "#4c6a92");
+
+        // A file written before either setting existed keeps the WinUI palette
+        // and lets it choose the accent, which is what the defaults are.
+        let older = Settings::parse("{\"formatVersion\":2,\"theme\":\"dark\",\"fontScale\":115}");
+        assert_eq!(older.palette, Palette::Default);
+        assert_eq!(older.accent, "");
+        assert_eq!(older.font_scale, 115);
+
+        // A palette this build does not know costs that one setting, not the
+        // file: everything else in it is still read.
+        let unknown =
+            Settings::parse("{\"formatVersion\":2,\"palette\":\"solarized2\",\"fontScale\":130}");
+        assert_eq!(unknown.palette, Palette::Default);
+        assert_eq!(unknown.font_scale, 130);
     }
 
     #[test]

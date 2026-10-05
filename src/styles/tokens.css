@@ -219,6 +219,337 @@
   --g-toast-outline: var(--g-stroke-default);
 }
 
+/* ---------------------------------------------------------- palettes */
+
+/* Six palettes, each stated for both modes. A palette sets the colours that
+ * carry meaning - the three opaque layers, the four text tiers, the strokes,
+ * the accent and the three states - and leaves the layering to the alphas
+ * above, so every palette is the same depth system in different colour. The
+ * first entry is the WinUI palette itself: it is a block like the others so
+ * the settings window can show it next to them, and a test keeps it
+ * identical to the `:root` defaults it repeats.
+ *
+ * The hues of the others come from the schemes they are named for (Nord,
+ * nordtheme.com, MIT; Solarized, ethanschoonover.com/solarized, MIT; Dracula
+ * and Alucard, draculatheme.com, MIT); warm paper and true black are built
+ * here. Every pair a reader has to read clears 4.5:1, which
+ * `tests/tokens.test.js` re-measures from this file rather than trusting the
+ * arithmetic that wrote it. Selecting a palette other than the first also
+ * takes the window off the system backdrop: Mica is tinted by the desktop,
+ * and a palette that states its own window colour cannot have that. */
+
+/* WinUI - the colours the app has always used, and still the default */
+[data-palette="default"] {
+  --g-surface-window: #f3f3f3;
+  --g-surface-sunken: #eeeeee;
+  --g-surface-solid: #ffffff;
+  --g-surface-flyout: rgba(252, 252, 252, 0.9);
+  --g-text-primary: rgba(0, 0, 0, 0.8956);
+  --g-text-secondary: rgba(0, 0, 0, 0.6063);
+  --g-text-tertiary: rgba(0, 0, 0, 0.558);
+  --g-text-disabled: rgba(0, 0, 0, 0.3614);
+  --g-stroke-subtle: rgba(0, 0, 0, 0.0578);
+  --g-stroke-default: rgba(0, 0, 0, 0.0803);
+  --g-stroke-strong: rgba(0, 0, 0, 0.4458);
+  --g-accent: #0f6cbd;
+  --g-accent-hover: #115ea3;
+  --g-accent-pressed: #0c3b5e;
+  --g-accent-soft: rgba(15, 108, 189, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #0f7b0f;
+  --g-ok-soft: rgba(15, 123, 15, 0.14);
+  --g-warn: #9d5d00;
+  --g-warn-soft: rgba(157, 93, 0, 0.14);
+  --g-bad: #c42b1c;
+  --g-bad-soft: rgba(196, 43, 28, 0.14);
+}
+
+[data-palette="default"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #202020;
+  --g-surface-sunken: #1c1c1c;
+  --g-surface-solid: #2b2b2b;
+  --g-surface-flyout: rgba(44, 44, 44, 0.9);
+  --g-text-primary: #ffffff;
+  --g-text-secondary: rgba(255, 255, 255, 0.786);
+  --g-text-tertiary: rgba(255, 255, 255, 0.5646);
+  --g-text-disabled: rgba(255, 255, 255, 0.3628);
+  --g-stroke-subtle: rgba(255, 255, 255, 0.0693);
+  --g-stroke-default: rgba(255, 255, 255, 0.0939);
+  --g-stroke-strong: rgba(255, 255, 255, 0.5442);
+  --g-accent: #60cdff;
+  --g-accent-hover: #6fd4ff;
+  --g-accent-pressed: #4fbfe8;
+  --g-accent-soft: rgba(96, 205, 255, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #6ccb5f;
+  --g-ok-soft: rgba(108, 203, 95, 0.16);
+  --g-warn: #fce100;
+  --g-warn-soft: rgba(252, 225, 0, 0.16);
+  --g-bad: #ff99a4;
+  --g-bad-soft: rgba(255, 153, 164, 0.16);
+}
+
+/* Warm paper — reading under a lamp, and long sessions at night */
+[data-palette="sepia"] {
+  --g-surface-window: #f3ead8;
+  --g-surface-sunken: #eee3cd;
+  --g-surface-solid: #fffaf0;
+  --g-surface-flyout: rgba(255, 250, 240, 0.9);
+  --g-text-primary: #33281a;
+  --g-text-secondary: #55452e;
+  --g-text-tertiary: #5f4d34;
+  --g-text-disabled: #a4906f;
+  --g-stroke-subtle: rgba(84, 68, 38, 0.09);
+  --g-stroke-default: rgba(84, 68, 38, 0.14);
+  --g-stroke-strong: rgba(84, 68, 38, 0.46);
+  --g-accent: #a4471a;
+  --g-accent-hover: #8d3d16;
+  --g-accent-pressed: #703012;
+  --g-accent-soft: rgba(164, 71, 26, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #4f6b16;
+  --g-ok-soft: rgba(79, 107, 22, 0.14);
+  --g-warn: #87520a;
+  --g-warn-soft: rgba(135, 82, 10, 0.14);
+  --g-bad: #a5291a;
+  --g-bad-soft: rgba(165, 41, 26, 0.14);
+}
+
+[data-palette="sepia"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #221b12;
+  --g-surface-sunken: #1c1610;
+  --g-surface-solid: #2c2418;
+  --g-surface-flyout: rgba(44, 36, 24, 0.9);
+  --g-text-primary: #f6ead4;
+  --g-text-secondary: #ded0b4;
+  --g-text-tertiary: #c2b193;
+  --g-text-disabled: #7d6f57;
+  --g-stroke-subtle: rgba(255, 255, 255, 0.07);
+  --g-stroke-default: rgba(255, 255, 255, 0.11);
+  --g-stroke-strong: rgba(255, 255, 255, 0.52);
+  --g-accent: #e9a13c;
+  --g-accent-hover: #ecac53;
+  --g-accent-pressed: #c48732;
+  --g-accent-soft: rgba(233, 161, 60, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #9fc46a;
+  --g-ok-soft: rgba(159, 196, 106, 0.16);
+  --g-warn: #e6c05c;
+  --g-warn-soft: rgba(230, 192, 92, 0.16);
+  --g-bad: #f08a72;
+  --g-bad-soft: rgba(240, 138, 114, 0.16);
+}
+
+/* Nord — cool blue-grey, easy on a bright office screen */
+[data-palette="nord"] {
+  --g-surface-window: #e5e9f0;
+  --g-surface-sunken: #dee3ec;
+  --g-surface-solid: #ffffff;
+  --g-surface-flyout: rgba(255, 255, 255, 0.9);
+  --g-text-primary: #2e3440;
+  --g-text-secondary: #414b5c;
+  --g-text-tertiary: #4b5668;
+  --g-text-disabled: #98a2b3;
+  --g-stroke-subtle: rgba(46, 52, 64, 0.08);
+  --g-stroke-default: rgba(46, 52, 64, 0.12);
+  --g-stroke-strong: rgba(46, 52, 64, 0.45);
+  --g-accent: #4c6a92;
+  --g-accent-hover: #415b7e;
+  --g-accent-pressed: #344863;
+  --g-accent-soft: rgba(76, 106, 146, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #4a7434;
+  --g-ok-soft: rgba(74, 116, 52, 0.14);
+  --g-warn: #8a6100;
+  --g-warn-soft: rgba(138, 97, 0, 0.14);
+  --g-bad: #a3384a;
+  --g-bad-soft: rgba(163, 56, 74, 0.14);
+}
+
+[data-palette="nord"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #2e3440;
+  --g-surface-sunken: #292f3a;
+  --g-surface-solid: #3b4252;
+  --g-surface-flyout: rgba(59, 66, 82, 0.9);
+  --g-text-primary: #eceff4;
+  --g-text-secondary: #d4dae6;
+  --g-text-tertiary: #b6bfce;
+  --g-text-disabled: #6d7686;
+  --g-stroke-subtle: rgba(255, 255, 255, 0.08);
+  --g-stroke-default: rgba(255, 255, 255, 0.12);
+  --g-stroke-strong: rgba(255, 255, 255, 0.5);
+  --g-accent: #88c0d0;
+  --g-accent-hover: #96c8d6;
+  --g-accent-pressed: #72a1af;
+  --g-accent-soft: rgba(136, 192, 208, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #a3be8c;
+  --g-ok-soft: rgba(163, 190, 140, 0.16);
+  --g-warn: #ebcb8b;
+  --g-warn-soft: rgba(235, 203, 139, 0.16);
+  --g-bad: #ff9aa4;
+  --g-bad-soft: rgba(255, 154, 164, 0.16);
+}
+
+/* Solarized — the low-glare palette for all-day reading */
+[data-palette="solarized"] {
+  --g-surface-window: #fdf6e3;
+  --g-surface-sunken: #f6efdb;
+  --g-surface-solid: #fffbf0;
+  --g-surface-flyout: rgba(255, 251, 240, 0.9);
+  --g-text-primary: #073642;
+  --g-text-secondary: #4f626c;
+  --g-text-tertiary: #5e727a;
+  --g-text-disabled: #93a1a1;
+  --g-stroke-subtle: rgba(7, 54, 66, 0.09);
+  --g-stroke-default: rgba(7, 54, 66, 0.14);
+  --g-stroke-strong: rgba(7, 54, 66, 0.46);
+  --g-accent: #14639c;
+  --g-accent-hover: #115586;
+  --g-accent-pressed: #0e436a;
+  --g-accent-soft: rgba(20, 99, 156, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #4a6b0f;
+  --g-ok-soft: rgba(74, 107, 15, 0.14);
+  --g-warn: #855b00;
+  --g-warn-soft: rgba(133, 91, 0, 0.14);
+  --g-bad: #a32f2a;
+  --g-bad-soft: rgba(163, 47, 42, 0.14);
+}
+
+[data-palette="solarized"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #002b36;
+  --g-surface-sunken: #00232c;
+  --g-surface-solid: #073642;
+  --g-surface-flyout: rgba(7, 54, 66, 0.9);
+  --g-text-primary: #eee8d5;
+  --g-text-secondary: #a7b3b2;
+  --g-text-tertiary: #93a1a1;
+  --g-text-disabled: #586e75;
+  --g-stroke-subtle: rgba(255, 255, 255, 0.08);
+  --g-stroke-default: rgba(255, 255, 255, 0.12);
+  --g-stroke-strong: rgba(255, 255, 255, 0.5);
+  --g-accent: #3c9bd6;
+  --g-accent-hover: #53a7db;
+  --g-accent-pressed: #3282b4;
+  --g-accent-soft: rgba(60, 155, 214, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #9cb300;
+  --g-ok-soft: rgba(156, 179, 0, 0.16);
+  --g-warn: #c99a00;
+  --g-warn-soft: rgba(201, 154, 0, 0.16);
+  --g-bad: #ff948f;
+  --g-bad-soft: rgba(255, 148, 143, 0.16);
+}
+
+/* Dracula — the night palette, purple where the accent goes */
+[data-palette="dracula"] {
+  --g-surface-window: #f5f5f5;
+  --g-surface-sunken: #ededee;
+  --g-surface-solid: #ffffff;
+  --g-surface-flyout: rgba(255, 255, 255, 0.9);
+  --g-text-primary: #1f1f1f;
+  --g-text-secondary: #44475a;
+  --g-text-tertiary: #575a70;
+  --g-text-disabled: #a8a8b3;
+  --g-stroke-subtle: rgba(31, 31, 31, 0.09);
+  --g-stroke-default: rgba(31, 31, 31, 0.13);
+  --g-stroke-strong: rgba(31, 31, 31, 0.45);
+  --g-accent: #644ac9;
+  --g-accent-hover: #5640ad;
+  --g-accent-pressed: #443289;
+  --g-accent-soft: rgba(100, 74, 201, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #1a7f37;
+  --g-ok-soft: rgba(26, 127, 55, 0.14);
+  --g-warn: #8a5a00;
+  --g-warn-soft: rgba(138, 90, 0, 0.14);
+  --g-bad: #b3261e;
+  --g-bad-soft: rgba(179, 38, 30, 0.14);
+}
+
+[data-palette="dracula"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #282a36;
+  --g-surface-sunken: #21222c;
+  --g-surface-solid: #343746;
+  --g-surface-flyout: rgba(52, 55, 70, 0.9);
+  --g-text-primary: #f8f8f2;
+  --g-text-secondary: #d8d9e3;
+  --g-text-tertiary: #b8bcc9;
+  --g-text-disabled: #6272a4;
+  --g-stroke-subtle: rgba(255, 255, 255, 0.08);
+  --g-stroke-default: rgba(255, 255, 255, 0.13);
+  --g-stroke-strong: rgba(255, 255, 255, 0.5);
+  --g-accent: #bd93f9;
+  --g-accent-hover: #c5a0fa;
+  --g-accent-pressed: #9f7bd1;
+  --g-accent-soft: rgba(189, 147, 249, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #50fa7b;
+  --g-ok-soft: rgba(80, 250, 123, 0.16);
+  --g-warn: #f1fa8c;
+  --g-warn-soft: rgba(241, 250, 140, 0.16);
+  --g-bad: #ff7a85;
+  --g-bad-soft: rgba(255, 122, 133, 0.16);
+}
+
+/* True black — for an OLED panel, and for the least light in a dark room */
+[data-palette="amoled"] {
+  --g-surface-window: #ffffff;
+  --g-surface-sunken: #f3f3f3;
+  --g-surface-solid: #ffffff;
+  --g-surface-flyout: rgba(255, 255, 255, 0.9);
+  --g-text-primary: #000000;
+  --g-text-secondary: #3d3d3d;
+  --g-text-tertiary: #525252;
+  --g-text-disabled: #9a9a9a;
+  --g-stroke-subtle: rgba(0, 0, 0, 0.1);
+  --g-stroke-default: rgba(0, 0, 0, 0.16);
+  --g-stroke-strong: rgba(0, 0, 0, 0.58);
+  --g-accent: #0a5fbf;
+  --g-accent-hover: #0952a4;
+  --g-accent-pressed: #074182;
+  --g-accent-soft: rgba(10, 95, 191, 0.1);
+  --g-on-accent: #ffffff;
+  --g-ok: #0b6b12;
+  --g-ok-soft: rgba(11, 107, 18, 0.14);
+  --g-warn: #8a5300;
+  --g-warn-soft: rgba(138, 83, 0, 0.14);
+  --g-bad: #c0180c;
+  --g-bad-soft: rgba(192, 24, 12, 0.14);
+}
+
+[data-palette="amoled"][data-theme="dark"] {
+  color-scheme: dark;
+  --g-surface-window: #000000;
+  --g-surface-sunken: #000000;
+  --g-surface-solid: #0d0d0d;
+  --g-surface-flyout: rgba(13, 13, 13, 0.9);
+  --g-text-primary: #ffffff;
+  --g-text-secondary: #c9c9c9;
+  --g-text-tertiary: #a8a8a8;
+  --g-text-disabled: #6b6b6b;
+  --g-stroke-subtle: rgba(255, 255, 255, 0.1);
+  --g-stroke-default: rgba(255, 255, 255, 0.17);
+  --g-stroke-strong: rgba(255, 255, 255, 0.62);
+  --g-accent: #4cc2ff;
+  --g-accent-hover: #61c9ff;
+  --g-accent-pressed: #40a3d6;
+  --g-accent-soft: rgba(76, 194, 255, 0.16);
+  --g-on-accent: #000000;
+  --g-ok: #46d160;
+  --g-ok-soft: rgba(70, 209, 96, 0.16);
+  --g-warn: #ffd166;
+  --g-warn-soft: rgba(255, 209, 102, 0.16);
+  --g-bad: #ff6b6b;
+  --g-bad-soft: rgba(255, 107, 107, 0.16);
+}
+
 /* ------------------------------------------------------ high contrast */
 
 /* Windows' own high-contrast palette, rather than a second dark theme:
@@ -233,8 +564,15 @@
  * gone with them: nothing here is read through something else, and nothing is
  * asked to be noticed by being faint.
  */
+/* The selector list names every combination a palette can add, because a
+ * contrast theme is the one layer that has to win outright: a palette states the
+ * same tokens on `[data-palette]` and `[data-palette][data-theme]`, which would
+ * otherwise outrank these rules and paint the requested contrast scheme over. */
 @media (prefers-contrast: more) {
-  :root {
+  :root,
+  :root[data-theme],
+  :root[data-palette],
+  :root[data-theme][data-palette] {
     color-scheme: light dark;
 
     --g-surface-window: Canvas;
@@ -290,6 +628,40 @@
     --g-toast-text: CanvasText;
     --g-toast-outline: CanvasText;
   }
+}
+
+/* -------------------------------------------------------- accent choices */
+
+/* The seven colours the accent row offers beside "let the palette decide".
+ * They are stated here because this is the only stylesheet that holds a colour;
+ * the picker reads them back out of the document rather than keeping a second
+ * list in JavaScript, and what it stores is the colour itself, so renaming one
+ * of these never invalidates a stored setting. Each is a mid-tone that carries
+ * white or black text, whichever reads better on it. */
+:root {
+  --g-accent-blue: #2f6fd0;
+  --g-accent-teal: #0d7d84;
+  --g-accent-green: #2f8f46;
+  --g-accent-amber: #c07a12;
+  --g-accent-coral: #d1483c;
+  --g-accent-violet: #7a5af0;
+  --g-accent-pink: #c0398f;
+  --g-accent-slate: #5b6673;
+}
+
+/* ---------------------------------------------------- browser surfaces */
+
+/* The parts of a window nobody draws: a text selection, the caret, the tick in
+ * a checkbox. They ship with WebView2 defaults that belong to no design system,
+ * and leaving them is what makes a themed window read as half-finished. The
+ * accent token is the one thing every palette is guaranteed to state. */
+::selection {
+  background: var(--g-accent);
+  color: var(--g-on-accent);
+}
+
+:root {
+  caret-color: var(--g-accent);
 }
 
 /* ----------------------------------------------------------- density */

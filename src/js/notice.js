@@ -36,6 +36,8 @@
       const settings = await Glossy.readSettings();
       applyLanguage(settings.uiLang);
       applyTheme(settings.theme);
+      // The palette and the accent reach this window through the cache js/theme.js
+      // keeps, which its boot path has already applied.
     } catch (error) {
       console.warn("glossy: cannot read settings", error);
       applyLanguage("system");

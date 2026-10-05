@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Theme as TauriTheme};
 
+use crate::platform;
 use crate::settings::Theme;
 
 /// Whether the settings window really got a backdrop. The stylesheet only turns
@@ -100,4 +101,73 @@ pub fn surface_info() -> SurfaceInfo {
 #[tauri::command]
 pub fn set_window_theme(app: AppHandle, label: String, theme: Theme) -> bool {
     set_theme(&app, &label, theme)
+}
+
+/// Called by the page whenever the palette setting changes, with the window
+/// colour that palette paints — or nothing at all for the default one.
+///
+/// A palette has a window colour of its own, and the two things Windows draws
+/// around the page have to be told: the title bar (DWM, or it keeps the colour
+/// of the scheme the window is not in) and the backdrop (Mica is tinted by the
+/// desktop, which is exactly what a palette with its own window colour cannot
+/// have). The default palette sends `None`, which gives the caption back to
+/// Windows and lays the backdrop again.
+///
+/// The colour comes from the page rather than from a table here, because
+/// `tokens.css` is where a palette is defined — a second copy in Rust is a
+/// second thing to keep in step.
+#[tauri::command]
+pub fn set_window_surface(app: AppHandle, label: String, colour: Option<String>) -> bool {
+    set_surface(&app, &label, colour.as_deref())
+}
+
+fn set_surface(app: &AppHandle, label: &str, colour: Option<&str>) -> bool {
+    let Some(window) = app.get_webview_window(label) else {
+        return false;
+    };
+    let handle = platform::desktop::Handle(window.hwnd().map(|h| h.0 as isize).unwrap_or(0));
+    let rgb = colour.and_then(parse_colour);
+    match rgb {
+        Some((red, green, blue)) => {
+            let _ = window_vibrancy::clear_mica(&window);
+            BACKDROP.store(false, Ordering::Relaxed);
+            // The page paints this too; the window is set as well so that the
+            // frame, the title bar and the moment before the page paints are
+            // the same colour rather than the previous palette's.
+            let _ = window.set_background_color(Some(tauri::window::Color(red, green, blue, 255)));
+            platform::desktop::set_caption_color(handle, Some((red, green, blue)))
+        }
+        None => {
+            let dark = matches!(window.theme(), Ok(TauriTheme::Dark));
+            let cleared = platform::desktop::set_caption_color(handle, None);
+            apply_backdrop(app, label, dark) && cleared
+        }
+    }
+}
+
+/// `#rrggbb` as three channels, or nothing when the page sent something else.
+fn parse_colour(value: &str) -> Option<(u8, u8, u8)> {
+    let text = value.trim().trim_start_matches('#');
+    if text.len() != 6 || !text.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let channel = |at: usize| u8::from_str_radix(&text[at..at + 2], 16).ok();
+    Some((channel(0)?, channel(2)?, channel(4)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_window_colour_is_read_only_from_a_plain_hex_value() {
+        assert_eq!(parse_colour("#4c6a92"), Some((0x4c, 0x6a, 0x92)));
+        assert_eq!(parse_colour("  #FFFFFF "), Some((255, 255, 255)));
+        assert_eq!(parse_colour("4c6a92"), Some((0x4c, 0x6a, 0x92)));
+        // Anything else is left to Windows rather than painted half-read.
+        assert_eq!(parse_colour("rgba(255, 255, 255, 0.7)"), None);
+        assert_eq!(parse_colour("#fff"), None);
+        assert_eq!(parse_colour(""), None);
+        assert_eq!(parse_colour("#12345g"), None);
+    }
 }

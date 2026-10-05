@@ -1,6 +1,7 @@
 {
   "formatVersion": 2,
   "settingsKeys": [
+    "accent",
     "autoCloseSecs",
     "autostart",
     "checkUpdates",
@@ -21,6 +22,7 @@
     "ignoredApps",
     "minSelectionLen",
     "ocrPacks",
+    "palette",
     "popupOpacity",
     "popupWidth",
     "restoreClipboard",
@@ -99,6 +101,7 @@
     "service_languages",
     "set_service",
     "set_target_lang",
+    "set_window_surface",
     "set_window_theme",
     "show_popup",
     "speaking",

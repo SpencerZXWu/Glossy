@@ -960,6 +960,221 @@ input:focus-visible {
   font-weight: 550;
 }
 
+/* ------------------------------------------------------------- palettes */
+
+/* One card per palette, each previewing itself: the two halves are the light and
+   the dark one, and every colour inside them comes from the palette's own
+   tokens, so a card cannot drift from what choosing it does. */
+.palettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.palette-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+  transition: box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.palette-card:hover {
+  border-color: var(--g-stroke-default);
+  background: var(--g-surface-hover);
+}
+
+.palette-card[data-selected="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.palette-card input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.palette-card:focus-within {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+.palette-card__preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+/* A miniature of a card in that palette and that mode. `data-theme` is on the
+   element rather than inherited, so both halves show even when the window is
+   only in one of them. */
+.swatch-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  height: 42px;
+  padding: 6px;
+  border-radius: var(--g-radius-sm);
+  background: var(--g-surface-window);
+  box-shadow: inset 0 0 0 1px var(--g-stroke-subtle);
+}
+
+.swatch-page__line {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--g-text-primary);
+}
+
+.swatch-page__line--soft {
+  width: 58%;
+  background: var(--g-text-tertiary);
+}
+
+.swatch-page__dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--g-accent);
+}
+
+.palette-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.palette-card__use {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* -------------------------------------------------------------- accents */
+
+.accents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.accents__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.accent-dot {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: box-shadow 140ms ease;
+}
+
+/* One rule per choice rather than a colour in JavaScript: the value is a token,
+   and the picker reads it back out of the document. */
+.accent-dot[data-choice="blue"] { background: var(--g-accent-blue); }
+.accent-dot[data-choice="teal"] { background: var(--g-accent-teal); }
+.accent-dot[data-choice="green"] { background: var(--g-accent-green); }
+.accent-dot[data-choice="amber"] { background: var(--g-accent-amber); }
+.accent-dot[data-choice="coral"] { background: var(--g-accent-coral); }
+.accent-dot[data-choice="violet"] { background: var(--g-accent-violet); }
+.accent-dot[data-choice="pink"] { background: var(--g-accent-pink); }
+.accent-dot[data-choice="slate"] { background: var(--g-accent-slate); }
+
+/* The swatch that hands the choice back to the palette shows what the palette
+   chose, with a hairline of the text colour across it so it reads as "whatever
+   the palette says" rather than as one more colour. */
+.accent-dot[data-follow="true"] {
+  background: var(--g-accent);
+}
+
+.accent-dot[data-follow="true"]::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1px;
+  background: var(--g-on-accent);
+  opacity: 0.75;
+}
+
+.accent-dot[data-selected="true"] {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
+
+.accent-dot:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* The colour picker of the system, dressed as one more swatch: the input covers
+   the button so a click opens it, and the ring it draws is the system's. */
+.accent-custom {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px dashed var(--g-stroke-strong);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.accent-custom input {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.accent-custom[data-selected="true"] {
+  border-style: solid;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+}
+
+.accent-custom__mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--fg-soft);
+  pointer-events: none;
+}
+
+.accent-custom__mark svg {
+  width: 15px;
+  height: 15px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .document-folder {
   display: flex;
   align-items: center;

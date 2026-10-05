@@ -950,6 +950,7 @@ pub fn run() {
             save_settings,
             surface::surface_info,
             surface::set_window_theme,
+            surface::set_window_surface,
             export_settings,
             import_settings,
             log_status,
