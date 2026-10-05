@@ -906,6 +906,17 @@ input:focus-visible {
   margin-top: 12px;
 }
 
+/* The channel is picked where the text is translated, as the same choice the
+   Language page offers; the list is copied from there rather than repeated, so
+   the two can never show different engines. */
+.demo-channel {
+  margin: 12px 0 0;
+}
+
+.demo-channel select {
+  max-width: 260px;
+}
+
 /* The box a document is dropped into. */
 .dropzone {
   display: flex;

@@ -105,8 +105,8 @@
     guideReadKey: $("guideReadKey"),
     demoText: $("demoText"),
     demoRun: $("demoRun"),
-    demoPaste: $("demoPaste"),
     demoClear: $("demoClear"),
+    demoService: $("demoService"),
     demoUnits: $("demoUnits"),
     demoCard: $("demoCard"),
     demoHeadword: $("demoHeadword"),
@@ -849,6 +849,48 @@
       scheduleSave();
     }
     renderFallbackOrder();
+  }
+
+  /**
+   * Chooses the engine that translates, from either of the two lists that offer
+   * it: the Language page and the page the text is translated on.
+   *
+   * Both lists are one list — the second is copied from the first — so the only
+   * thing left to keep in step is what follows from the choice: the languages
+   * the engine takes, the fallback order, the allowance line, and the card that
+   * is on screen. The save is awaited because the backend is what the rest of
+   * that follows from.
+   */
+  async function chooseService(service) {
+    pickedService = true;
+    els.service.value = service;
+    syncService();
+    syncChannelQuota();
+    // What the two language lists offer follows the engine, and so does the
+    // answer of the card.
+    els.targetLang.value = fillLanguages(els.targetLang.value);
+    dropUnservedPair();
+    refreshDocumentLanguages();
+    clearTimeout(saveTimer);
+    saveTimer = 0;
+    pending = false;
+    await save();
+    refreshDemo();
+  }
+
+  /**
+   * Puts the same list of engines on the Translate page.
+   *
+   * It is copied rather than written twice: the entries and the keys that name
+   * them live in the markup of the Language page, and two hand-kept lists that
+   * have to agree eventually do not.
+   */
+  function fillServiceOptions() {
+    els.demoService.innerHTML = "";
+    Array.from(els.service.options).forEach((option) => {
+      els.demoService.appendChild(new Option(option.textContent, option.value));
+    });
+    els.demoService.value = els.service.value;
   }
 
   /** The dropdown value that matches what the settings file holds. */
@@ -2238,6 +2280,9 @@
   function applyLanguage() {
     Glossy.i18n.apply(document);
     syncShortcutHints();
+    // The channel list is copied from the one in the markup, so it is filled
+    // after the entries themselves have their language back.
+    fillServiceOptions();
     renderGuide();
     renderIgnored();
     renderSourceLangs();
@@ -2808,23 +2853,6 @@
     refreshDemo();
   }
 
-  /** Puts the clipboard in the box and translates it right away. */
-  async function pasteDemo() {
-    let text = "";
-    try {
-      text = String((await Glossy.invoke("read_clipboard")) || "");
-    } catch (error) {
-      text = "";
-    }
-    if (!text.trim()) {
-      showToast(Glossy.i18n.t("demo.pasteEmpty"));
-      return;
-    }
-    els.demoText.value = text;
-    resetDemoLanguages();
-    runDemo(text);
-  }
-
   /** Empties the box and takes the card away. */
   function clearDemo() {
     // A translation still in flight must not draw into the emptied card.
@@ -2872,22 +2900,7 @@
     applyLanguage();
     scheduleSave();
   });
-  els.service.addEventListener("change", async () => {
-    pickedService = true;
-    syncService();
-    syncChannelQuota();
-    // What the two language lists offer follows the engine, and so does the
-    // answer of the card; the save is awaited because the backend only knows
-    // the new engine once it has landed.
-    els.targetLang.value = fillLanguages(els.targetLang.value);
-    dropUnservedPair();
-    refreshDocumentLanguages();
-    clearTimeout(saveTimer);
-    saveTimer = 0;
-    pending = false;
-    await save();
-    refreshDemo();
-  });
+  els.service.addEventListener("change", () => chooseService(els.service.value));
   els.cloudQuotaRefresh.addEventListener("click", () => refreshCloudQuota());
   els.ignoredRunning.addEventListener("change", () => {
     const picked = els.ignoredRunning.value;
@@ -3465,7 +3478,7 @@
     const picked = highlighted().replace(/\s+/g, " ").trim();
     runDemo(picked.length >= 2 ? picked : els.demoText.value);
   });
-  els.demoPaste.addEventListener("click", pasteDemo);
+  els.demoService.addEventListener("change", () => chooseService(els.demoService.value));
   els.demoClear.addEventListener("click", clearDemo);
   els.demoText.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
