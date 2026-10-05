@@ -63,3 +63,27 @@ test("every control of a page is named, by a label or by an attribute", () => {
   assert.ok(label, "the interface language has no visible label");
   assert.ok(!/data-i18n-title="ui\.lang"/.test(html), "the tooltip is doing the label's work");
 });
+
+test("the guide offers one step per scene, and every scene says what it shows", () => {
+  const html = readPage("index.html");
+  const steps = Array.from(html.matchAll(/class="guide-step"/g));
+  const scenes = Array.from(html.matchAll(/<section class="scene" id="guideScene(\d+)"/g), (m) => m[1]);
+
+  // A step with no scene behind it is a button that opens nothing.
+  assert.equal(steps.length, scenes.length, "the rail and the scenes disagree");
+  assert.deepEqual(scenes, scenes.map((_, index) => String(index)));
+
+  // The numbers the rail shows run in the order the scenes are written, which
+  // is the order the arrows and the counter walk.
+  const numbers = Array.from(html.matchAll(/<span class="guide-num">(\d+)<\/span>/g), (m) => m[1]);
+  assert.deepEqual(numbers, scenes.map((_, index) => String(index + 1)));
+
+  for (const id of scenes) {
+    // Every scene carries a heading and both lines of copy, each localized:
+    // a scene that shows an animation and explains nothing is not a step.
+    const block = html.split(`id="guideScene${id}"`)[1].split("</section>")[0];
+    for (const part of ["<h3 data-i18n=", 'class="guide-how" data-i18n=', 'class="hint" data-i18n=']) {
+      assert.ok(block.includes(part), `scene ${id} is missing ${part}`);
+    }
+  }
+});

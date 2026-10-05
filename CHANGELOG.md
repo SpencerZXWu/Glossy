@@ -13,6 +13,16 @@ back to the field it is typed in.
 
 ### Added
 
+- **A guided tour on the first launch.** The window that only ever opens once now
+  explains itself: four steps — selecting a text, typing or pasting one, reading a
+  screenshot, and downloading what has to be on this machine — each with its own
+  short animation and two lines saying what to do and what happens. The scenes are
+  drawn from the same tokens as the window behind them rather than recorded, so
+  they follow the palette, the accent and the interface language, and a reader who
+  asked Windows for less motion gets the last frame of each scene instead of no
+  scene at all. The rail, the arrow keys, Escape and a play/pause button work the
+  way the four steps deserve, and **Watch the guide again** on the **General**
+  page plays it from the start.
 - **The state in the title bar is a switch.** *Listening* used to be a label that only said
   what the app was doing; it now takes a click and turns the selection capture off and on
   from wherever the window is, and a second click brings it back. It is the same setting the

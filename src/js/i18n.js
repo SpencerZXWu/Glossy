@@ -55,6 +55,45 @@
     "status.switch": "Selection translation",
     "status.switch.title": "Click to pause or resume",
 
+    "guide.title": "Getting started",
+    "guide.subtitle": "The four things worth knowing first.",
+    "guide.close": "Close the guide",
+    "guide.rail": "Steps",
+    "guide.play": "Play the animation",
+    "guide.pause": "Pause the animation",
+    "guide.back": "Back",
+    "guide.next": "Next",
+    "guide.start": "Start using Glossy",
+    "guide.step": "Step {0} of {1}",
+    "guide.again": "Watch the guide again",
+    "guide.chapter.select": "Select text",
+    "guide.chapter.type": "Type or paste",
+    "guide.chapter.read": "Screenshot",
+    "guide.chapter.fetch": "Offline files",
+    "guide.select.title": "Select a text and the mark appears",
+    "guide.select.how":
+      "Drag across a word, a phrase or a sentence in any program, or double-click a single word.",
+    "guide.select.what":
+      "Nothing is translated yet: a small Glossy mark waits under the selection. Click it and the translation opens in a card right there; click anywhere else and the mark goes away.",
+    "guide.type.title": "Or type and paste the text instead",
+    "guide.type.how":
+      "Type or paste it into the box on Translate text, or take it from the clipboard with the paste button.",
+    "guide.type.what":
+      "Ctrl+Enter translates everything in the box, in the same card the popup draws. A pasted text is translated as soon as it lands.",
+    "guide.read.title": "Read the text you cannot select",
+    "guide.read.how":
+      "Press the screenshot button on OCR translation, or the camera in the card, then drag a rectangle over the text.",
+    "guide.read.what":
+      "The screen freezes while you pick, and the rectangle is read on this machine and translated into the usual card. Esc or a right click cancels.",
+    "guide.fetch.title": "Download the parts that work offline",
+    "guide.fetch.how":
+      "On Resources, press the button that downloads the engine, then download the languages you meet. The offline pack is on the same page.",
+    "guide.fetch.what":
+      "Nothing is downloaded until you ask. The engine is what reads a screenshot here, with no connection and no allowance; the offline pack translates Chinese and English both ways on this machine.",
+    "guide.fetch.ready": "Ready",
+    "guide.sampleForeign": "敏捷的棕色狐狸跳过了那只懒狗",
+    "guide.sampleOwn": "The quick brown fox jumps over the lazy dog",
+
     "master.title": "Enable text selection translation",
     "master.hint": "A selection shows the Glossy icon; click it to translate.",
     "option.drag": "Translate when the mouse drags across text",
@@ -552,6 +591,42 @@
     "status.hook.title": "全局鼠标钩子没有运行。",
     "status.switch": "划词翻译",
     "status.switch.title": "点击可暂停或继续",
+
+    "guide.title": "新手上路",
+    "guide.subtitle": "最值得先知道的四件事。",
+    "guide.close": "关闭引导",
+    "guide.rail": "步骤",
+    "guide.play": "播放动画",
+    "guide.pause": "暂停动画",
+    "guide.back": "上一步",
+    "guide.next": "下一步",
+    "guide.start": "开始使用",
+    "guide.step": "第 {0} 步，共 {1} 步",
+    "guide.again": "再看一次引导",
+    "guide.chapter.select": "划词翻译",
+    "guide.chapter.type": "输入原文",
+    "guide.chapter.read": "截图翻译",
+    "guide.chapter.fetch": "离线资源",
+    "guide.select.title": "选中文字，图标就出现",
+    "guide.select.how": "在任意程序里拖动划过单词、短语或整句；双击则取一个词。",
+    "guide.select.what":
+      "这时还没有翻译：选区下方会等一个小 Glossy 图标。点一下它，译文才在图标下方弹出卡片；点别处图标就消失。",
+    "guide.type.title": "也可以自己输入或粘贴",
+    "guide.type.how": "把文字输入或粘贴到「文本翻译」页的输入框，或用「粘贴」按钮从剪贴板取。",
+    "guide.type.what":
+      "按 Ctrl+Enter 翻译框里的全部内容，用的就是弹窗那张卡片；粘贴进来的整段文字会立即翻译。",
+    "guide.read.title": "选不中的字，截图来读",
+    "guide.read.how": "在「图片文字翻译」页点「截图」按钮，或点卡片里的相机，然后在文字上拖出一个矩形。",
+    "guide.read.what":
+      "框选时屏幕会定住；矩形里的文字在本机识别后翻译进同一张卡片。按 Esc 或点右键即可取消。",
+    "guide.fetch.title": "需要离线的部分，先下载",
+    "guide.fetch.how":
+      "在「资源」页点下载识别引擎的按钮，再把你会遇到的语言下载下来；离线翻译包也在这一页。",
+    "guide.fetch.what":
+      "不点就不会下载。识别引擎让截图在本机读出文字，不联网、也不扣额度；离线翻译包在本机做中英互译。",
+    "guide.fetch.ready": "已就绪",
+    "guide.sampleForeign": "The quick brown fox jumps over the lazy dog",
+    "guide.sampleOwn": "敏捷的棕色狐狸跳过了那只懒狗",
 
     "master.title": "开启划词翻译",
     "master.hint": "选中文字后显示 Glossy 图标，点击图标才会翻译。",

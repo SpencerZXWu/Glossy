@@ -429,6 +429,13 @@ pub struct Settings {
     /// launch opens the settings window; every later one goes straight to the
     /// notification area.
     pub first_run: bool,
+    /// Whether the first-run walkthrough has been shown.
+    ///
+    /// It is written when the guide opens rather than when it is finished, for
+    /// the same reason as [`Self::first_run`]: a window closed a second later
+    /// has still shown it, and the way back to it is the button on the
+    /// **General** page.
+    pub guide_seen: bool,
     /// Colour scheme for both windows.
     pub theme: Theme,
     /// Which palette those colours come from; `theme` still decides whether the
@@ -524,6 +531,7 @@ impl Default for Settings {
             source_langs: Vec::new(),
             ui_lang: UiLanguage::default(),
             first_run: true,
+            guide_seen: false,
             theme: Theme::default(),
             palette: Palette::default(),
             accent: String::new(),

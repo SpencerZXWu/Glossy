@@ -15,6 +15,7 @@
     "firstRun",
     "fontScale",
     "formatVersion",
+    "guideSeen",
     "historyLimit",
     "hotkey",
     "hotkeyOcr",

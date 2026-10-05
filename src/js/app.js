@@ -95,6 +95,14 @@
     accentHint: $("accentHint"),
     status: $("status"),
     statusText: $("statusText"),
+    guide: $("guide"),
+    guideClose: $("guideClose"),
+    guidePlay: $("guidePlay"),
+    guideBack: $("guideBack"),
+    guideNext: $("guideNext"),
+    guideStep: $("guideStep"),
+    guideAgain: $("guideAgain"),
+    guideReadKey: $("guideReadKey"),
     demoText: $("demoText"),
     demoRun: $("demoRun"),
     demoPaste: $("demoPaste"),
@@ -641,6 +649,108 @@
     toastTimer = setTimeout(() => {
       els.toast.hidden = true;
     }, 1400);
+  }
+
+  /* --------------------------------------------------------------- guide */
+
+  /** The scenes of the first-run guide, in the order the rail walks them. */
+  const GUIDE_SCENES = Array.from(document.querySelectorAll("#guide .scene"));
+  const GUIDE_STEPS = Array.from(document.querySelectorAll("#guide .guide-step"));
+  let guideIndex = 0;
+  let guidePlaying = true;
+  let guideSeen = false;
+  let guideReturn = null;
+
+  /** The controls of the open guide, in the order Tab walks them. */
+  function guideStops() {
+    return [...GUIDE_STEPS, els.guidePlay, els.guideBack, els.guideNext, els.guideClose].filter(
+      (control) => !control.disabled,
+    );
+  }
+
+  /**
+   * Draws the step that is open: one scene, one rail row, one pair of buttons.
+   *
+   * The scenes are taken out of the flow and put back rather than hidden with
+   * CSS, because a scene that is put back starts its own sequence at the
+   * beginning: walking back to the first step shows the mark appearing again
+   * rather than the middle of an animation nobody saw the start of.
+   */
+  function renderGuide() {
+    GUIDE_SCENES.forEach((scene, index) => {
+      scene.hidden = index !== guideIndex;
+    });
+    GUIDE_STEPS.forEach((step, index) => {
+      if (index === guideIndex) step.setAttribute("aria-current", "step");
+      else step.removeAttribute("aria-current");
+    });
+    const last = GUIDE_SCENES.length - 1;
+    els.guideStep.textContent = Glossy.i18n.t("guide.step", guideIndex + 1, GUIDE_SCENES.length);
+    els.guideBack.disabled = guideIndex === 0;
+    els.guideNext.textContent = Glossy.i18n.t(
+      guideIndex === last ? "guide.start" : "guide.next",
+    );
+    const playKey = guidePlaying ? "guide.pause" : "guide.play";
+    els.guidePlay.title = Glossy.i18n.t(playKey);
+    els.guidePlay.setAttribute("aria-label", Glossy.i18n.t(playKey));
+    els.guidePlay.setAttribute("aria-pressed", String(!guidePlaying));
+    els.guide.dataset.playing = String(guidePlaying);
+  }
+
+  /** Opens one step, moving the keyboard to the rail row when it was a key. */
+  function showGuideStep(index, focus) {
+    guideIndex = Math.min(GUIDE_SCENES.length - 1, Math.max(0, index));
+    renderGuide();
+    if (focus) GUIDE_STEPS[guideIndex].focus();
+  }
+
+  /** Opens the guide on its first step, holding the keyboard while it is up. */
+  function openGuide() {
+    if (!els.guide.hidden) return;
+    guideReturn = document.activeElement;
+    els.guide.hidden = false;
+    guideIndex = 0;
+    guidePlaying = true;
+    renderGuide();
+    els.guideNext.focus();
+    document.addEventListener("keydown", onGuideKey, true);
+    // Seen is written down when the guide opens rather than when it is closed:
+    // a window closed a second later has still shown it, and the way back is
+    // the button on the General page.
+    if (!guideSeen) {
+      guideSeen = true;
+      save(false);
+    }
+  }
+
+  function closeGuide() {
+    if (els.guide.hidden) return;
+    els.guide.hidden = true;
+    document.removeEventListener("keydown", onGuideKey, true);
+    flushSave();
+    if (guideReturn && document.contains(guideReturn)) guideReturn.focus();
+  }
+
+  /** Arrow keys walk the steps, Escape closes, Tab stays inside the guide. */
+  function onGuideKey(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeGuide();
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      event.preventDefault();
+      event.stopPropagation();
+      showGuideStep(guideIndex + (event.key === "ArrowRight" ? 1 : -1), true);
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const stops = guideStops();
+    const here = stops.indexOf(document.activeElement);
+    const step = event.shiftKey ? -1 : 1;
+    event.preventDefault();
+    stops[(here + step + stops.length) % stops.length].focus();
   }
 
   /**
@@ -2116,12 +2226,19 @@
     const shot = Glossy.i18n.withShortcut(Glossy.i18n.t("ocr.run"), stored.hotkeyOcr);
     els.ocrRun.title = shot;
     els.ocrRun.setAttribute("aria-label", shot);
+    // The guide names the screenshot key that is recorded now, and a key that
+    // was cleared takes the line away with it — the rest of the step says what
+    // to press instead.
+    const readKey = String(stored.hotkeyOcr || "").trim();
+    els.guideReadKey.textContent = readKey || "Ctrl+Alt+Q";
+    els.guideReadKey.parentElement.hidden = !readKey;
   }
 
   /** Re-applies the interface language to everything the script writes itself. */
   function applyLanguage() {
     Glossy.i18n.apply(document);
     syncShortcutHints();
+    renderGuide();
     renderIgnored();
     renderSourceLangs();
     relabelRunningApps();
@@ -2212,6 +2329,7 @@
     els.service.value = serviceOf(next);
     els.targetLang.value = fillLanguages(next.targetLang);
     els.uiLang.value = next.uiLang === "zh" || next.uiLang === "en" ? next.uiLang : "system";
+    guideSeen = !!next.guideSeen;
     Glossy.i18n.set(els.uiLang.value);
     els.options.dataset.disabled = String(!next.enabled);
     applyLanguage();
@@ -2271,13 +2389,19 @@
       subtitleFontSize: Math.min(40, Math.max(13, numberOr(els.subtitleFontSize.value, stored.subtitleFontSize || 26))),
       targetLang: pickedTarget ? els.targetLang.value : String(stored.targetLang || ""),
       uiLang: els.uiLang.value,
+      guideSeen,
     };
   }
 
-  async function save() {
+  /**
+   * Writes the settings down. `announce` is off for a write the user did not
+   * make — the guide recording that it was shown — where a toast would only be
+   * a message about something they never asked for.
+   */
+  async function save(announce = true) {
     try {
       apply(await Glossy.invoke("save_settings", { settings: collect() }));
-      showToast(Glossy.i18n.t("toast.saved"));
+      if (announce) showToast(Glossy.i18n.t("toast.saved"));
       await refreshStatus();
       // A change of the cap, or of nothing at all: the list stays right by
       // asking the backend what it remembers.
@@ -2721,6 +2845,28 @@
   els.options.addEventListener("change", scheduleSave);
   els.enabled.addEventListener("change", () => setEnabled(els.enabled.checked));
   els.status.addEventListener("click", () => setEnabled(!els.enabled.checked));
+  els.guideClose.addEventListener("click", closeGuide);
+  els.guideAgain.addEventListener("click", openGuide);
+  els.guidePlay.addEventListener("click", () => {
+    guidePlaying = !guidePlaying;
+    renderGuide();
+  });
+  els.guideBack.addEventListener("click", () => showGuideStep(guideIndex - 1, false));
+  els.guideNext.addEventListener("click", () => {
+    if (guideIndex === GUIDE_SCENES.length - 1) closeGuide();
+    else showGuideStep(guideIndex + 1, false);
+  });
+  GUIDE_STEPS.forEach((step, index) => {
+    step.addEventListener("click", () => showGuideStep(index, false));
+  });
+  // A window behind the notification area spends most of its life hidden, and
+  // nothing on screen is worth a loop nobody can see. What the reader stopped
+  // is remembered: coming back to the front starts it again only if it was
+  // playing when the window went away.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) els.guide.dataset.playing = "false";
+    else renderGuide();
+  });
   els.uiLang.addEventListener("change", () => {
     Glossy.i18n.set(els.uiLang.value);
     applyLanguage();
@@ -3536,6 +3682,9 @@
     } catch (error) {
       showToast(Glossy.i18n.t("toast.loadFailed") + Glossy.errorMessage(error));
     }
+    // The very first launch of a build that has a guide gets the guide: the
+    // settings say whether it has been seen, and opening it writes that down.
+    if (settings && !settings.guideSeen) openGuide();
     // The document page is set up once the settings are in, because the target
     // language it starts from is the one they hold.
     setupDocumentPage();

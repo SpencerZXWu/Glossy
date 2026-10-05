@@ -559,7 +559,9 @@ main::-webkit-scrollbar-thumb {
   width: 88px;
 }
 
-.keys kbd {
+.keys kbd,
+.mock-key,
+.guide-key kbd {
   padding: 2px 7px;
   border: 1px solid var(--line);
   border-bottom-width: 2px;
@@ -1987,6 +1989,887 @@ input:focus-visible {
 
 .hint.warn {
   color: var(--bad);
+}
+
+/* ------------------------------------------------------------- the guide */
+
+/* The first-run walkthrough: the one place in this window where a picture of
+   the app is drawn instead of the app itself. Every part of every scene is a
+   token from above rather than a screenshot, and every scene is animated by
+   keyframes alone.
+
+   Each scene's resting state is its *last* frame, and the animations only ever
+   travel into the state the scene is already in. That is what leaves a reader
+   whose Windows asks for less motion with the answer — the text selected, the
+   card open, the downloads finished — instead of an empty stage. */
+
+.guide {
+  --guide-loop: 7.6s;
+  --guide-fetch: 9.6s;
+  /* The dim the screenshot overlay paints outside the rectangle it is dragging,
+     borrowed from `ocr.css` so the schematic is the colour of the real thing,
+     and the darker tone that overlay puts behind its own chips. */
+  --guide-dim: rgba(14, 16, 20, 0.42);
+  --guide-chip: rgba(14, 16, 20, 0.78);
+
+  position: fixed;
+  inset: 0;
+  z-index: var(--g-z-overlay);
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: var(--g-scrim);
+}
+
+.guide-box {
+  display: flex;
+  flex-direction: column;
+  width: min(820px, 100%);
+  max-height: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--g-surface-solid);
+  box-shadow: var(--g-shadow-dialog);
+  overflow: hidden;
+}
+
+.guide-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 16px 13px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.guide-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.guide-heading h2 {
+  margin: 0 0 3px;
+  font-size: var(--g-fs-title);
+}
+
+.guide-heading .hint {
+  margin: 0;
+}
+
+.guide-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--nav-width) minmax(0, 1fr);
+}
+
+/* The steps read the way the sidebar beside them reads: the same rows, the
+   same fill for the one that is open. Here the order carries the meaning, so
+   the number is worth its place. */
+.guide-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 12px 12px 12px 16px;
+  border-right: 1px solid var(--line);
+  list-style: none;
+}
+
+.guide-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--g-radius-lg);
+  background: transparent;
+  color: var(--fg-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
+}
+
+.guide-step:hover {
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.guide-step[aria-current="step"],
+.guide-step[aria-current="step"]:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: var(--g-fw-semibold);
+}
+
+.guide-step:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+.guide-num {
+  flex: none;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--g-stroke-default);
+  border-radius: 50%;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-step[aria-current="step"] .guide-num {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--g-on-accent);
+}
+
+.guide-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--g-panel-pad);
+  overflow-y: auto;
+}
+
+.scene {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scene h3 {
+  /* More space above a heading than below it, so it belongs to what follows. */
+  margin: 4px 0 0;
+  font-size: var(--g-fs-body);
+  font-weight: var(--g-fw-semibold);
+}
+
+.scene .hint,
+.guide-how,
+.guide-key {
+  margin: 0;
+}
+
+.guide-how {
+  color: var(--fg-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.guide-key {
+  display: flex;
+  gap: 6px;
+}
+
+/* The stage a scene plays in. The clipping is what keeps the dim of the third
+   scene's rectangle inside the stage instead of dimming the window. */
+.scene-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 244px;
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-lg);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------- the scenes themselves */
+
+/* One line of a paragraph that is not the sentence being read. */
+.mock-bar {
+  flex: none;
+  height: 8px;
+  border-radius: var(--g-radius-pill);
+  background: var(--g-text-disabled);
+  opacity: 0.45;
+}
+
+.mock-bar.b1 { width: 42%; }
+.mock-bar.b2 { width: 76%; }
+.mock-bar.b3 { width: 88%; }
+.mock-bar.b4 { width: 64%; }
+.mock-bar.b5 { width: 72%; }
+
+/* A program's window, with the text in it. */
+.mock-window {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-md);
+  background: var(--g-surface-solid);
+  box-shadow: var(--g-shadow-card);
+  overflow: hidden;
+}
+
+.mock-titlebar {
+  display: flex;
+  gap: 5px;
+  padding: 7px 9px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+
+.mock-titlebar span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--g-stroke-strong);
+}
+
+.mock-page,
+.mock-panel {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 16px;
+  overflow: hidden;
+}
+
+.mock-panel {
+  margin: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-md);
+  background: var(--g-surface-solid);
+}
+
+/* The whole screen, read by a rectangle instead of by selecting. */
+.mock-screen {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  background: var(--g-surface-solid);
+  overflow: hidden;
+}
+
+/* The run of text a scene marks up, and the anchor everything that points at
+   it is positioned against. */
+.mock-sample {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.mock-run {
+  position: relative;
+  display: inline-block;
+}
+
+/* A selected run: the accent behind it and the text turned to whatever reads
+   on the accent, which is what a real selection does. The fill is a layer of
+   its own so it can be drawn open as the pointer travels without the text
+   moving with it. */
+.mock-pick {
+  position: relative;
+  z-index: 0;
+  color: var(--g-on-accent);
+  animation: guide-pick-text var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-pick::before {
+  content: "";
+  position: absolute;
+  inset: -2px -3px;
+  z-index: -1;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: guide-pick var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-read {
+  color: var(--fg-soft);
+}
+
+/* The pointer the user's own mouse is, drawn the way Windows draws it: white
+   with a dark outline in both themes, because that is what they see. */
+.mock-pointer {
+  position: absolute;
+  left: 52%;
+  top: 25px;
+  z-index: 3;
+  width: 15px;
+  height: 18px;
+  animation: guide-pointer var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-screen .mock-pointer {
+  left: 100%;
+  top: 24px;
+  animation-name: guide-pointer-read;
+}
+
+.mock-pointer svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: #ffffff;
+  stroke: rgba(0, 0, 0, 0.75);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+/* The mark Glossy leaves under a selection. */
+.mock-mark {
+  position: absolute;
+  left: 50%;
+  top: 24px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  animation: guide-mark var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mock-ripple {
+  position: absolute;
+  left: 50%;
+  top: 41px;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  animation: guide-ripple var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+/* The card the translation opens in, as the popup draws it. Under a selection
+   it starts at the left edge of the run of text it is about, which is also what
+   keeps it out of the stage's own edge. */
+.mock-card {
+  position: absolute;
+  left: 0;
+  top: 60px;
+  z-index: 2;
+  width: 300px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-xl);
+  background: var(--g-surface-solid);
+  box-shadow: var(--g-shadow-flyout);
+  overflow: hidden;
+  animation: guide-card var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+/* Under the rectangle in the third scene, and in the middle of the page in the
+   second, where there is no run of text to hang it off. */
+.mock-screen .mock-card {
+  top: 40px;
+}
+
+.mock-panel .mock-card {
+  left: 50%;
+  top: 124px;
+  margin-left: -150px;
+}
+
+.mock-card-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.mock-headword {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: var(--g-fw-semibold);
+}
+
+.mock-icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: var(--muted);
+}
+
+.mock-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 10px 10px;
+}
+
+.mock-original {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.mock-translated {
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: var(--g-fw-medium);
+  line-height: 1.5;
+}
+
+/* The box a text is typed or pasted into, and the keys that translate it. */
+.mock-field {
+  position: relative;
+  flex: none;
+  min-height: 56px;
+  padding: 9px 10px;
+  /* The box the user is typing in holds the keyboard, which is what the ring
+     and the accent edge say; it is not a state that comes and goes here. */
+  border: 1px solid var(--accent);
+  border-radius: var(--g-radius-md);
+  background: var(--g-surface-solid);
+  font-size: 12.5px;
+  line-height: 1.6;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.mock-placeholder {
+  position: absolute;
+  inset: 9px 10px;
+  color: var(--muted);
+  overflow: hidden;
+  opacity: 0;
+  animation: guide-placeholder var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-caret {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 1.5px;
+  height: 15px;
+  background: var(--accent);
+  animation: guide-caret var(--guide-loop) steps(1, end) infinite;
+}
+
+.mock-typed {
+  display: block;
+  animation: guide-typed var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-keys {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  animation: guide-keys var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+/* The rectangle a screenshot is read from: it draws itself out of its top left
+   corner, and the shadow around it is the dim, with the rectangle as its hole —
+   the same trick the overlay itself uses. */
+.mock-band {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: calc(100% + 14px);
+  height: 31px;
+  border: 1px solid var(--accent);
+  transform-origin: 0 0;
+  box-shadow: 0 0 0 100vmax var(--guide-dim);
+  animation: guide-band var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+.mock-size {
+  position: absolute;
+  left: calc(100% - 4px);
+  top: -24px;
+  padding: 1px 6px;
+  border-radius: var(--g-radius-sm);
+  background: var(--guide-chip);
+  color: #ffffff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: guide-size var(--guide-loop) var(--g-ease-standard) infinite;
+}
+
+/* The downloads on the Resources page, one after another: while one of them is
+   running the other rows offer nothing, which is what the page itself does. */
+.mock-list {
+  position: relative;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px;
+  animation: guide-list var(--guide-fetch) var(--g-ease-standard) infinite;
+}
+
+.mock-res {
+  flex: none;
+  padding: 7px 10px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-md);
+  background: var(--g-surface-solid);
+}
+
+.mock-res-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mock-res-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: var(--g-fw-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mock-res-size {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mock-res-foot {
+  position: relative;
+  height: 20px;
+  margin-top: 4px;
+}
+
+.mock-download {
+  position: absolute;
+  left: 0;
+  top: 1px;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-sm);
+  background: var(--bg-soft);
+  color: var(--fg-soft);
+  font-size: 11px;
+}
+
+.mock-track {
+  position: absolute;
+  left: 0;
+  right: 54px;
+  top: 8px;
+  height: 5px;
+  border-radius: var(--g-radius-pill);
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+
+.mock-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--g-radius-pill);
+  background: var(--accent);
+  transform-origin: 0 50%;
+}
+
+.mock-ready {
+  position: absolute;
+  right: 0;
+  top: 1px;
+  color: var(--ok);
+  font-size: 11px;
+  font-weight: var(--g-fw-semibold);
+}
+
+.mock-download,
+.mock-track,
+.mock-ready {
+  animation-duration: var(--guide-fetch);
+  animation-timing-function: var(--g-ease-standard);
+  animation-iteration-count: infinite;
+}
+
+/* The button that started a download is gone once it is running, so the state a
+   row rests in is the bar at its end and the word beside it. */
+.mock-download {
+  opacity: 0;
+  animation-name: guide-btn-1;
+}
+
+.mock-track { animation-name: guide-track-1; }
+.mock-fill {
+  transform-origin: 0 50%;
+  animation: guide-fill-1 var(--guide-fetch) var(--g-ease-standard) infinite;
+}
+.mock-ready {
+  animation-name: guide-ready-1;
+}
+
+.mock-track.r1 { animation-name: guide-track-1; }
+.mock-fill.r1 { animation-name: guide-fill-1; }
+.mock-track.r2 { animation-name: guide-track-2; }
+.mock-fill.r2 { animation-name: guide-fill-2; }
+.mock-track.r3 { animation-name: guide-track-3; }
+.mock-fill.r3 { animation-name: guide-fill-3; }
+.mock-res:nth-of-type(2) .mock-download { animation-name: guide-btn-2; }
+.mock-res:nth-of-type(2) .mock-ready { animation-name: guide-ready-2; }
+.mock-res:nth-of-type(3) .mock-download { animation-name: guide-btn-3; }
+.mock-res:nth-of-type(3) .mock-ready { animation-name: guide-ready-3; }
+
+/* ------------------------------------------------------------------ foot */
+
+.guide-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-soft);
+}
+
+.guide-foot .icon-button {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--g-radius-md);
+  background: var(--g-surface-solid);
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+
+.guide-foot .icon-button:hover {
+  background: var(--g-surface-hover);
+  color: var(--fg);
+}
+
+.guide-foot .icon-button:focus-visible,
+#guideNext:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+.guide-play,
+.guide-pause {
+  width: 12px;
+  height: 12px;
+  display: none;
+}
+
+.guide[data-playing="true"] .guide-pause,
+.guide[data-playing="false"] .guide-play {
+  display: block;
+}
+
+.guide-gap {
+  flex: 1 1 auto;
+}
+
+/* Stopped is a state of the scene, not of the window: nothing else here moves,
+   so pausing the animations is all it takes. */
+.guide[data-playing="false"] .scene * {
+  animation-play-state: paused;
+}
+
+#guideNext {
+  padding: 6px 13px;
+  border: 1px solid transparent;
+  border-radius: var(--g-radius-lg);
+  background: var(--accent);
+  color: var(--g-on-accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: var(--g-fw-medium);
+  cursor: pointer;
+}
+
+/* The animations, one per thing that moves. Each set opens with the state the
+   scene rests in — a selection, an open card, a finished download — and travels
+   back to it, so the loop has somewhere to start from and the last frame is the
+   one the layout already draws. */
+
+@keyframes guide-pick {
+  0%, 6% { clip-path: inset(0 100% 0 0); }
+  24%, 92% { clip-path: inset(0 0 0 0); }
+  97%, 100% { clip-path: inset(0 100% 0 0); }
+}
+
+@keyframes guide-pick-text {
+  0%, 6% { color: var(--fg-soft); }
+  24%, 92% { color: var(--g-on-accent); }
+  97%, 100% { color: var(--fg-soft); }
+}
+
+/* The pointer is positioned rather than transformed: the run of text it drags
+   across is as wide as the sentence it is reading, which only `left` in a
+   percentage of the run can say. */
+@keyframes guide-pointer {
+  0% { left: -18px; top: 3px; opacity: 0; }
+  5% { left: -18px; top: 3px; opacity: 1; }
+  24% { left: 100%; top: 3px; opacity: 1; }
+  40% { left: 52%; top: 25px; opacity: 1; }
+  96% { left: 52%; top: 25px; opacity: 1; }
+  99%, 100% { left: 52%; top: 25px; opacity: 0; }
+}
+
+@keyframes guide-pointer-read {
+  0%, 5% { left: -14px; top: -8px; opacity: 0; }
+  8% { left: -14px; top: -8px; opacity: 1; }
+  26% { left: 100%; top: 24px; opacity: 1; }
+  96% { left: 100%; top: 24px; opacity: 1; }
+  99%, 100% { left: 100%; top: 24px; opacity: 0; }
+}
+
+@keyframes guide-mark {
+  0%, 26% { opacity: 0; transform: translateY(-4px) scale(0.72); }
+  32% { opacity: 1; transform: translateY(0) scale(1.08); }
+  36% { transform: translateY(0) scale(1); }
+  43% { transform: translateY(0) scale(0.92); }
+  47%, 93% { transform: translateY(0) scale(1); }
+  94%, 100% { opacity: 0; transform: translateY(-4px) scale(0.72); }
+}
+
+@keyframes guide-ripple {
+  0%, 42% { opacity: 0; transform: scale(0.3); }
+  45% { opacity: 0.5; }
+  58% { opacity: 0; transform: scale(1.7); }
+  100% { opacity: 0; transform: scale(1.7); }
+}
+
+@keyframes guide-card {
+  0%, 46% { opacity: 0; transform: translateY(10px); }
+  58%, 93% { opacity: 1; transform: translateY(0); }
+  98%, 100% { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes guide-placeholder {
+  0% { opacity: 0; }
+  4%, 12% { opacity: 1; }
+  18%, 100% { opacity: 0; }
+}
+
+@keyframes guide-caret {
+  0%, 3%, 8%, 13%, 18% { opacity: 1; }
+  5%, 10%, 15%, 20%, 100% { opacity: 0; }
+}
+
+@keyframes guide-typed {
+  0%, 14% { clip-path: inset(0 100% 0 0); }
+  38%, 96% { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 100% 0 0); }
+}
+
+@keyframes guide-keys {
+  0%, 40% { opacity: 0; transform: translateY(4px); }
+  46%, 94% { opacity: 1; transform: translateY(0); }
+  98%, 100% { opacity: 0; transform: translateY(4px); }
+}
+
+@keyframes guide-band {
+  0%, 6% { transform: scale(0, 0); opacity: 0.6; }
+  10% { opacity: 1; }
+  26%, 96% { transform: scale(1, 1); opacity: 1; }
+  100% { transform: scale(1, 1); opacity: 0; }
+}
+
+@keyframes guide-size {
+  0%, 20% { opacity: 0; transform: translateY(4px); }
+  26%, 96% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(4px); }
+}
+
+@keyframes guide-btn-1 {
+  0%, 8% { opacity: 1; }
+  12%, 100% { opacity: 0; }
+}
+
+/* The whole list fades in and out so the loop can start again: everything
+   inside it resets at a moment when none of it can be seen. */
+@keyframes guide-list {
+  0% { opacity: 0; }
+  4%, 95% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes guide-track-1 {
+  0%, 6% { opacity: 0; }
+  10%, 100% { opacity: 1; }
+}
+
+@keyframes guide-fill-1 {
+  0%, 10% { transform: scaleX(0); }
+  30%, 100% { transform: scaleX(1); }
+}
+
+@keyframes guide-ready-1 {
+  0%, 28% { opacity: 0; }
+  32%, 100% { opacity: 1; }
+}
+
+@keyframes guide-btn-2 {
+  0%, 8% { opacity: 1; }
+  12%, 30% { opacity: 0; }
+  34%, 44% { opacity: 1; }
+  48%, 100% { opacity: 0; }
+}
+
+@keyframes guide-track-2 {
+  0%, 36% { opacity: 0; }
+  40%, 100% { opacity: 1; }
+}
+
+@keyframes guide-fill-2 {
+  0%, 40% { transform: scaleX(0); }
+  58%, 100% { transform: scaleX(1); }
+}
+
+@keyframes guide-ready-2 {
+  0%, 56% { opacity: 0; }
+  60%, 100% { opacity: 1; }
+}
+
+@keyframes guide-btn-3 {
+  0%, 8% { opacity: 1; }
+  12%, 60% { opacity: 0; }
+  64%, 72% { opacity: 1; }
+  76%, 100% { opacity: 0; }
+}
+
+@keyframes guide-track-3 {
+  0%, 64% { opacity: 0; }
+  68%, 100% { opacity: 1; }
+}
+
+@keyframes guide-fill-3 {
+  0%, 68% { transform: scaleX(0); }
+  86%, 100% { transform: scaleX(1); }
+}
+
+@keyframes guide-ready-3 {
+  0%, 84% { opacity: 0; }
+  88%, 100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Nothing travels; every scene is left in the state its own rules describe,
+     which is the frame the scene ends on. */
+  .guide .scene * {
+    animation: none !important;
+  }
 }
 
 /* ------------------------------------------------------ high contrast */

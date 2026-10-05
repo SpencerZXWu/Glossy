@@ -57,7 +57,10 @@ To build from source instead, see [Development](#development).
 
 1. Start Glossy. The settings window opens on the very first launch only —
    later launches start quietly in the notification area, and Glossy listens for
-   selections from the moment it starts.
+   selections from the moment it starts. That first window opens with the
+   guided tour of the four things below, played as four short animations; the
+   tour is shown once, and **Watch the guide again** on the **General** page
+   brings it back at any time.
 2. Closing that window does not quit Glossy — it keeps watching for selections
    in the background. Click the Glossy icon in the notification area (or pick
    **Open Glossy** from its menu) to bring the window back. That menu also
@@ -197,6 +200,7 @@ installer puts next to the app.
 | Interface language | On the **Language** page. `Follow Windows`, `简体中文` or `English`. Switches the settings window and the popup immediately. |
 | Enable selection translation | Master switch. Turning it off pauses the global selection capture immediately. The same switch sits in the title bar's state, which reads *Listening* or *Paused* and toggles the capture on a click. |
 | Start Glossy with Windows | Adds a `--autostart` entry to `HKCU\...\Run`, so Glossy is already waiting in the notification area after a login. Started that way it does not show the "Glossy is running" card. |
+| Watch the guide again | Replays the first-run tour: four animated steps covering selecting a text, typing or pasting one, reading a screenshot, and downloading the offline files. |
 | Translate when the mouse drags across text | Enables the drag gesture. |
 | Translate a word on double click | Enables the double-click gesture. |
 | Put the clipboard back after reading a selection | Restores your previous clipboard content after Glossy copied the selection. |
@@ -756,6 +760,8 @@ none of them is covered by the automated tests.
 | 58 | Turn on a Windows contrast theme with a palette and a custom accent chosen, look at both windows, then turn it off | The contrast scheme wins over both — no palette colour and no custom accent survives in it — and both come back exactly as they were once the theme is off |
 | 59 | Click the state in the title bar, select some text in another program, then click it again and select again, and reopen the settings window | The click pauses the capture straight away — the label reads *Paused*, the dot goes grey and the setting's own switch follows — so nothing is translated and nothing is charged while it is off; the second click brings it back, the choice matches the master switch on **General**, and it is still there after the window is closed and reopened |
 | 60 | Drag across an image in a browser or in WeChat to select more than one picture, then drag across a paragraph of text | Holding and dragging where there is no text leaves the keyboard alone: the pictures keep their selection and nothing is copied; dragging over the paragraph still translates it, and so does a double click on a word — the check only ever answers for elements that have text of their own |
+| 61 | Start a build whose settings file has `"guideSeen": false`, watch the tour that opens, step through all four with the rail and the arrow keys, press Escape, then open **General** and press **Watch the guide again** | The tour opens on the first step over the window with the keyboard inside it; each step shows its own animation and its own two lines of text, the counter follows, and **Next** becomes **Start using Glossy** on the last one; Escape closes it and the settings file now says `"guideSeen": true`; the button on **General** plays it again from the first step, and reopening the window no longer opens it by itself |
+| 62 | With the tour open, press its pause button, switch the interface language, then turn on a Windows contrast theme and a palette | Pausing stops every scene where it is and the button turns into a play button; the copy, the rail and the counter come back in the new language without the window being reopened; in a contrast theme and under a palette the scenes are still legible, because every colour in them is a token |
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -945,7 +951,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 ## 使用方法
 
-1. 启动 Glossy。设置窗口只在首次启动时打开——之后的启动都会安静地在通知区域运行，Glossy 从启动那一刻起就开始监听选区。
+1. 启动 Glossy。设置窗口只在首次启动时打开——之后的启动都会安静地在通知区域运行，Glossy 从启动那一刻起就开始监听选区。首次打开的窗口里就是下面这四件事的引导，用四段小动画分别演示；引导只自动播放一次，之后可以在**常规**页点**再看一次引导**随时调出来。
 2. 关闭该窗口并不会退出 Glossy——它会在后台继续监听选区。点击通知区域中的 Glossy 图标（或在其菜单中选择**打开 Glossy**）可以把窗口重新调出来。这个菜单里还有两个不需要窗口的动作——**截图翻译**和**翻译剪贴板**，各自写着对应的快捷键，所以窗口关着也能查到按键；**退出**结束 Glossy。菜单里的「翻译剪贴板」翻译的是点击那一刻剪贴板里现有的文字（快捷键那个会先按一次 `Ctrl+C` 把当前选中的内容复制过来，而点菜单无法保证这一点）。在已经运行时再次启动 Glossy，只会显示一条简短提示。静默启动会由右下角的一张小卡片告知；它几秒后淡出，点击它会打开设置窗口。Windows 11 会把新的通知区域图标收进溢出菜单（时钟旁的 `^`）——把图标拖到任务栏上，或在**设置 → 个性化 → 任务栏 → 其他系统托盘图标**中打开它，即可让它保持可见。
 3. 在任何应用中，**拖动划过文字**（或**双击一个单词**）即可选中它。
 4. Glossy 会在选区下方显示一个小图标。在**点击这个图标**之前不会翻译，也不会占用当天的翻译额度，因此只是随手划过的一个词不会有任何消耗。点击其他区域图标就会消失。
@@ -977,6 +983,7 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 | 界面语言 | 在**语言**页。`跟随系统`、`简体中文` 或 `English`。会立即切换设置窗口和弹窗。 |
 | 开启划词翻译 | 总开关。关闭后立即暂停全局划词捕获。标题栏里的状态是同一个开关：显示"监听中"或"已暂停"，点一下即可开启或关闭。 |
 | 随 Windows 启动 | 在 `HKCU\...\Run` 中写入一条 `--autostart` 项，这样登录后 Glossy 就已经在通知区域待命。这样启动时不会显示"Glossy 已在后台运行"卡片。 |
+| 再看一次引导 | 重播首次启动的新手引导：四步动画分别演示划词翻译、输入或粘贴原文、截图翻译，以及下载离线资源。 |
 | 拖动鼠标划过文字时翻译 | 启用拖动划词手势。 |
 | 双击单词时翻译 | 启用双击手势。 |
 | 读取选区后恢复剪贴板 | 在 Glossy 复制了选区之后，恢复你原先的剪贴板内容。 |
@@ -1300,6 +1307,8 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 58 | 在高对比主题打开的情况下选一套配色和一个自定义强调色，看看两个窗口，然后关掉高对比 | 高对比方案压过两者——配色颜色和自定义强调色都不生效——关掉之后两者都原样回来 |
 | 59 | 点击标题栏里的状态，在别的程序里选中一段文字，再点一次并重新选中，最后关掉设置窗口再打开 | 点一下就立刻暂停捕获——文字变成"已暂停"、圆点变灰，「常规」页的总开关也跟着变——暂停期间的选中不翻译也不扣额度；再点一次恢复，两处开关始终一致，窗口关掉再打开也还是这个状态 |
 | 60 | 在浏览器或微信里拖选多张图片，然后再拖选一段文字 | 在没有文字的地方按住拖动不碰键盘：图片的选中状态留着，也没有任何内容被复制；拖选那段文字照常翻译，双击取词也照常——这个判断只对那些自身带文字的控件给出结论 |
+| 61 | 用一份 `"guideSeen": false` 的设置文件启动，看自动打开的引导，用侧边步骤和方向键走完四步，按 Esc 关闭，再到**常规**页点**再看一次引导** | 引导开在第一步、键盘落在它里面；每一步显示各自的动画和两行说明，计数器跟着走，最后一步的**下一步**变成**开始使用**；Esc 关掉后设置文件里已是 `"guideSeen": true`；**常规**页的按钮会从第一步重新播放，之后再打开窗口也不会自动弹出 |
+| 62 | 引导开着时按暂停，切换界面语言，再打开高对比主题和一套配色 | 暂停后每个场景都停在原地，按钮变成播放；文案、步骤和计数器随新语言变化，不需要重开窗口；在高对比和配色下场景依然清楚，因为里面每个颜色都是 token |
 
 ### 工具链说明（Windows，GNU 工具链）
 

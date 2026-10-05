@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -310,6 +310,10 @@
 
             <div class="options" id="startup">
               <label class="check"><input type="checkbox" id="autostart" /><span data-i18n="option.autostart">Start Glossy with Windows</span></label>
+            </div>
+
+            <div class="demo-actions">
+              <button type="button" id="guideAgain" class="ghost" data-i18n="guide.again">Watch the guide again</button>
             </div>
           </section>
           <section class="panel">
@@ -830,7 +834,6 @@
     </div>
 
     <div class="toast" id="toast" hidden></div>
-
     <div class="confirm" id="confirm" hidden>
       <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
         <h3 id="confirmTitle"></h3>
@@ -839,6 +842,250 @@
           <button type="button" class="ghost" id="confirmCancel"></button>
           <button type="button" id="confirmOk"></button>
         </div>
+      </div>
+    </div>
+
+    <!-- The first-run guide. Every scene is a schematic of the real thing, drawn
+         from the same tokens as the window behind it and animated by CSS alone:
+         no frame of it is a picture of a screen that was never on this machine.
+         A scene's resting state is its last frame, so a reader who asked Windows
+         for less motion still gets the answer rather than an empty box. -->
+    <div class="guide" id="guide" hidden>
+      <div class="guide-box" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+        <header class="guide-head">
+          <div class="guide-heading">
+            <h2 id="guideTitle" data-i18n="guide.title">Getting started</h2>
+            <p class="hint" data-i18n="guide.subtitle">The four things worth knowing first.</p>
+          </div>
+          <button
+            type="button"
+            id="guideClose"
+            class="icon-button"
+            title="Close the guide"
+            aria-label="Close the guide"
+            data-i18n-title="guide.close"
+            data-i18n-aria-label="guide.close"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </header>
+
+        <div class="guide-main">
+          <ol class="guide-rail" id="guideRail" aria-label="Steps" data-i18n-aria-label="guide.rail">
+            <li>
+              <button type="button" class="guide-step" aria-current="step">
+                <span class="guide-num">1</span>
+                <span data-i18n="guide.chapter.select">Select text</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="guide-step">
+                <span class="guide-num">2</span>
+                <span data-i18n="guide.chapter.type">Type or paste</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="guide-step">
+                <span class="guide-num">3</span>
+                <span data-i18n="guide.chapter.read">Screenshot</span>
+              </button>
+            </li>
+            <li>
+              <button type="button" class="guide-step">
+                <span class="guide-num">4</span>
+                <span data-i18n="guide.chapter.fetch">Offline files</span>
+              </button>
+            </li>
+          </ol>
+
+          <div class="guide-body">
+            <!-- 1 · a text is selected in another program, the mark appears under
+                 it, and clicking the mark opens the card. -->
+            <section class="scene" id="guideScene0">
+              <div class="scene-frame" aria-hidden="true">
+                <div class="mock-window">
+                  <div class="mock-titlebar"><span></span><span></span><span></span></div>
+                  <div class="mock-page">
+                    <span class="mock-bar b1"></span>
+                    <p class="mock-sample">
+                      <span class="mock-run">
+                        <span class="mock-pick" data-i18n="guide.sampleForeign">The quick brown fox jumps over the lazy dog</span>
+                        <span class="mock-ripple"></span>
+                        <span class="mock-mark"><img src="images/logo.png" alt="" /></span>
+                        <span class="mock-pointer">
+                          <svg viewBox="0 0 18 22"><path d="M3 1.6l12.4 11.1-5.2.5 3 6.1-2.4 1.1-2.9-6.2-4 3.8z" /></svg>
+                        </span>
+                        <span class="mock-card">
+                          <span class="mock-card-bar">
+                            <span class="mock-headword">Glossy</span>
+                            <svg class="mock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M4 9.2A1.7 1.7 0 015.7 7.5h1.1l.9-1.5h4.6l.9 1.5h1.1A1.7 1.7 0 0116 9.2v6.3a1.7 1.7 0 01-1.7 1.7H5.7A1.7 1.7 0 014 15.5z" />
+                              <circle cx="10" cy="12.2" r="2.6" />
+                            </svg>
+                          </span>
+                          <span class="mock-card-body">
+                            <span class="mock-original" data-i18n="guide.sampleForeign">The quick brown fox jumps over the lazy dog</span>
+                            <span class="mock-translated" data-i18n="guide.sampleOwn">敏捷的棕色狐狸跳过了那只懒狗</span>
+                          </span>
+                        </span>
+                      </span>
+                    </p>
+                    <span class="mock-bar b3"></span>
+                    <span class="mock-bar b4"></span>
+                    <span class="mock-bar b5"></span>
+                  </div>
+                </div>
+              </div>
+              <h3 data-i18n="guide.select.title">Select a text and the mark appears</h3>
+              <p class="guide-how" data-i18n="guide.select.how"></p>
+              <p class="hint" data-i18n="guide.select.what"></p>
+            </section>
+
+            <!-- 2 · the same text typed or pasted into the box, and Ctrl+Enter
+                 translating all of it. -->
+            <section class="scene" id="guideScene1" hidden>
+              <div class="scene-frame" aria-hidden="true">
+                <div class="mock-panel">
+                  <span class="mock-bar b3"></span>
+                  <div class="mock-field">
+                    <span class="mock-placeholder" data-i18n="demo.placeholder">Type or paste the text to translate, then select a part of it…</span>
+                    <span class="mock-caret"></span>
+                    <span class="mock-typed" data-i18n="guide.sampleForeign">The quick brown fox jumps over the lazy dog</span>
+                  </div>
+                  <div class="mock-keys">
+                    <span class="mock-key">Ctrl</span>
+                    <span class="mock-key">Enter</span>
+                  </div>
+                  <div class="mock-card">
+                    <div class="mock-card-bar">
+                      <span class="mock-headword">Glossy</span>
+                      <svg class="mock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 8h6M14 8h6M4 16h10M18 16h2" />
+                        <circle cx="12" cy="8" r="2" />
+                        <circle cx="16" cy="16" r="2" />
+                      </svg>
+                    </div>
+                    <div class="mock-card-body">
+                      <span class="mock-original" data-i18n="guide.sampleForeign">The quick brown fox jumps over the lazy dog</span>
+                      <span class="mock-translated" data-i18n="guide.sampleOwn">敏捷的棕色狐狸跳过了那只懒狗</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <h3 data-i18n="guide.type.title">Or type and paste the text instead</h3>
+              <p class="guide-how" data-i18n="guide.type.how"></p>
+              <p class="hint" data-i18n="guide.type.what"></p>
+            </section>
+
+            <!-- 3 · the screen freezes, a rectangle is dragged over text that
+                 cannot be selected, and the reading lands in the same card. -->
+            <section class="scene" id="guideScene2" hidden>
+              <div class="scene-frame" aria-hidden="true">
+                <div class="mock-screen">
+                  <span class="mock-bar b1"></span>
+                  <span class="mock-bar b2"></span>
+                  <p class="mock-sample">
+                    <span class="mock-run">
+                      <span class="mock-read" data-i18n="guide.sampleForeign">The quick brown fox jumps over the lazy dog</span>
+                      <span class="mock-band"></span>
+                      <span class="mock-size">512 × 96</span>
+                      <span class="mock-pointer">
+                        <svg viewBox="0 0 18 22"><path d="M3 1.6l12.4 11.1-5.2.5 3 6.1-2.4 1.1-2.9-6.2-4 3.8z" /></svg>
+                      </span>
+                      <span class="mock-card">
+                        <span class="mock-card-bar">
+                          <span class="mock-headword">Glossy</span>
+                          <svg class="mock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 9.2A1.7 1.7 0 015.7 7.5h1.1l.9-1.5h4.6l.9 1.5h1.1A1.7 1.7 0 0116 9.2v6.3a1.7 1.7 0 01-1.7 1.7H5.7A1.7 1.7 0 014 15.5z" />
+                            <circle cx="10" cy="12.2" r="2.6" />
+                          </svg>
+                        </span>
+                        <span class="mock-card-body">
+                          <span class="mock-translated" data-i18n="guide.sampleOwn">敏捷的棕色狐狸跳过了那只懒狗</span>
+                        </span>
+                      </span>
+                    </span>
+                  </p>
+                  <span class="mock-bar b3"></span>
+                  <span class="mock-bar b4"></span>
+                </div>
+              </div>
+              <h3 data-i18n="guide.read.title">Read the text you cannot select</h3>
+              <p class="guide-how" data-i18n="guide.read.how"></p>
+              <p class="guide-key"><kbd id="guideReadKey">Ctrl+Alt+Q</kbd></p>
+              <p class="hint" data-i18n="guide.read.what"></p>
+            </section>
+
+            <!-- 4 · the three downloads on the Resources page, one after the
+                 other, and what each of them buys. -->
+            <section class="scene" id="guideScene3" hidden>
+              <div class="scene-frame" aria-hidden="true">
+                <div class="mock-list">
+                  <div class="mock-res">
+                    <div class="mock-res-head">
+                      <span class="mock-res-name" data-i18n="resources.core.title">Reading engine</span>
+                      <span class="mock-res-size">21 MB</span>
+                    </div>
+                    <div class="mock-res-foot">
+                      <span class="mock-download" data-i18n="ocr.engine.download">Download the engine</span>
+                      <span class="mock-track r1"><span class="mock-fill"></span></span>
+                      <span class="mock-ready r1" data-i18n="guide.fetch.ready">Ready</span>
+                    </div>
+                  </div>
+                  <div class="mock-res">
+                    <div class="mock-res-head">
+                      <span class="mock-res-name" data-i18n="pack.ch">Chinese and English</span>
+                      <span class="mock-res-size">10 MB</span>
+                    </div>
+                    <div class="mock-res-foot">
+                      <span class="mock-download" data-i18n="resources.packs.download">Download</span>
+                      <span class="mock-track r2"><span class="mock-fill"></span></span>
+                      <span class="mock-ready r2" data-i18n="guide.fetch.ready">Ready</span>
+                    </div>
+                  </div>
+                  <div class="mock-res">
+                    <div class="mock-res-head">
+                      <span class="mock-res-name" data-i18n="resources.offline.title">Offline translation</span>
+                      <span class="mock-res-size">244 MB</span>
+                    </div>
+                    <div class="mock-res-foot">
+                      <span class="mock-download" data-i18n="resources.offline.download">Download the pack</span>
+                      <span class="mock-track r3"><span class="mock-fill"></span></span>
+                      <span class="mock-ready r3" data-i18n="guide.fetch.ready">Ready</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <h3 data-i18n="guide.fetch.title">Download the parts that work offline</h3>
+              <p class="guide-how" data-i18n="guide.fetch.how"></p>
+              <p class="hint" data-i18n="guide.fetch.what"></p>
+            </section>
+          </div>
+        </div>
+
+        <footer class="guide-foot">
+          <button
+            type="button"
+            id="guidePlay"
+            class="icon-button"
+            title="Pause the animation"
+            aria-label="Pause the animation"
+            aria-pressed="false"
+          >
+            <svg class="guide-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8.5 5.4l10 6.6-10 6.6z" />
+            </svg>
+            <svg class="guide-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M9 5.5v13M15 5.5v13" />
+            </svg>
+          </button>
+          <span class="hint" id="guideStep"></span>
+          <span class="guide-gap"></span>
+          <button type="button" id="guideBack" class="ghost" data-i18n="guide.back">Back</button>
+          <button type="button" id="guideNext">Next</button>
+        </footer>
       </div>
     </div>
 

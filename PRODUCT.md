@@ -111,6 +111,12 @@ website cannot truthfully copy.
   how the two windows look: the mode (follow Windows, always light, always dark),
   the palette (WinUI, warm paper, Nord, Solarized, Dracula, true black) and the
   accent colour, which the palette sets unless the reader picks one.
+- The window that opens on the very first launch also plays a four-step tour:
+  selecting a text, typing or pasting one, reading a screenshot, and downloading
+  the offline files. Each step is an animated schematic built from the design
+  tokens, so it follows the palette and the interface language, and it is left in
+  its finished state when the reader has asked Windows for less motion. It is
+  shown once and can be replayed from the General page.
 - Open decision: macOS and Linux support is an intention, not a commitment. The
   abstraction layer a port would be written against exists, and the packaging
   matrix covers x64; no macOS or Linux code has been written, ARM64 needs a
