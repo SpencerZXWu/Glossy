@@ -107,7 +107,10 @@ website cannot truthfully copy.
 - Settings include: interface language, the master switch for selection
   translation, start with Windows, the drag and double-click gestures, clipboard
   restore, showing the original, unit conversion, the reading options (source
-  sentence, sentence pairing, compact card), the fallback order, and the hotkey.
+  sentence, sentence pairing, compact card), the fallback order, the hotkey, and
+  how the two windows look: the mode (follow Windows, always light, always dark),
+  the palette (WinUI, warm paper, Nord, Solarized, Dracula, true black) and the
+  accent colour, which the palette sets unless the reader picks one.
 - Open decision: macOS and Linux support is an intention, not a commitment. The
   abstraction layer a port would be written against exists, and the packaging
   matrix covers x64; no macOS or Linux code has been written, ARM64 needs a

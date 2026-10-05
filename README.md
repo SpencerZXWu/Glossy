@@ -213,6 +213,8 @@ installer puts next to the app.
 | Never translate in these programs | A list of process names (`idea64.exe`, `mstsc`) in which selection capture is skipped. Add one by typing it (the `.exe` suffix is optional — the `Add` button normalises it), by choosing it from the dropdown of currently running programs, or by pressing `Pick with the mouse` and clicking the window to ignore. Each entry has an `×` to remove it; duplicates are dropped case-insensitively. |
 | Only translate these source languages | A list of languages, e.g. `English` and `日本語`. Empty means every language triggers a translation. A selection whose language cannot be pinned down — mixed scripts, digits, a word half a dozen languages share — is always let through, so a wrong guess never swallows a selection. The list is stored as a `sourceLangs` array. |
 | Colours | `system` follows the Windows light/dark preference; `light` and `dark` force one scheme in both windows. A Windows contrast theme is not one of these entries: with one on, both windows take the system colours on their own, and the choice comes back when the theme is turned off. |
+| Palette | Which colours those are: **WinUI** (the ones the app has always used), **warm paper**, **Nord**, **Solarized**, **Dracula** or **true black**. The mode above still decides light or dark — every palette states both — so the two settings are independent. Each card in the picker previews itself in both modes, drawn with that palette's own colours, so what a card shows is what choosing it does. Stored as `palette`, and leaving it alone keeps WinUI. Choosing anything but WinUI also takes the window off the Mica backdrop and colours its title bar and frame: Mica is tinted by the desktop, which a palette with a window colour of its own cannot have. |
+| Accent | The colour of the things the app accents — the language bar's chosen entry, a focused control, the ring around a selected card, a text selection, the caret. `let the palette decide` takes whatever the chosen palette uses; the eight swatches name a colour each; the last one opens the system's colour picker for anything else. Stored as `accent` (`#rrggbb`, empty for the palette's own), and the eight are stated in `tokens.css` beside the palettes. |
 | Text size | Multiplier for every text size in the popup (`90 %`–`150 %`). |
 | Width | Popup card width (`300`–`520` CSS px). |
 | Opacity | How see-through the popup card is (`100 %` solid down to `50 %`). The card fades while the text stays readable on top of whatever is behind it. |
@@ -749,6 +751,9 @@ none of them is covered by the automated tests.
 | 53 | Start a subtitle reading, then press `Esc` and a right click while picking, and let the overlay sit for 30 seconds | Each cancels without a reading starting, the settings window is still there, and nothing is translated or charged |
 | 54 | While a reading runs, pick *Adjust the subtitle boxes* from the tray menu, drag both boxes somewhere else, resize one by its corner, then press `Esc` and open the menu again | Both boxes carry a faint dashed frame over the video and take no clicks of their own; the editor shows them where they are, the drag moves and the corner resizes, and `Esc` leaves them where they were — the reading carries on with them; doing it again and pressing **Use these boxes** moves them for real: the next line is read from the new area and drawn in the new place, without the reading stopping |
 | 55 | In the editor, drag a box at the very edge of the screen and shrink another one as far as it will go | The first stops with all of it still on the monitor, the second stops at the smallest box a reading can use, and neither ends up inside out |
+| 56 | On the Colours section, walk the palette cards with the arrow keys, take each one with `Space`, and switch between light and dark on each | Every card takes the arrow keys and keeps a visible ring; choosing one repaints both windows at once — sidebar, panels, the buttons in the demo card and their text — while the card's own preview never moves, because each previews itself rather than the window; the title bar and the frame follow the palette, and both go back to the system's own when WinUI is chosen again |
+| 57 | On the Colours section, take each accent swatch in turn, then the last one with a colour that is none of the eight, then `let the palette decide` | The chosen swatch carries the ring and the line under the row names it; the app repaints the moment a colour is picked, including a selection made in the demo box and the caret; the system's colour picker opens for the last swatch and its colour is stored as `#rrggbb` in `accent`; `let the palette decide` brings the palette's own colour back and stores an empty `accent` |
+| 58 | Turn on a Windows contrast theme with a palette and a custom accent chosen, look at both windows, then turn it off | The contrast scheme wins over both — no palette colour and no custom accent survives in it — and both come back exactly as they were once the theme is off |
 
 ### Toolchain notes (Windows, GNU toolchain)
 
@@ -986,6 +991,8 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 | 以下程序中不翻译 | 一份进程名列表（`idea64.exe`、`mstsc`），其中的程序会跳过划词捕获。输入名字即可添加（`.exe` 后缀可选——`添加` 按钮会把它规范化），也可以从当前运行程序的下拉框中选择，或按下 `用鼠标拾取` 后点选要忽略的窗口。每个条目都有一个 `×` 可以删除；重复项按大小写不敏感处理并被丢弃。 |
 | 仅翻译以下原文语言 | 一份语言列表，例如 `英语` 和 `日语`。留空表示任何语言都会触发翻译。无法确定语言的选区——混排文字、数字、多种语言共有的词——一律放行，因此猜错也不会吞掉你的选区。该列表以 `sourceLangs` 数组保存。 |
 | 配色 | `跟随系统` 跟随 Windows 的浅色/深色偏好；`始终浅色` 和 `始终深色` 会在两个窗口中强制使用一种方案。Windows 的高对比主题不在这里：它开着的时候两个窗口会自己改用系统配色，关掉之后原来的选择照旧。 |
+| 配色方案 | 具体用哪一套颜色：**WinUI**（应用一直以来的颜色）、**暖纸**、**Nord**、**Solarized**、**Dracula** 或 **纯黑**。上面的模式仍然决定浅色还是深色——每套方案都写了两套颜色——所以这两个设置互相独立。选择器里的每张卡片都会预览自己：两张小图用的是该方案自己的颜色，因此卡片显示的就是选中后的效果。保存为 `palette`，不动它就是 WinUI。选 WinUI 以外的方案还会让窗口不再使用 Mica 背景，并把标题栏与边框改成该方案的颜色：Mica 的颜色来自桌面，而自带窗口颜色的方案没法有它。 |
+| 强调色 | 应用里所有用强调色表示的地方：语言栏里被选中的那一项、获得焦点的控件、被选中卡片的外圈、文字选区，以及光标。`跟随配色方案` 用它那套配色自己的强调色；八个色块各代表一种颜色；最后一个打开系统取色器，可以选任意颜色。保存为 `accent`（`#rrggbb`，留空表示跟随配色），八个色块就写在 `tokens.css` 里配色方案旁边。 |
 | 文字大小 | 弹窗中所有文字大小的倍数（`90 %`–`150 %`）。 |
 | 宽度 | 弹窗卡片宽度（`300`–`520` CSS 像素）。 |
 | 不透明度 | 弹窗卡片的透明程度（从 `100 %` 不透明一直到 `50 %`）。卡片会变淡，而文字在它背后的任何内容之上都保持可读。 |
@@ -1286,6 +1293,9 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 53 | 开始一次字幕识别，在框选过程中分别按 `Esc`、点右键，再让遮罩放满 30 秒 | 三种情况都不会真的开始识别，设置窗口还在原地，什么都不会翻译、也不会扣额度 |
 | 54 | 识别进行中时，从托盘菜单点「调整字幕框」，把两个框都拖到别处，拖其中一个的角改大小，然后按 `Esc`，再打开一次菜单 | 画面上两个框都显示很淡的虚线，而且不吃点击；编辑器把两个框显示在当前位置，拖中间能移动、拖角能改大小，`Esc` 退出后它们保持原样，识别照常继续；再进一次并点「就用这两个框」才真正生效：下一行从新的区域读取、画在新的位置，识别不会中断 |
 | 55 | 在编辑器里把一个框拖到屏幕最边上，把另一个缩到最小 | 第一个仍然完整地留在显示器内，第二个停在一次识别所能用的最小尺寸，两个都不会被拖成里外颠倒 |
+| 56 | 在「配色」页用方向键走一遍配色卡片，每张都按 `Space` 选中，并且每张都把模式在浅色与深色之间切一次 | 每张卡片都能用方向键选中且焦点环可见；选中后两个窗口立刻重绘——侧边栏、面板、演示卡片里的按钮和文字——而卡片自己的预览不动，因为每张预览的是它自己而不是当前窗口；标题栏和边框跟着配色走，选回 WinUI 时两者都交还给系统 |
+| 57 | 在「配色」页逐个点强调色色块，再点最后一个并选一个不属于前八个的颜色，最后点 `跟随配色方案` | 选中的色块带外圈，下面那行会写出它是什么；一选就立刻重绘，包括在演示框里选中的文字和光标；最后一个会打开系统取色器，颜色以 `#rrggbb` 存进 `accent`；点 `跟随配色方案` 会回到配色自带的强调色，并把 `accent` 存成空 |
+| 58 | 在高对比主题打开的情况下选一套配色和一个自定义强调色，看看两个窗口，然后关掉高对比 | 高对比方案压过两者——配色颜色和自定义强调色都不生效——关掉之后两者都原样回来 |
 
 ### 工具链说明（Windows，GNU 工具链）
 

@@ -6,12 +6,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
-## [2.0.1] - 2026-10-04
+## [2.1.0] - 2026-10-04
 
-The release that gives Ctrl+Enter back to the field it is typed in.
+The release that lets the window be something other than grey, and that gives Ctrl+Enter
+back to the field it is typed in.
+
+### Added
+
+- **Six palettes, and an accent colour of your own.** The **Colours** page used to offer one
+  choice — follow Windows, always light, always dark — and now offers three: the mode, the
+  palette, and the accent. The palettes are **WinUI** (what the app has always used), **warm
+  paper**, **Nord**, **Solarized**, **Dracula** and **true black**, and each states both
+  halves, so the mode still decides light or dark and the palette decides the hues. Every
+  card in the picker previews itself: its two halves carry that palette's own tokens, so what
+  a card shows is what choosing it does, and the light and dark halves are both visible
+  whichever mode the window is in. The row under it takes an accent — hand the choice back to
+  the palette, or name one of eight colours, or pick any colour at all with the system's own
+  picker — and the whole app follows it, selection colour and caret included.
+- **The window frame follows the palette.** Windows draws the title bar and the frame, so a
+  palette states its window colour to them through DWM (`set_window_surface`), and choosing
+  one takes the window off the Mica backdrop: Mica is tinted by the desktop, which is exactly
+  what a palette with a window colour of its own cannot have. The default palette keeps both,
+  as it always has.
+
+### Changed
+
+- **The palette layer is one layer of the token system.** Every colour in a palette lives in
+  `tokens.css` beside the two the app already had, and a palette states only the colours that
+  carry meaning — the three opaque surfaces, the four text tiers, the strokes, the accent and
+  the three states. The layering fills stay the white and black alphas they always were, so a
+  palette changes the colours and never the depth system. `tests/tokens.test.js` re-measures
+  the file: every text tier and the label on an accent fill has to clear 4.5:1 in all twelve
+  palette-and-mode pairs, the WinUI palette has to stay identical to the `:root` defaults it
+  is stated beside, and the picker has to offer exactly the palettes the stylesheet defines.
+- **Text selection, the caret and the accent of a checkbox come from the palette too.** They
+  were WebView2's defaults, which belong to no design system, and a themed window that keeps
+  them reads as half-finished.
 
 ### Fixed
 
+- **A Windows contrast theme is no longer painted over.** The `prefers-contrast` block was
+  stated on `:root` alone, which every `:root[data-theme="dark"]` rule outranked — so a
+  contrast scheme with a dark Windows theme behind it had its palette replaced by the app's
+  dark one, which is the opposite of following the setting.
+- **A custom accent takes the text colour that reads better on it.** The choice was made at a
+  luminance of 0.5, which leaves every mid-tone accent — amber, sky, coral — with white text
+  at about 2:1 on it. The crossover is 0.179, and both halves are compared rather than guessed.
 - **Ctrl+Enter in the card's grey original replaced the text behind it instead of translating
   the correction.** The card's write-back key is registered with Windows rather than with the
   page, and a registered shortcut is delivered to Glossy before the window that has the caret —
