@@ -4,6 +4,11 @@
 
 ![Total Downloads](https://img.shields.io/github/downloads/SpencerZXWu/Glossy/total?style=for-the-badge)
 
+***旧版本已经不支持下载,请下载[最新版本](https://github.com/SpencerZXWu/Glossy/releases/latest)***
+
+***The old version no longer supports downloading, please download the [latest version](https://github.com/SpencerZXWu/Glossy/releases/latest)***
+
+
 [English](#en) · [中文](#zh-cn)
 
 <a id="en"></a>
