@@ -13,7 +13,9 @@ import { join } from "node:path";
 
 import { createHandler } from "./handler.js";
 import { createRequestListener, DEFAULT_MAX_BODY } from "./node-server.js";
+import { createRedisLink } from "./redis-link.js";
 import { createFileStore } from "./store-file.js";
+import { createRedisStore } from "./store-redis.js";
 import { createUpstream } from "./upstream.js";
 
 const DEFAULT_IP_HEADERS = ["x-forwarded-for", "x-real-ip", "cf-connecting-ip"];
@@ -32,10 +34,44 @@ const clientIpHeaders = (process.env.CLIENT_IP_HEADERS || "")
 
 const upstream = createUpstream(process.env);
 
+/**
+ * Where the counters live.
+ *
+ * With `REDIS_HOST` set they live in one Redis instance that every instance of
+ * this function reads and writes, so the allowance is the deployment's rather
+ * than the instance's; without it they live in this instance's memory and
+ * `/tmp`, as they always did. The file store is kept either way: it is what the
+ * counters fall back to when Redis cannot be reached, so a Redis that is down
+ * costs accuracy rather than translations.
+ */
+function createStores() {
+  const fileStore = createFileStore({ file: stateFile });
+  const fileOcrStore = createFileStore({ file: stateFile ? `${stateFile}.month` : "" });
+  const host = (process.env.REDIS_HOST || "").trim();
+  if (!host) {
+    return { day: fileStore, month: fileOcrStore, where: stateFile || "(memory only)" };
+  }
+
+  const dbPort = Number.parseInt(process.env.REDIS_PORT ?? "", 10) || 6379;
+  const link = createRedisLink({
+    host,
+    port: dbPort,
+    user: process.env.REDIS_USER || "",
+    password: process.env.REDIS_PASSWORD || "",
+  });
+  return {
+    day: createRedisStore({ link, fallback: fileStore }),
+    month: createRedisStore({ link, fallback: fileOcrStore }),
+    where: `redis://${host}:${dbPort}`,
+  };
+}
+
+const stores = createStores();
+
 const handler = createHandler({
-  store: createFileStore({ file: stateFile }),
-  // 截图次数按自然月统计：日度计数每天清零，所以月度计数要另存一个文件。
-  ocrStore: createFileStore({ file: stateFile ? `${stateFile}.month` : "" }),
+  store: stores.day,
+  // 截图次数按自然月统计：日度计数每天清零，所以月度计数要另存一个键。
+  ocrStore: stores.month,
   upstream,
   config: process.env,
 });
@@ -57,6 +93,6 @@ server.headersTimeout = 70_000;
 
 server.listen(port, host, () => {
   console.log(`glossy-cloud listening on http://${host}:${port}`);
-  console.log(`glossy-cloud quota state: ${stateFile || "(memory only)"}`);
+  console.log(`glossy-cloud quota state: ${stores.where || "(memory only)"}`);
   console.log(`glossy-cloud upstream: ${upstream.configured ? "configured" : "missing"}`);
 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { compareVersions, noticeFor } from "../src/version.js";
+import { blockedBy, compareVersions, noticeFor } from "../src/version.js";
 
 test("versions compare field by field, not as text", () => {
   assert.equal(compareVersions("2.1.1", "2.1.1"), 0);
@@ -66,4 +66,40 @@ test("an announcement is clipped to one line's worth", () => {
   const notice = noticeFor({ announcement: "x".repeat(1000) });
   assert.equal(notice.code, "announce");
   assert.equal(notice.message.length, 400);
+});
+
+test("a floor nobody has set refuses nothing", () => {
+  assert.equal(blockedBy({ appVersion: "1.0.0" }), false);
+  assert.equal(blockedBy({ appVersion: "1.0.0", blockBelow: "" }), false);
+  assert.equal(blockedBy({ appVersion: "1.0.0", blockBelow: "   " }), false);
+  // A floor that is not a version is a typo, and refusing everybody over it
+  // would be the worst possible reading of one.
+  assert.equal(blockedBy({ appVersion: "1.0.0", blockBelow: "latest" }), false);
+  assert.equal(blockedBy({ appVersion: "", blockBelow: "nonsense" }), false);
+});
+
+test("a floor refuses every build below it and nothing else", () => {
+  assert.equal(blockedBy({ appVersion: "2.0.0", blockBelow: "2.1.1" }), true);
+  assert.equal(blockedBy({ appVersion: "2.1.0", blockBelow: "2.1.1" }), true);
+  assert.equal(blockedBy({ appVersion: "1.9.9", blockBelow: "2.1.1" }), true);
+  // At the floor and above it, the App is served as usual.
+  assert.equal(blockedBy({ appVersion: "2.1.1", blockBelow: "2.1.1" }), false);
+  assert.equal(blockedBy({ appVersion: "2.10.0", blockBelow: "2.9.0" }), false);
+});
+
+test("a build that sends no version looks like an old one, and is refused", () => {
+  // Nothing before 2.1.1 sends a version, so this is the only way a floor can
+  // reach the builds it exists for — and the reason a floor cannot be drawn
+  // between, say, 1.5.0 and 2.0.0: from here they are the same build.
+  assert.equal(blockedBy({ appVersion: "", blockBelow: "2.1.1" }), true);
+  assert.equal(blockedBy({ appVersion: "   ", blockBelow: "2.1.1" }), true);
+  assert.equal(blockedBy({ blockBelow: "2.1.1" }), true);
+});
+
+test("a version that cannot be read is not judged", () => {
+  // Locking out a whole release over a suffix this file never learned would be a
+  // far worse failure than serving one build too many.
+  assert.equal(blockedBy({ appVersion: "2.2.0-beta.1", blockBelow: "2.1.1" }), false);
+  assert.equal(blockedBy({ appVersion: "preview", blockBelow: "2.1.1" }), false);
+  assert.equal(blockedBy({ appVersion: "v2.1.1", blockBelow: "2.1.1" }), false);
 });

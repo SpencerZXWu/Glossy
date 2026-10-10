@@ -147,7 +147,24 @@ test("health reports whether the upstream has credentials", async () => {
   const bare = setup({ configured: false });
   assert.equal((await (await bare.call("/v1/health")).json()).configured, false);
 });
+test("health reports which version switches are on", async () => {
+  // The operator's way to tell a live switch from one that was set on a
+  // deployment that never took it: one request, no old build needed.
+  const off = await (await setup().call("/v1/health")).json();
+  assert.deepEqual(off.version, { blockBelow: null, minVersion: null, announcement: false });
 
+  const on = await (
+    await setup({
+      env: { BLOCK_BELOW: " 2.1.1 ", MIN_VERSION: "2.2.0", ANNOUNCEMENT: "明天维护" },
+    }).call("/v1/health")
+  ).json();
+  assert.equal(on.version.blockBelow, "2.1.1");
+  assert.equal(on.version.minVersion, "2.2.0");
+  assert.equal(on.version.announcement, true);
+  // Whether there is one is all this needs to say; the text itself is for the
+  // Apps, not for anyone who asks.
+  assert.equal(JSON.stringify(on).includes("明天维护"), false);
+});
 test("translates and reports usage", async () => {
   const { translate, calls } = setup();
   const response = await translate({ text: "hello world", from: "en", to: "zh-CN" });
@@ -519,4 +536,38 @@ test("a quota report without a month limit has nothing left to report", async ()
   const body = await (await call("/v1/quota?client=install-0001")).json();
   assert.equal(body.remainingOcrMonth, null);
   assert.equal(body.usage.ocrMonth, 0);
+});
+
+test("a deployment that has stopped an old build refuses it and books nothing", async () => {
+  const { translate, ocr, calls, ocrCalls, store } = setup({ env: { BLOCK_BELOW: "2.1.1" } });
+
+  // A build that sends no version is one from before 2.1.1, which is what a
+  // floor is for.
+  const old = await translate({ text: "hello world", to: "zh" });
+  assert.equal(old.status, 403);
+  const body = await old.json();
+  assert.equal(body.ok, false);
+  assert.equal(body.code, "version_too_old");
+  // The App reading this is the one that has no sentence for the code, so the
+  // text has to come from the relay.
+  assert.match(body.message, /releases\/latest/);
+  assert.equal(store.calls.reserve, 0, "被停用的版本不该占用额度");
+  assert.deepEqual(calls, [], "被停用的版本不该调用上游");
+
+  // A screenshot costs the operator a call to the vendor as well.
+  const shot = await ocr({});
+  assert.equal(shot.status, 403);
+  assert.equal(store.calls.reserveOcr, 0);
+  assert.deepEqual(ocrCalls, []);
+
+  // At the floor, or above it, nothing changes.
+  const fresh = await translate({ text: "hello world", to: "zh", appVersion: "2.1.1" });
+  assert.equal(fresh.status, 200);
+  assert.equal((await fresh.json()).translation, "你好");
+});
+
+test("a deployment that has set no floor serves every build", async () => {
+  const { translate } = setup();
+  const response = await translate({ text: "hello", to: "zh", appVersion: "0.9.0" });
+  assert.equal(response.status, 200);
 });

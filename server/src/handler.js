@@ -7,7 +7,7 @@
  */
 
 import { isBaseCode } from "./rates.js";
-import { noticeFor } from "./version.js";
+import { BLOCK_MESSAGE, blockedBy, noticeFor } from "./version.js";
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BODY = 64 * 1024;
@@ -90,6 +90,23 @@ export function routeOf(pathname) {
 export function createHandler({ store, ocrStore, upstream, config, now = () => Date.now() }) {
   const limits = limitsFrom(config);
 
+  /** One environment setting, trimmed, with anything unset read as empty. */
+  const setting = (name) => String(config[name] ?? "").trim();
+
+  /**
+   * The refusal a build the deployment has stopped serving gets, or null.
+   *
+   * It is asked before anything else is touched: a stopped build spends no
+   * characters, books no reading and calls no upstream, so the only thing it can
+   * cost the deployment is one answer.
+   */
+  function stoppedFor(payload) {
+    const appVersion = typeof payload?.appVersion === "string" ? payload.appVersion : "";
+    if (!blockedBy({ appVersion, blockBelow: config.BLOCK_BELOW })) return null;
+    const message = String(config.BLOCK_MESSAGE || "").trim();
+    return fail(403, "version_too_old", message || BLOCK_MESSAGE);
+  }
+
   return async function handle(request) {
     const url = new URL(request.url);
     const route = routeOf(url.pathname);
@@ -109,6 +126,17 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
         ocr: Boolean(upstream.ocrConfigured),
         ocrVendor: upstream.ocrVendor || null,
         vendors: upstream.vendors || [],
+        // What this deployment says about the builds it serves. None of it is a
+        // secret — an App sees the effect of these in the answers it gets — and
+        // reporting them is what makes "is that switch actually on?" a question
+        // one request can answer, instead of one that needs a copy of an old
+        // build to be found and run. The announcement itself is not repeated
+        // here: whether there is one is the only part that matters here.
+        version: {
+          blockBelow: setting("BLOCK_BELOW") || null,
+          minVersion: setting("MIN_VERSION") || null,
+          announcement: Boolean(setting("ANNOUNCEMENT")),
+        },
       });
     }
 
@@ -199,6 +227,11 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
       // means the App never has to care which form it is holding.
       const image = String(payload.image || "").replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "").replace(/[\r\n\s]/g, "");
       const language = typeof payload.language === "string" ? payload.language : "";
+
+      // A stopped build may not read pictures either: one call to the vendor
+      // costs the operator money whatever the App then does with the text.
+      const stopped = stoppedFor(payload);
+      if (stopped) return stopped;
 
       if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");
       if (!image) return fail(400, "invalid_request", "没有收到要识别的图片。");
@@ -302,6 +335,11 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
     // The build the App is from, from 2.1.1 onwards. Older builds send nothing,
     // and nothing means "leave it alone": they cannot read a notice anyway.
     const appVersion = typeof payload.appVersion === "string" ? payload.appVersion : "";
+
+    // A build the deployment has stopped serving is answered here, before the
+    // text is looked at: there is nothing about it worth reading.
+    const stopped = stoppedFor(payload);
+    if (stopped) return stopped;
 
     if (!text.trim()) return fail(400, "invalid_request", "没有要翻译的内容。");
     if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");

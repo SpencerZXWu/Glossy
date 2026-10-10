@@ -9,6 +9,7 @@
     "dev": "wrangler dev",
     "dev:node": "node src/node.js",
     "build:scf": "node scripts/build-scf.mjs",
+    "check:redis": "node scripts/redis-check.mjs",
     "deploy": "wrangler deploy",
     "logs": "wrangler tail"
   },

@@ -22,17 +22,7 @@ import {
   reserve as policyReserve,
   reserveOcr as policyReserveOcr,
 } from "./policy.js";
-
-function hydrate(raw) {
-  const state = createState();
-  for (const [key, row] of Object.entries(raw.usage ?? {})) {
-    state.usage.set(key, { chars: Number(row?.chars) || 0, requests: Number(row?.requests) || 0 });
-  }
-  for (const [key, count] of Object.entries(raw.minutes ?? {})) {
-    state.minutes.set(key, Number(count) || 0);
-  }
-  return state;
-}
+import { hydrateState, serializeState } from "./store-state.js";
 
 export function createFileStore({ file = "" } = {}) {
   let day = "";
@@ -44,7 +34,7 @@ export function createFileStore({ file = "" } = {}) {
       const raw = JSON.parse(readFileSync(file, "utf8"));
       if (typeof raw?.day === "string") {
         day = raw.day;
-        state = hydrate(raw);
+        state = hydrateState(raw);
       }
     } catch {
       // No file yet, or it was truncated by a crash: start the day empty.
@@ -56,11 +46,7 @@ export function createFileStore({ file = "" } = {}) {
     try {
       // Written through a temporary file so a crash mid-write cannot leave a
       // half-parsed counter file behind.
-      const text = JSON.stringify({
-        day,
-        usage: Object.fromEntries(state.usage),
-        minutes: Object.fromEntries(state.minutes),
-      });
+      const text = JSON.stringify(serializeState(day, state));
       writeFileSync(`${file}.tmp`, text, "utf8");
       renameSync(`${file}.tmp`, file);
     } catch (error) {
