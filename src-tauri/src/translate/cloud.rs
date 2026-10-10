@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::classify::Kind;
 use crate::log::note;
 
-use super::{Failure, TranslationResult};
+use super::{Failure, Notice, TranslationResult};
 
 /// Address the build points at when the user has not set one.
 ///
@@ -116,6 +116,11 @@ pub struct Request<'a> {
 
 impl Request<'_> {
     /// The body a translation is asked with.
+    ///
+    /// The version goes along with the text so the relay can tell whether this
+    /// build is one it still serves, and can say something to the builds that
+    /// are not. It is the only thing about the App that is sent, and a relay
+    /// built before it was sent simply ignores it.
     fn payload(&self, install_id: &str) -> serde_json::Value {
         serde_json::json!({
             "clientId": install_id,
@@ -123,6 +128,7 @@ impl Request<'_> {
             "from": self.source,
             "to": self.target,
             "vendor": self.vendor,
+            "appVersion": env!("CARGO_PKG_VERSION"),
         })
     }
 }
@@ -142,7 +148,10 @@ pub async fn translate(
         .await
         .map_err(|error| {
             Failure::coded(
-                format!("Could not reach the Glossy translation server: {error}"),
+                format!(
+                    "Could not reach the Glossy translation server: {}",
+                    super::transport_failed(&error)
+                ),
                 RELAY_UNREACHABLE,
             )
         })?;
@@ -150,7 +159,10 @@ pub async fn translate(
     let status = response.status();
     let body = response.text().await.map_err(|error| {
         Failure::coded(
-            format!("Could not read the Glossy translation server response: {error}"),
+            format!(
+                "Could not read the Glossy translation server response: {}",
+                super::transport_failed(&error)
+            ),
             RELAY_UNREACHABLE,
         )
     })?;
@@ -217,7 +229,51 @@ pub async fn translate(
         result.fallback_from = Some(asked.to_string());
         result.fallback_code = refused;
     }
+    // A line the relay wants added to the card, when it sent one. It rides on an
+    // answer that is otherwise complete, so a relay that never sends the field
+    // — and an App too old to read it — both end up with the same card.
+    result.notice = notice_in(&data);
     Ok(result)
+}
+
+/// The line the relay asked the card to add, when it sent one.
+///
+/// Only the two codes this build knows how to show are kept. A code from a newer
+/// relay would be a line with nothing to draw it with, so it is dropped and
+/// logged instead: the translation it came with is still shown, which is the
+/// whole point of the field being optional.
+fn notice_in(data: &serde_json::Value) -> Option<Notice> {
+    let notice = data.get("notice")?;
+    let code = notice
+        .get("code")
+        .and_then(|value| value.as_str())?
+        .trim()
+        .to_string();
+    let text = |key: &str| {
+        notice
+            .get(key)
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    match code.as_str() {
+        "update_available" => Some(Notice {
+            code,
+            min_version: text("minVersion"),
+            message: None,
+        }),
+        // An announcement with no line to show is nothing to say.
+        "announce" => text("message").map(|message| Notice {
+            code,
+            min_version: None,
+            message: Some(message),
+        }),
+        _ => {
+            note!("glossy: the relay sent a notice this build does not know: {code}");
+            None
+        }
+    }
 }
 
 /// The code a vendor was refused with, when the deployment reports it.
@@ -258,16 +314,20 @@ pub async fn quota(client: &reqwest::Client, install_id: &str) -> Result<Quota, 
         .query(&[("client", install_id)])
         .send()
         .await
-        .map_err(|_| {
+        .map_err(|error| {
             format!(
-                "Could not reach the Glossy translation server at {endpoint}. Check that the \
-                 service deployed from `server/` is still running."
+                "Could not reach the Glossy translation server at {endpoint} ({}). Check that the \
+                 service deployed from `server/` is still running.",
+                super::transport_failed(&error)
             )
         })?;
 
     let status = response.status();
     let body = response.text().await.map_err(|error| {
-        format!("Could not read the Glossy translation server response: {error}")
+        format!(
+            "Could not read the Glossy translation server response: {}",
+            super::transport_failed(&error)
+        )
     })?;
     let data: serde_json::Value = serde_json::from_str(&body).map_err(|_| {
         format!("The Glossy translation server answered HTTP {status} instead of a quota.")
@@ -500,8 +560,68 @@ mod tests {
         assert_eq!(body["from"], "en");
         assert_eq!(body["to"], "zh");
         assert_eq!(body["vendor"], "youdao");
+        // The version goes with every request, so an out-of-date build can be
+        // told so. It is this build's own version, not a constant.
+        assert_eq!(body["appVersion"], env!("CARGO_PKG_VERSION"));
         // The empty string is how the app asks the server to choose.
         assert_eq!(request("").payload("abc")["vendor"], "");
+    }
+
+    #[test]
+    fn a_relay_with_nothing_to_say_leaves_the_card_alone() {
+        // Every relay built before this field existed answers like this, and
+        // those answers have to keep working exactly as they did.
+        assert!(notice_in(&serde_json::json!({})).is_none());
+        assert!(notice_in(&serde_json::json!({"notice": null})).is_none());
+        // A field that is not the shape this build knows is not a notice either.
+        assert!(notice_in(&serde_json::json!({"notice": "latest is 2.2.0"})).is_none());
+        assert!(notice_in(&serde_json::json!({"notice": {"code": "  "}})).is_none());
+    }
+
+    #[test]
+    fn a_build_the_relay_has_moved_past_is_told_where_to_go() {
+        let notice = notice_in(&serde_json::json!({
+            "notice": {"code": "update_available", "minVersion": " 2.2.0 "},
+        }))
+        .expect("an update notice");
+        assert_eq!(notice.code, "update_available");
+        assert_eq!(notice.min_version.as_deref(), Some("2.2.0"));
+        assert_eq!(notice.message, None);
+
+        // A relay that nudges without naming a version is still worth showing:
+        // the card can say there is a newer build without saying which.
+        let bare = notice_in(&serde_json::json!({"notice": {"code": "update_available"}}))
+            .expect("an update notice");
+        assert_eq!(bare.min_version, None);
+    }
+
+    #[test]
+    fn an_announcement_carries_its_line_and_nothing_else() {
+        let notice = notice_in(&serde_json::json!({
+            "notice": {"code": "announce", "message": "  明天上午维护  "},
+        }))
+        .expect("an announcement");
+        assert_eq!(notice.code, "announce");
+        assert_eq!(notice.message.as_deref(), Some("明天上午维护"));
+        assert_eq!(notice.min_version, None);
+
+        // Nothing to say is not the same as saying nothing.
+        assert!(notice_in(&serde_json::json!({"notice": {"code": "announce"}})).is_none());
+        assert!(
+            notice_in(&serde_json::json!({"notice": {"code": "announce", "message": "   "}}))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn a_notice_this_build_cannot_draw_is_dropped_with_the_translation_intact() {
+        // A newer relay saying something new: the line is skipped rather than
+        // drawn as nothing, and the answer it came with is unaffected.
+        assert!(notice_in(&serde_json::json!({
+            "notice": {"code": "maintenance_window", "message": "今晚维护"},
+        }))
+        .is_none());
+        assert!(notice_in(&serde_json::json!({"notice": {"code": "Update_Available"}})).is_none());
     }
 
     #[test]

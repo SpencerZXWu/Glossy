@@ -13,6 +13,24 @@
   /** event name -> Set<handler>, used to dispatch in preview mode only. */
   const previewListeners = new Map();
 
+  /**
+   * The line a relay would send with a translation, when the page asked for one.
+   *
+   * Both lines come from a deployed server that knows the build it is answering,
+   * and a browser tab is not that. `?notice` in the address puts one on screen
+   * anyway — `?notice=update` the update line, any other value an announcement —
+   * so the two cards can be looked at without a deployment.
+   */
+  const previewNotice = (function () {
+    const wanted = new URLSearchParams(window.location.search).get("notice");
+    if (!wanted) return null;
+    if (wanted === "update") return { code: "update_available", minVersion: "9.9.9" };
+    return {
+      code: "announce",
+      message: "明天上午 10 点到 11 点服务器维护，翻译可能暂时不可用，敬请谅解。",
+    };
+  })();
+
   /** What `ocr_model_status` answers in the preview: the engine and the six
    * languages, two of them already downloaded. */
   const ENGINE_INSTALLED = {
@@ -56,6 +74,7 @@
     unitsEnabled: true,
     wordSentence: true,
     sentencePairs: true,
+    historyLimit: 50,
     compactPopup: false,
     speechRate: 0,
     fallbackEnabled: true,
@@ -305,6 +324,11 @@
         return null;
       case "open_releases_page":
         return null;
+      case "notice_close":
+      case "notice_open":
+        // The card in the corner is a window of its own; behind a browser tab
+        // both of these are the same dismissal of nothing.
+        return null;
       case "history_list":
         return [];
       case "vocabulary_list":
@@ -355,7 +379,17 @@
             "The offline translation pack is not downloaded yet. It is on the Resources page of the settings window.",
           );
         }
-        return mockTranslate(input.text, input);
+        const answer = mockTranslate(input.text, input);
+        // A line for the user comes back with the translation the relay answered
+        // it with; `?notice` stands in for the deployment that would send one.
+        if (previewNotice) answer.notice = previewNotice;
+        return answer;
+      case "notice_text":
+        // What the card in the corner is showing, or empty for the start hint.
+        return previewNotice && previewNotice.code === "announce" ? previewNotice.message : "";
+      case "notice_announce":
+        previewEmit("glossy://notice", {});
+        return null;
       case "word_details":
         return {
           phonetic: "ˈrəniNG",

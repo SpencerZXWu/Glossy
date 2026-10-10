@@ -34,6 +34,57 @@ pub struct Entry {
 static ENTRIES: Mutex<Vec<Entry>> = Mutex::new(Vec::new());
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
 
+/// The entries either side of the card on screen, for its own arrows.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Neighborhood {
+    /// The entry the card is on, when it is one the history holds. Learned from
+    /// the newest entry that matches when the caller does not know it yet, which
+    /// is how a card that was just translated is placed in the list; `None` when
+    /// the card belongs to no entry at all.
+    pub current: Option<u64>,
+    /// The translation made before this one, and the one made after it. `None`
+    /// at the ends of the list, which is what leaves an arrow with nowhere to go
+    /// disabled.
+    pub older: Option<Entry>,
+    pub newer: Option<Entry>,
+}
+
+/// Finds the card on screen in the list and answers what sits either side of it.
+///
+/// `id` names the entry when the card already knows which one it is showing;
+/// otherwise the newest entry holding the same text and target is taken, which
+/// is the one a translation that was just made was recorded as.
+pub fn neighbors(id: Option<u64>, source_text: &str, target_lang: &str) -> Neighborhood {
+    let empty = Neighborhood {
+        current: None,
+        older: None,
+        newer: None,
+    };
+    let Ok(entries) = ENTRIES.lock() else {
+        return empty;
+    };
+    let index = id
+        .and_then(|id| entries.iter().position(|entry| entry.id == id))
+        .or_else(|| {
+            entries.iter().position(|entry| {
+                entry.result.source_text == source_text
+                    && entry.result.target_lang == target_lang
+            })
+        });
+    let Some(index) = index else {
+        return empty;
+    };
+    Neighborhood {
+        current: Some(entries[index].id),
+        older: entries.get(index + 1).cloned(),
+        newer: index
+            .checked_sub(1)
+            .and_then(|before| entries.get(before))
+            .cloned(),
+    }
+}
+
 fn path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
         .app_config_dir()
@@ -235,6 +286,7 @@ mod tests {
             fallback_code: None,
             pairs: Vec::new(),
             conversions: Vec::new(),
+            notice: None,
         }
     }
 

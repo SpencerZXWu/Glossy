@@ -7,6 +7,7 @@
  */
 
 import { isBaseCode } from "./rates.js";
+import { noticeFor } from "./version.js";
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BODY = 64 * 1024;
@@ -298,6 +299,9 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
     // Which vendor the user picked in the App. An unknown name is not an error:
     // the upstream falls back to the order the deployment was configured with.
     const vendor = typeof payload.vendor === "string" ? payload.vendor.trim().toLowerCase() : "";
+    // The build the App is from, from 2.1.1 onwards. Older builds send nothing,
+    // and nothing means "leave it alone": they cannot read a notice anyway.
+    const appVersion = typeof payload.appVersion === "string" ? payload.appVersion : "";
 
     if (!text.trim()) return fail(400, "invalid_request", "没有要翻译的内容。");
     if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");
@@ -338,6 +342,16 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
       return fail(status, result.code, result.message);
     }
 
+    // Something to tell this App about itself — an update it should take, or one
+    // line for everyone. Off unless the deployment sets MIN_VERSION or
+    // ANNOUNCEMENT, and never a reason to refuse: the translation is returned
+    // either way, and a build too old to know the field simply ignores it.
+    const notice = noticeFor({
+      appVersion,
+      minVersion: config.MIN_VERSION,
+      announcement: config.ANNOUNCEMENT,
+    });
+
     return json({
       ok: true,
       from: result.from,
@@ -350,6 +364,7 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
       attempts: result.attempts || [],
       chars,
       usage: { client: reserved.used, remaining: reserved.remaining },
+      ...(notice ? { notice } : {}),
     });
   };
 }

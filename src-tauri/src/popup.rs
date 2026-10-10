@@ -177,14 +177,20 @@ fn store_handle(window: &WebviewWindow) {
 /// drag would leave the click test pointing at the old spot: clicks on the moved
 /// popup would then close it and the release would trigger another translation.
 /// A drag never changes the size, so the stored extent is kept as is.
-pub fn track_move(x: i32, y: i32) {
+///
+/// Answers whether the window really is somewhere new. A placement of our own
+/// writes the spot it is moving to into the bounds first, so the move it causes
+/// arrives here as one that changes nothing and is not passed on — which is what
+/// keeps a card that puts itself back after a drag from going round again on its
+/// own echo.
+pub fn track_move(x: i32, y: i32) -> bool {
     let Some(rect) = bounds() else {
-        return;
+        return false;
     };
     let width = rect.right - rect.left;
     let height = rect.bottom - rect.top;
-    if width <= 0 || height <= 0 {
-        return;
+    if width <= 0 || height <= 0 || (rect.left == x && rect.top == y) {
+        return false;
     }
     store_bounds(ScreenRect {
         left: x,
@@ -192,6 +198,7 @@ pub fn track_move(x: i32, y: i32) {
         right: x + width,
         bottom: y + height,
     });
+    true
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -311,19 +318,41 @@ pub fn fail(app: &AppHandle, message: &str) {
     let _ = app.emit("glossy://popup-error", message.to_string());
 }
 
+/// A card put back on screen from somewhere that keeps it: the history, or the
+/// wordbook.
+///
+/// The entry it came from travels with it when it came from the history, so the
+/// card's arrows start from that entry rather than from the newest entry holding
+/// the same text.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoredPayload {
+    pub result: TranslationResult,
+    /// `None` for a card that came from anywhere else, and for a history that is
+    /// not keeping anything.
+    pub history_id: Option<u64>,
+}
+
 /// Shows the card for a translation that was already made, which is how the
 /// history puts an old result back on screen without asking the provider again.
 pub fn reveal_result(
     app: &AppHandle,
     state: &AppState,
     result: TranslationResult,
+    history_id: Option<u64>,
     anchor: (f64, f64),
 ) {
     let Some(window) = popup_window(app) else {
         return;
     };
     state.set_anchor(anchor);
-    let _ = window.emit("glossy://result", result);
+    let _ = window.emit(
+        "glossy://result",
+        StoredPayload {
+            result,
+            history_id,
+        },
+    );
 }
 
 /// Sizes, places and optionally shows the popup window.
@@ -627,15 +656,20 @@ mod tests {
         });
         assert!(contains(350, 250));
 
-        track_move(700, 500);
+        // A real move is one the card has to hear about.
+        assert!(track_move(700, 500));
         assert!(contains(950, 690));
         assert!(contains(700, 500));
         // The old spot is free again, so a click there starts a new selection.
         assert!(!contains(350, 250));
 
+        // The same spot again is the echo of a placement, not a move: passing it
+        // on would have the card put itself back for ever.
+        assert!(!track_move(700, 500));
+
         // A hidden popup keeps the remembered rectangle, it just stops matching.
         BOUNDS.visible.store(false, Ordering::Relaxed);
-        track_move(0, 0);
+        assert!(!track_move(0, 0));
         assert!(!contains(0, 0));
     }
 

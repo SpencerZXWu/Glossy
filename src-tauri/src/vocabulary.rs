@@ -256,6 +256,7 @@ mod tests {
             fallback_code: None,
             pairs: Vec::new(),
             conversions: Vec::new(),
+            notice: None,
         }
     }
 

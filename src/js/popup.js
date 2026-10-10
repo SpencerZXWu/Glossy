@@ -52,6 +52,9 @@
   let screenCap = 0;
   let ticket = 0;
   let closeTimer = 0;
+  /** Settles after the last move of the window, which is what says a drag has
+      ended and the window may be sized again. */
+  let moveTimer = 0;
   /** True while the card is pinned: clicks elsewhere leave it alone and the
       "close by itself" countdown stands still. */
   let pinned = false;
@@ -64,6 +67,13 @@
   /** True while the caret is in the card's editable original, where Ctrl+Enter
       is the field's key rather than the card's. */
   let editing = false;
+  /** The history entry the card on screen is showing, once that is known. A
+      card that was just translated learns it from the backend, which finds the
+      entry the same translation was recorded as. */
+  let historyId = null;
+  /** What is known about the two arrows of the card on screen: an arrow with
+      nothing behind it stays disabled. */
+  let historySteps = { older: false, newer: false };
 
   /**
    * Arms or releases the card's accelerator, which is how the backend knows
@@ -438,6 +448,8 @@
     serviceMenu = null;
     current = null;
     text = value;
+    historyId = null;
+    historySteps = { older: false, newer: false };
     // A badge holds a selection, but it is not a translation yet.
     showWriteBack(false);
     Glossy.render.stopSpeaking();
@@ -455,6 +467,10 @@
 
     text = value;
     current = null;
+    // A new translation becomes the newest entry, so which old one the card was
+    // on has nothing to do with this one.
+    historyId = null;
+    historySteps = { older: false, newer: false };
     // The card is the answer to a selection the program in front still has,
     // so the translation can take its place.
     showWriteBack(true);
@@ -542,8 +558,14 @@
       onCopied: cardCopied,
       onEditing: showEditing,
       onRetranslate: run,
+      onHistory: historyStepHandler(),
+      onUpdate: openReleases,
     });
     await place(false);
+    // The card on screen is the same one, so what the arrows already know is
+    // enough: asking again would be a round trip for an answer that cannot have
+    // changed.
+    applyHistory();
 
     let details = null;
     try {
@@ -589,8 +611,155 @@
       onCopied: cardCopied,
       onEditing: showEditing,
       onRetranslate: run,
+      onHistory: historyStepHandler(),
+      onUpdate: openReleases,
     });
     readStar(result);
+    syncHistory();
+    passOn(result.notice);
+  }
+
+  /** Opens the page a newer build can be downloaded from. */
+  function openReleases() {
+    Glossy.invoke("open_releases_page").catch((error) => {
+      console.warn("glossy: could not open the releases page", error);
+    });
+  }
+
+  /**
+   * Does what a line the relay sent alongside the translation asks for.
+   *
+   * Only an announcement gets here: `update_available` is drawn on the card
+   * itself, and the link on it is what acts on it. An announcement is about
+   * Glossy rather than about the text, so it goes to the card in the corner of
+   * the screen — which the backend shows once per run however many translations
+   * carry the line, so repeating it here would be no help.
+   */
+  function passOn(notice) {
+    if (!notice || String(notice.code || "") !== "announce") return;
+    const message = String(notice.message || "").trim();
+    if (!message) return;
+    Glossy.invoke("notice_announce", { message }).catch((error) => {
+      console.warn("glossy: could not show the announcement", error);
+    });
+  }
+
+  /**
+   * The step handler the card is drawn with, or `null` when there is no history
+   * to walk: the arrows are then not drawn at all, rather than drawn dead.
+   */
+  function historyStepHandler() {
+    return Number(preferences.historyLimit) > 0 ? stepHistory : null;
+  }
+
+  /**
+   * The card the arrows are walking: the history entry it is on when that is
+   * known, and the text it is showing otherwise — a card that was translated a
+   * moment ago has not learned which entry it became yet, and the backend finds
+   * it by its text.
+   */
+  function historyKey() {
+    if (!current) return null;
+    return {
+      id: historyId,
+      sourceText: String(current.sourceText || ""),
+      targetLang: String(current.targetLang || ""),
+    };
+  }
+
+  /** The two arrows of the card on screen, when it carries them. */
+  function historyArrows() {
+    return {
+      older: content.querySelector('.history-step[data-step="-1"]'),
+      newer: content.querySelector('.history-step[data-step="1"]'),
+    };
+  }
+
+  /**
+   * Draws the known state of the arrows onto whatever buttons the card holds now.
+   *
+   * A redraw of the same card — a word card growing into its full entry — gets
+   * its arrows back this way, without asking the backend again for an answer
+   * that cannot have changed.
+   */
+  function applyHistory() {
+    const arrows = historyArrows();
+    if (arrows.older) arrows.older.disabled = !historySteps.older;
+    if (arrows.newer) arrows.newer.disabled = !historySteps.newer;
+  }
+
+  /**
+   * Asks which translations sit either side of the card on screen, remembers the
+   * answer and settles the arrows on it: an arrow with nowhere to go is left
+   * disabled.
+   *
+   * Both are drawn disabled, so a card being drawn shows two dead arrows for
+   * the round trip it takes to learn better, rather than two that do nothing
+   * when they are pressed.
+   */
+  async function syncHistory() {
+    const key = historyKey();
+    const arrows = historyArrows();
+    if (!key || (!arrows.older && !arrows.newer)) return;
+    const mine = ticket;
+    let steps = null;
+    try {
+      steps = await Glossy.invoke("history_neighbors", key);
+    } catch (error) {
+      steps = null;
+    }
+    if (mine !== ticket) return;
+    if (steps && steps.current != null) historyId = steps.current;
+    historySteps = { older: !!(steps && steps.older), newer: !!(steps && steps.newer) };
+    applyHistory();
+  }
+
+  /** Walks the card to the translation made before, or after, the one on it. */
+  async function stepHistory(direction) {
+    const key = historyKey();
+    if (!key) return;
+    const mine = ticket;
+    let steps = null;
+    try {
+      steps = await Glossy.invoke("history_neighbors", key);
+    } catch (error) {
+      return;
+    }
+    // Another card took over while the answer was on its way; the arrows the
+    // user pressed belong to the one that has gone.
+    if (mine !== ticket) return;
+    const entry = direction < 0 ? steps && steps.older : steps && steps.newer;
+    if (entry) showEntry(entry);
+  }
+
+  /**
+   * Draws one translation the history holds into the card, where it stands.
+   *
+   * The arrows walk a list: they ask for no new translation and move nothing.
+   * A card taken out of the history has no selection behind it, so nothing on it
+   * can be written back over.
+   */
+  function showEntry(entry) {
+    const result = entry && entry.result;
+    if (!result || !result.translation) return;
+    ticket += 1;
+    clearTimeout(closeTimer);
+    serviceMenu = null;
+    resetLanguages();
+    text = String(result.sourceText || "");
+    current = result;
+    historyId = entry.id;
+    historySteps = { older: false, newer: false };
+    showWriteBack(false);
+    detected = result.sourceLang || "";
+    headword.textContent = text;
+    document.body.dataset.state = result.kind === "sentence" ? "sentence" : "word";
+    draw(result);
+    showLanguages(result);
+    size = { width: 0, height: 0 };
+    // Kept where it is: the card is being read, not answered to a new selection.
+    place(false);
+    scheduleAutoClose();
   }
 
   /**
@@ -776,7 +945,7 @@
 
   /** Shows a translation the history already has, without asking the provider
       again: the stored card keeps its phonetic symbols, meanings and example. */
-  async function showStored(result) {
+  async function showStored(result, entryId) {
     if (!result || !result.translation) return;
     const mine = ++ticket;
     clearTimeout(closeTimer);
@@ -785,6 +954,10 @@
 
     text = String(result.sourceText || "");
     current = result;
+    // A card put back from the history knows which entry it is, so its arrows
+    // start from there; one that came from anywhere else is found by its text.
+    historyId = entryId == null ? null : entryId;
+    historySteps = { older: false, newer: false };
     // An old translation has no selection behind it to be written over.
     showWriteBack(false);
     detected = result.sourceLang || "";
@@ -906,7 +1079,11 @@
   });
 
   Glossy.listen("glossy://result", (event) => {
-    showStored(event && event.payload);
+    const payload = (event && event.payload) || {};
+    // The card may be one the history put back, in which case it names the entry
+    // it came from; the shapes are the payload and a bare result for anything
+    // that has no entry to name.
+    showStored(payload.result || payload, payload.historyId);
   });
 
   // Ctrl+Enter writes the translation back over the text it came from. The
@@ -975,6 +1152,9 @@
   });
 
   Glossy.listen("glossy://settings", async (event) => {
+    // Whether the card draws the arrows that walk the history is a setting, and
+    // the card on screen was drawn with the old one.
+    const hadArrows = historyStepHandler() !== null;
     preferences = { ...preferences, ...(event.payload || {}) };
     applyAppearance();
     applyLanguage();
@@ -982,9 +1162,43 @@
     // engine offers other languages; the labels of the bar are translated too.
     await loadService();
     if (!langbar.hidden) showLanguages(current);
-    // A different width or text size also changes the card size.
     const state = document.body.dataset.state;
-    if (state && state !== "idle") place(false);
+    if (!state || state === "idle") return;
+    // A card whose row of arrows the setting just turned on or off is drawn
+    // again, so what it shows is what the setting now says.
+    if (current && (historyStepHandler() !== null) !== hadArrows) draw(current);
+    // A different width or text size also changes the card size.
+    place(false);
+  });
+
+  /**
+   * Puts the window back where the card needs it once a move has settled.
+   *
+   * Dragging the card runs a modal loop in the operating system that owns the
+   * window's geometry for as long as it lasts, which can spoil two things: a
+   * resize asked for while the drag was going on is dropped, so the card ends up
+   * taller than its window with its bottom cut off and no scrollbar to reach it;
+   * and the window is left wherever the pointer let go, which can be half off
+   * the screen. Once the moves have stopped the card is placed again, which asks
+   * the backend for the size the card needs and for the window to be clamped
+   * back onto its monitor.
+   */
+  Glossy.listen("glossy://popup-moved", () => {
+    // Every move restarts the wait, so this only runs after the drag: a window
+    // in the middle of being dragged is being placed by the loop, not by us.
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(async () => {
+      if (document.body.dataset.state === "idle") return;
+      // The monitor the window ended up on is the one the card has to be
+      // measured against now, not the one the anchor still names, so the anchor
+      // is taken from where the window really is before the card is placed.
+      await Glossy.invoke("popup_sync_anchor").catch(() => {});
+      // Forgetting the recorded size is what makes the next placement ask for it
+      // again. A placement that finds nothing to change writes the same spot
+      // back, and the move it causes is not passed back to us.
+      size = { width: 0, height: 0 };
+      await place(false);
+    }, 180);
   });
 
   /** Renders a sample card when the page is opened outside of Tauri. */

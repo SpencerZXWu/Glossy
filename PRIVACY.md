@@ -14,7 +14,10 @@ text you asked about.
 - **The built-in engines** — the project's own relay, a Cloudflare Worker whose source is
   in [`server/`](./server/README.md), which passes the text on to Baidu, Youdao or Zhipu
   depending on how it is deployed. It counts the characters a day per installation and per
-  address and stores nothing else: the text is not logged and not kept. The installation is
+  address and stores nothing else: the text is not logged and not kept. **The app's own version
+  number goes with each request**, so the relay can tell a build it no longer serves and can
+  pass back a one-line announcement; the version is all it learns about the copy of Glossy on
+  this machine. The installation is
   identified by an id derived from this computer and this Windows account (a hash of the two,
   so neither is sent), which is what keeps the daily allowance the same one after installing
   the app again.
@@ -81,7 +84,9 @@ Glossy 没有账号、没有统计分析、没有遥测，也不会记录你选�
 - **Google 翻译**（`translate.googleapis.com`）—— Google 提供的公共端点。
 - **内置引擎** —— 项目自己的中转服务，源码在 [`server/`](./server/README.md)，是一个
   Cloudflare Worker，按部署配置把文本转给百度、有道或智谱。它只按"每台设备 / 每个地址 / 每天"
-  统计字符数，其余什么都不存：文本不写日志、不落盘。设备用一个由本机与当前 Windows 账户推导出的
+  统计字符数，其余什么都不存：文本不写日志、不落盘。**每次请求还会带上应用自己的版本号**，
+  中转服务据此判断某个版本是否还能继续提供服务，也可以回一句公告；除版本号外，它不会知道这台
+  机器上这份 Glossy 的任何信息。设备用一个由本机与当前 Windows 账户推导出的
   安装 ID 标识（两者哈希后的值，二者本身都不会被发送），这样重新安装应用后每日额度仍然是同一份额度。
 - **你自己的服务**（`api-baidu`、`api-openai`）—— 只有在「常规」页填过它的凭据时才会用到，此时文本
   从本机**直接发往那个服务**：你自己的 APP ID 与密钥对应的百度 `fanyi-api.baidu.com`，或者你为兼容

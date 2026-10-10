@@ -6,6 +6,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [2.1.1] - 2026-10-10
+
+### Added
+
+- **Two arrows that walk the translations the card has already shown.** In the
+  blank at the right of the engine's name at the foot of the card, a pair of
+  arrows steps to the translation made before this one and back to the one made
+  after it, without asking any provider again: the list is the history the
+  settings window already keeps. An arrow with nothing behind it is disabled, a
+  translation brought back this way has no selection behind it and so cannot be
+  written back over, and the card keeps its place on screen while the arrows walk.
+- **A build the relay has moved past says so on the card, and a message meant for
+  everyone arrives in the corner of the screen.** A translation asked of the
+  built-in engines now carries the app's own version number, and the relay may
+  answer with a line of its own beside the translation: when this build is older
+  than the oldest one the deployment still serves, a marked line appears under
+  the card with the version to move to and a link to the download page; a
+  one-line announcement is shown once per run in the card in the corner of the
+  screen. Both are decided by the deployment — a relay that says nothing, and one
+  that has never heard of either, change nothing — and the version number is the
+  only thing about the app that goes with a request.
+
+### Fixed
+
+- **Dragging the card while it is still being filled no longer cuts off what
+  sits below.** The card sizes the window to itself, but a drag runs a modal
+  loop in Windows that owns the window's geometry for as long as it lasts, so a
+  resize asked for while the user was dragging the popup during a reading could
+  be dropped: the card was then taller than its window, and the bottom of it —
+  the translation of a long reading, say — was cut off with no scrollbar to
+  reach it. The window now hears about every move and is asked for the size the
+  card needs once the moves have stopped.
+- **A translation no longer stays broken until the app is restarted.** The whole
+  app shares one HTTP client, and a client is a pool of connections: a network
+  change, a proxy that went away or a machine that woke from sleep can leave that
+  pool holding connections that go nowhere, after which every service is
+  reported as unreachable for as long as the process lives. A request that cannot
+  be sent now throws the shared client away, so the next translation begins from
+  a fresh pool. The log also carries the whole chain of reasons a request failed
+  now, rather than only that it did.
+- **A card dragged half off the screen comes back.** A drag was the one thing
+  that could leave the card hanging over the edge: the window is clamped onto
+  its monitor when it is placed, and a drag placed nothing. Once the moves stop
+  the card is placed again, so the window is put back onto the screen — which is
+  also the moment the size the card needs is asked for again, so the two are one
+  pass rather than two.
+- **A card reopened from the history walks the list from the entry it is showing.**
+  The entry it came from travels with it now, so the arrows start there instead of
+  from the newest entry that happens to hold the same text and target.
+
+### Changed
+
+- The arrows that walk the history ask the backend once per card rather than on
+  every redraw, and a card whose row of arrows the settings just turned on or off
+  is drawn again rather than waiting for the next one.
+
 ## [2.1.0] - 2026-10-05
 
 The release that lets the window be something other than grey, that opens with a

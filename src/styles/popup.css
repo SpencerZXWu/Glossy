@@ -715,6 +715,50 @@ body.dragging .card::before {
   border-top: 0;
 }
 
+/* The line the relay puts under a card from a build it has moved past: one
+   sentence and the way to act on it. It is the only line on a card that comes
+   from the server as an instruction rather than as part of the translation, so
+   it is marked as something to notice — without shouting over the translation
+   above it. */
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--g-warn-soft);
+  color: var(--g-warn);
+  font-size: calc(11.5px * var(--popup-font));
+}
+
+.notice-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice-go {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.notice-go:hover {
+  text-decoration: none;
+}
+
+.notice-go:focus-visible {
+  outline: var(--g-focus-width) solid currentColor;
+  outline-offset: var(--g-focus-offset);
+  border-radius: 3px;
+}
+
 /* The name of the engine that answered. It is a button because the list of the
    other ones opens under it; without that it is plain text, which is how the
    card looked before and how it still looks where there is nothing to choose. */
@@ -761,6 +805,71 @@ body.dragging .card::before {
 .foot .service:focus-visible {
   outline: var(--g-focus-width) solid var(--accent);
   outline-offset: var(--g-focus-offset);
+}
+
+/* The arrows that walk the translations the history holds. They sit in the
+   blank at the right of the name of the engine and take the place of the space
+   between it and the mark, so the row still reads as one line.
+   The names are kept off the bare `history` the settings window uses for its
+   own list: `render.js` draws this row into that window's demo card too, and a
+   class the two share would style the arrows as a scrolling column. */
+.foot .history-nav {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.foot .history-step {
+  display: grid;
+  place-items: center;
+  width: calc(20px * var(--popup-font));
+  height: calc(20px * var(--popup-font));
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--g-dur-fast) var(--g-ease-standard),
+    color var(--g-dur-fast) var(--g-ease-standard);
+}
+
+.foot .history-step svg {
+  width: calc(12px * var(--popup-font));
+  height: calc(12px * var(--popup-font));
+  display: block;
+}
+
+.foot .history-step:hover {
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+
+.foot .history-step:active {
+  transform: translateY(1px);
+}
+
+.foot .history-step:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: var(--g-focus-offset);
+}
+
+/* An arrow with nothing behind it is dead, and says so by going faint rather
+   than by doing nothing when it is pressed. */
+.foot .history-step:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.foot .history-step:disabled:hover {
+  background: none;
+  color: inherit;
+}
+
+.foot .history-step:disabled:active {
+  transform: none;
 }
 
 /* The engines the card can switch to, listed under the name that answered. */

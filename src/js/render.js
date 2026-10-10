@@ -171,14 +171,50 @@
 
   /** The bottom row of the card, added only when it has something to hold. */
   function foot(target, provider, options) {
+    const opts = options || {};
     const row = node("div", "foot");
-    engineName(row, provider, options);
+    engineName(row, provider, opts);
     // The row names the engine that answered; the mark of the app that asked it
     // closes the line. Without an engine to name there is no row at all.
     if (!row.childNodes.length) return row;
+    const steps = historyNav(opts);
+    if (steps) row.appendChild(steps);
     row.appendChild(brand());
     target.appendChild(row);
     return row;
+  }
+
+  /**
+   * The pair of arrows that walk the translations the history holds, drawn in
+   * the blank at the right of the name of the engine.
+   *
+   * They are only drawn when the caller knows how to move — a card in the demo
+   * pane, or one in the settings window, has no list behind it — and both start
+   * disabled, because which way a card can go is only known once the list has
+   * been asked: the caller settles them the moment the answer is in.
+   */
+  function historyNav(options) {
+    const opts = options || {};
+    if (typeof opts.onHistory !== "function") return null;
+    const group = node("div", "history-nav");
+    group.appendChild(historyStep(-1, BACK_GLYPH, "popup.historyPrev", opts.onHistory));
+    group.appendChild(historyStep(1, FORWARD_GLYPH, "popup.historyNext", opts.onHistory));
+    return group;
+  }
+
+  /** One arrow of the pair: a button that asks the caller to step that way. */
+  function historyStep(direction, glyph, key, onHistory) {
+    const step = node("button", "history-step");
+    step.type = "button";
+    step.dataset.step = String(direction);
+    step.disabled = true;
+    step.innerHTML = glyph;
+    name(step, key);
+    step.addEventListener("click", (event) => {
+      if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+      onHistory(direction);
+    });
+    return step;
   }
 
   /** The translucent Glossy mark at the right of the row that names the engine. */
@@ -403,6 +439,41 @@
         : Glossy.i18n.t("render.fallback", failed);
       target.appendChild(node("div", "foot fallback", line));
     }
+
+    // The relay can tell the App something about itself as well as translate:
+    // that this build is older than the one it serves. It goes last, so the
+    // translation keeps the top of the card.
+    updateLine(target, data.notice, opts);
+  }
+
+  /**
+   * The line a relay that has moved on puts under a card from before it moved.
+   *
+   * Only `update_available` is drawn here. Every other code is the caller's to
+   * deal with — an announcement belongs in the corner of the screen rather than
+   * on top of somebody's translation — and a code this build has never heard of
+   * is not drawn at all, because there is nothing here to draw it with.
+   */
+  function updateLine(target, notice, options) {
+    if (!notice || String(notice.code || "") !== "update_available") return;
+    const opts = options || {};
+    const line = node("div", "notice update");
+    line.setAttribute("role", "status");
+    const version = String(notice.minVersion || "").trim();
+    const text = version
+      ? Glossy.i18n.t("render.updateAvailable", version)
+      : Glossy.i18n.t("render.updateAvailableAny");
+    line.appendChild(node("span", "notice-text", text));
+    if (typeof opts.onUpdate === "function") {
+      const go = node("button", "notice-go", Glossy.i18n.t("render.updateAction"));
+      go.type = "button";
+      go.addEventListener("click", (event) => {
+        if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+        opts.onUpdate();
+      });
+      line.appendChild(go);
+    }
+    target.appendChild(line);
   }
 
   /**
@@ -512,6 +583,12 @@
       original, which is the one thing it does. */
   const REPLACE_GLYPH =
     '<svg class="glyph glyph-replace" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h12.5l-3-3" /><path d="M20 16H7.5l3 3" /></svg>';
+
+  /** The two arrows that walk the translations the history holds. */
+  const BACK_GLYPH =
+    '<svg class="glyph glyph-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" /></svg>';
+  const FORWARD_GLYPH =
+    '<svg class="glyph glyph-forward" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 6l6 6-6 6" /></svg>';
 
   /** How often the card asks whether the voice is still reading. */
   const SPEECH_POLL_MS = 250;

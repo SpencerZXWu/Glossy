@@ -34,7 +34,7 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 
-use notice::{notice_close, notice_open, NOTICE_LABEL};
+use notice::{notice_announce, notice_close, notice_open, notice_text, NOTICE_LABEL};
 use popup::POPUP_LABEL;
 use settings::{Service, Settings};
 use state::AppState;
@@ -344,7 +344,7 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
     };
     let cache = app.path().app_config_dir().ok();
     result.conversions = units::conversions_for(
-        client,
+        &client,
         &result.source_text,
         &result.translation,
         &result.target_lang,
@@ -366,7 +366,7 @@ async fn attach_conversions(app: &AppHandle, settings: &Settings, result: &mut T
 async fn cloud_status(state: State<'_, Arc<AppState>>) -> Result<translate::CloudQuota, String> {
     let settings = state.settings();
     let client = translate::client()?;
-    translate::cloud_quota(client, &settings.cloud_id).await
+    translate::cloud_quota(&client, &settings.cloud_id).await
 }
 
 /// The dictionary style extra of a word: phonetic symbols, meanings and one
@@ -417,6 +417,20 @@ fn history_remove(app: AppHandle, id: u64) {
     history::remove(&app, id);
 }
 
+/// The translations either side of the one on screen, for the card's own arrows.
+///
+/// The card names the entry it is on when it knows it, and the text it is
+/// showing otherwise, which is how a card that was just translated finds itself
+/// in the list.
+#[tauri::command]
+fn history_neighbors(
+    id: Option<u64>,
+    source_text: String,
+    target_lang: String,
+) -> history::Neighborhood {
+    history::neighbors(id, &source_text, &target_lang)
+}
+
 /// Puts an old translation back into the floating card, anchored to the cursor.
 #[tauri::command]
 async fn history_reopen(
@@ -425,6 +439,7 @@ async fn history_reopen(
     id: u64,
 ) -> Result<(), String> {
     let entry = history::get(id).ok_or("that translation is no longer in the history")?;
+    let history_id = entry.id;
     let mut result = entry.result;
     // Entries recorded before the unit feature existed (or while it was
     // switched off) have nothing to show, so they are filled in on the way out.
@@ -433,7 +448,7 @@ async fn history_reopen(
         attach_conversions(&app, &settings, &mut result).await;
     }
     let (x, y) = platform::desktop::cursor_pos();
-    popup::reveal_result(&app, &state, result, (x as f64, y as f64));
+    popup::reveal_result(&app, &state, result, Some(history_id), (x as f64, y as f64));
     Ok(())
 }
 
@@ -489,7 +504,7 @@ async fn vocabulary_reopen(
         attach_conversions(&app, &settings, &mut result).await;
     }
     let (x, y) = platform::desktop::cursor_pos();
-    popup::reveal_result(&app, &state, result, (x as f64, y as f64));
+    popup::reveal_result(&app, &state, result, None, (x as f64, y as f64));
     Ok(())
 }
 
@@ -935,9 +950,18 @@ pub fn run() {
                 api.prevent_close();
                 let _ = window.hide();
             }
-            // Dragging the popup moves its hit box with it.
+            // Dragging the popup moves its hit box with it, and tells the card
+            // where the window ended up. A native drag owns the window's
+            // geometry for as long as it lasts, so a resize asked for while the
+            // user is dragging it can be dropped, and the drag can also leave
+            // the card hanging over the edge of the screen; the card hears about
+            // every real move so it can put the window back to the size and the
+            // place its content asks for once the moves have stopped. A move
+            // caused by our own placement changes nothing and is not passed on.
             WindowEvent::Moved(position) if window.label() == POPUP_LABEL => {
-                popup::track_move(position.x, position.y);
+                if popup::track_move(position.x, position.y) {
+                    let _ = window.emit("glossy://popup-moved", ());
+                }
             }
             // Closing the settings window only hides it: Glossy keeps watching
             // for selections and stays reachable through the notification area.
@@ -1000,6 +1024,7 @@ pub fn run() {
             history_list,
             history_clear,
             history_remove,
+            history_neighbors,
             history_reopen,
             vocabulary_list,
             vocabulary_toggle,
@@ -1012,6 +1037,8 @@ pub fn run() {
             pick_app,
             notice_open,
             notice_close,
+            notice_text,
+            notice_announce,
             ocr::ocr_cancel,
             ocr::ocr_model_download,
             ocr::ocr_model_remove,

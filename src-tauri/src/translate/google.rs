@@ -172,10 +172,18 @@ async fn request(
     if let Some(budget) = budget {
         call = call.timeout(budget);
     }
-    let response = call
-        .send()
-        .await
-        .map_err(|error| format!("Could not reach Google Translate: {error}"))?;
+    let response = call.send().await.map_err(|error| {
+        // A lookup that was given a budget of its own runs out of it on a slow
+        // network by design, and that says nothing about the connection pool;
+        // one that failed without a budget was refused or broken and is worth
+        // starting the pool over for.
+        let described = if budget.is_none() {
+            super::transport_failed(&error)
+        } else {
+            super::describe(&error)
+        };
+        format!("Could not reach Google Translate: {described}")
+    })?;
 
     let status = response.status();
     if !status.is_success() {

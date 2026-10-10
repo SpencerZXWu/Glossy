@@ -88,6 +88,22 @@ body {
   font-size: 11.5px;
 }
 
+/* The same card carrying a line from the relay instead of the start hint. There
+   is no room for a heading above it, so the heading goes and the line takes the
+   card: it is what the user is meant to read. */
+.toast.announce .text strong {
+  display: none;
+}
+
+.toast.announce .text span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 12.5px;
+}
+
 .close {
   flex: none;
   width: 22px;

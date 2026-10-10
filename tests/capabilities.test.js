@@ -86,7 +86,7 @@ test("every page that listens for an event does so from a covered window", () =>
   const listeners = WINDOWS.filter(listensForEvents);
   assert.deepEqual(
     listeners.map((entry) => entry.label).sort(),
-    ["main", "ocr", "popup", "subtitle", "subtitle-edit"],
+    ["main", "notice", "ocr", "popup", "subtitle", "subtitle-edit"],
   );
 
   const denied = listeners.filter((entry) => !covered(entry.label)).map((entry) => entry.label);

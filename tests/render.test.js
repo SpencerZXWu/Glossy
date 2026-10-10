@@ -1397,6 +1397,67 @@ test("result says nothing about a fallback when none happened", () => {
   assert.equal(findByClass(node, "foot fallback"), null);
 });
 
+test("a relay that has moved past this build puts its line under the card", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    provider: "baidu",
+    notice: { code: "update_available", minVersion: "2.2.0" },
+  });
+  assert.equal(findByClass(node, "notice-text").textContent, "Glossy 2.2.0 is out");
+});
+
+test("the line asks for no version it was not given", () => {
+  const node = target();
+  Glossy.render.result(node, {
+    kind: "sentence",
+    translation: "你好。",
+    provider: "baidu",
+    notice: { code: "update_available" },
+  });
+  assert.equal(findByClass(node, "notice-text").textContent, "A newer Glossy is out");
+});
+
+test("the link on the line opens the page the caller names", () => {
+  const node = target();
+  let asked = 0;
+  Glossy.render.result(
+    node,
+    {
+      kind: "sentence",
+      translation: "你好。",
+      provider: "baidu",
+      notice: { code: "update_available", minVersion: "2.2.0" },
+    },
+    { onUpdate: () => (asked += 1) },
+  );
+  const go = findByClass(node, "notice-go");
+  assert.equal(go.textContent, "Get it");
+  go.dispatch("click");
+  assert.equal(asked, 1);
+});
+
+test("a line this build does not draw is left off the card", () => {
+  // An announcement belongs in the corner of the screen, and a code from a newer
+  // relay is not a line this build has anything to draw with: neither is a card
+  // that keeps saying something it does not mean.
+  for (const notice of [
+    { code: "announce", message: "服务器明天上午维护" },
+    { code: "maintenance_window" },
+    { minVersion: "2.2.0" },
+  ]) {
+    const node = target();
+    Glossy.render.result(node, {
+      kind: "sentence",
+      translation: "你好。",
+      provider: "baidu",
+      notice,
+    });
+    assert.equal(findByClass(node, "notice update"), null, JSON.stringify(notice));
+  }
+});
+
 test("the name of the engine is a button when the card can switch services", () => {
   const node = target();
   const asked = [];

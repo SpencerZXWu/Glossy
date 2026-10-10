@@ -7,7 +7,7 @@ mod dictionary;
 mod google;
 pub mod languages;
 
-use std::sync::OnceLock;
+use std::sync::Mutex;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -95,6 +95,32 @@ pub struct TranslationResult {
     /// would not expect, annotated with the switch to the units they do.
     #[serde(default)]
     pub conversions: Vec<crate::units::Conversion>,
+    /// One line the relay asked the card to add about the App itself, if any.
+    /// `None` for every other provider, and for a relay with nothing to say.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice: Option<Notice>,
+}
+
+/// Something the relay wants said about the App, sent alongside a translation
+/// that was answered normally.
+///
+/// The translation is shown either way; this is one line the card adds. It is
+/// additive and optional on purpose, so a build that does not know the field
+/// never sees one, and a relay that never sends one changes nothing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Notice {
+    /// `update_available` when this build is older than the relay's minimum,
+    /// or `announce` for a line meant for everyone.
+    pub code: String,
+    /// The oldest version the relay serves without a nudge. Only `update_available`
+    /// carries one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_version: Option<String>,
+    /// The line itself, for `announce`. Written by the relay and shown as it
+    /// is: it is not translated by the App.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
 }
 
 impl TranslationResult {
@@ -115,6 +141,7 @@ impl TranslationResult {
             fallback_code: None,
             pairs: Vec::new(),
             conversions: Vec::new(),
+            notice: None,
         }
     }
 
@@ -271,19 +298,69 @@ fn is_concrete(code: &str) -> bool {
     !code.is_empty() && !code.eq_ignore_ascii_case("auto")
 }
 
-/// Shared HTTP client, created on first use.
-pub fn client() -> Result<&'static reqwest::Client, String> {
-    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| {
-            reqwest::Client::builder()
-                .user_agent(USER_AGENT)
-                .timeout(REQUEST_TIMEOUT)
-                .build()
-                .map_err(|error| format!("Could not create the network client: {error}"))
-        })
-        .as_ref()
-        .map_err(|error| error.clone())
+/// Shared HTTP client, created on first use and handed out as a clone.
+///
+/// A `reqwest::Client` is a handle onto a pool of connections, so cloning one is
+/// cheap and every caller shares the same pool. It is held behind a lock rather
+/// than in a `OnceLock` because it can be thrown away: see [`reset_client`].
+static CLIENT: Mutex<Option<reqwest::Client>> = Mutex::new(None);
+
+/// The shared HTTP client, built the first time one is asked for.
+pub fn client() -> Result<reqwest::Client, String> {
+    let mut held = CLIENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(client) = held.as_ref() {
+        return Ok(client.clone());
+    }
+    let built = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .timeout(REQUEST_TIMEOUT)
+        .build()
+        .map_err(|error| format!("Could not create the network client: {error}"))?;
+    *held = Some(built.clone());
+    Ok(built)
+}
+
+/// Starts the connection pool over, keeping nothing from the old one.
+///
+/// A request that could not be sent says nothing about the service and
+/// everything about the road to it: a connection left half-open by a network
+/// change, a proxy that went away or a machine that has just woken up poisons
+/// the pool the shared client holds, and a process that keeps one client for
+/// its whole life goes on reporting every service as unreachable until it is
+/// restarted. Throwing the client away is what lets the next translation — once
+/// the road is back — begin from a fresh pool instead of waiting for a restart
+/// the user should not have to perform.
+pub fn reset_client() {
+    let mut held = CLIENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    *held = None;
+}
+
+/// The whole chain of reasons a request could not be sent.
+///
+/// `reqwest`'s own `Display` only says that the request failed; why — a name
+/// that would not resolve, a connection that was refused or timed out, a proxy
+/// that is not listening — hangs off its `source()`, and it is the why that
+/// makes the log worth reading the next time.
+pub fn describe(error: &reqwest::Error) -> String {
+    let mut text = error.to_string();
+    let mut source = std::error::Error::source(error);
+    while let Some(cause) = source {
+        text.push_str(": ");
+        text.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    text
+}
+
+/// Records a request that never reached a service and starts the pool over.
+///
+/// Answers with the described error, so the caller can put it in the message it
+/// hands back to the card.
+pub fn transport_failed(error: &reqwest::Error) -> String {
+    let described = describe(error);
+    note!("glossy: could not send a request: {described}");
+    reset_client();
+    described
 }
 
 /// Translates `text` from one language into another, both named by the caller.
@@ -319,7 +396,7 @@ pub async fn translate_pair(
     };
     let target = normalize_lang_code(target);
 
-    let mut result = call_provider(client, settings, text, &source, &target, kind).await?;
+    let mut result = call_provider(&client, settings, text, &source, &target, kind).await?;
     result.source_lang = normalize_lang_code(&result.source_lang);
     result.kind = kind.as_str().to_string();
     result.target_lang = target;
@@ -351,7 +428,7 @@ pub async fn translate(
     let source = languages.source_code();
     let (mut target, forced) = resolve_target(text, &settings.target_lang, languages, settings);
 
-    let mut result = call_provider(client, settings, text, source, &target, kind).await?;
+    let mut result = call_provider(&client, settings, text, source, &target, kind).await?;
     result.source_lang = normalize_lang_code(&result.source_lang);
 
     // Translating a language into itself just echoes the selection back.
@@ -360,7 +437,7 @@ pub async fn translate(
         && resembles(&result.translation, text)
     {
         if let Some(alternate) = alternate_target(&target) {
-            if let Ok(retry) = call_provider(client, settings, text, source, &alternate, kind).await
+            if let Ok(retry) = call_provider(&client, settings, text, source, &alternate, kind).await
             {
                 target = alternate;
                 result = retry;
@@ -434,7 +511,7 @@ pub async fn word_details(
         }))
     };
 
-    dictionary::enrich(client, text, &mut result).await;
+    dictionary::enrich(&client, text, &mut result).await;
     // The dictionary may already carry everything the free endpoint could add;
     // waiting for it then only holds the card back. When something is still
     // missing the card gives the free endpoint a moment, not its whole budget:
@@ -492,7 +569,7 @@ pub async fn sentence_context(
     let client = client().ok()?;
     let source = languages.source_code();
     let (target, _) = resolve_target(&text, &settings.target_lang, languages, settings);
-    let result = call_provider(client, settings, &text, source, &target, Kind::Sentence)
+    let result = call_provider(&client, settings, &text, source, &target, Kind::Sentence)
         .await
         .ok()?;
     let translation = result.translation.trim().to_string();
