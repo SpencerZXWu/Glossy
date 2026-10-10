@@ -1,0 +1,3 @@
+3d1ac5873524d87dc09c1f8950554133142aace4c813fa2d93829b0bd404e02a  Glossy_2.1.1_x64-setup.exe
+eb47d3e2fdacdf13567ca5bf115f73793745cd3481c4ecc9549cc7e1e6393668  Glossy_2.1.1_x64_en-US.msi
+ff25cf6adca710aaedff10aa6cba3ecab6a9cf92345cde044fd7ce3e8d4dc2fa  Glossy_2.1.1_x64_portable.zip
