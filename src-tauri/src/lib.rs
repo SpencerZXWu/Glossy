@@ -18,6 +18,7 @@ mod popup;
 mod selection;
 mod settings;
 mod state;
+mod stats;
 mod subtitle;
 mod surface;
 mod text;
@@ -73,6 +74,24 @@ fn developer_unlock(
     log::note!("glossy: developer mode is on");
     let _ = app.emit("glossy://settings", settings.clone());
     Ok(settings)
+}
+
+/// The report of the deployment this build talks to, for the one running it.
+///
+/// The numbers name installations and what each of them spent, so this is only
+/// answered while developer mode is on. The token is the deployment's own
+/// `ADMIN_TOKEN`: it is one the operator types in, it lives in the window's
+/// field for as long as the window is open, and nowhere on the disk.
+#[tauri::command]
+async fn dev_stats(
+    state: State<'_, Arc<AppState>>,
+    token: String,
+) -> Result<serde_json::Value, String> {
+    if !state.settings().developer_mode {
+        log::note!("glossy: a server report was asked for with developer mode off");
+        return Err("dev.locked".to_string());
+    }
+    stats::report(&token).await
 }
 
 /// Puts the pages that are still being built away again.
@@ -992,6 +1011,7 @@ pub fn run() {
             log_copy,
             log_export,
             log_clear,
+            dev_stats,
             open_releases_page,
             translate_text,
             word_details,

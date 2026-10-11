@@ -7,6 +7,7 @@
  */
 
 import { isBaseCode } from "./rates.js";
+import { bearerToken, buildStats, tokenMatches } from "./stats.js";
 import { BLOCK_MESSAGE, blockedBy, noticeFor } from "./version.js";
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -167,6 +168,31 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
             ? Math.max(0, limits.ocrPerClientMonth - readings.requests)
             : null,
       });
+    }
+
+    if (route === "/v1/stats") {
+      if (request.method !== "GET") return fail(405, "method_not_allowed", "只支持 GET。");
+      // Off unless the deployment names a token. This is the operator's view of
+      // its own counters — installation ids and what each of them spent — so the
+      // switch that turns it on is a secret, and nothing else opens it.
+      const token = setting("ADMIN_TOKEN");
+      if (!token) {
+        return fail(403, "not_configured", "服务端还没有配置 ADMIN_TOKEN，这个接口是关的。");
+      }
+      if (!tokenMatches(bearerToken(request.headers.get("Authorization")), token)) {
+        return fail(403, "forbidden", "口令不对。");
+      }
+      // Nothing is booked for a report: reading the counters must not move them.
+      return json(
+        buildStats({
+          day,
+          month,
+          dayCounters: await store.snapshot(day),
+          monthCounters: await ocrStore.snapshot(month),
+          limits,
+          now: at,
+        }),
+      );
     }
 
     if (route === "/v1/rates") {

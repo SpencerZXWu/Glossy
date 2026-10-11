@@ -54,6 +54,13 @@ function memoryStore() {
         total: read("total", "all"),
       };
     },
+    // The stored shape, which is what `/v1/stats` reads back out of a real store.
+    snapshot(day) {
+      const rows = new Map();
+      for (const [key, chars] of usage) rows.set(key, { chars, requests: 0 });
+      for (const [clientId, count] of readings) rows.set(key("client", clientId), { chars: 0, requests: count });
+      return { day, usage: Object.fromEntries(rows), minutes: Object.fromEntries(minutes) };
+    },
     async reserveOcr(month, { clientId, limit }) {
       this.calls.reserveOcr += 1;
       const readings = this.readings;
@@ -570,4 +577,35 @@ test("a deployment that has set no floor serves every build", async () => {
   const { translate } = setup();
   const response = await translate({ text: "hello", to: "zh", appVersion: "0.9.0" });
   assert.equal(response.status, 200);
+});
+
+test("the report about a deployment's own counters is off until it names a token", async () => {
+  const { call } = setup();
+  const response = await call("/v1/stats");
+  // Nothing else opens it: this is one request away from the installation ids
+  // and what each of them spent.
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).code, "not_configured");
+});
+
+test("the report answers only to the token the deployment named", async () => {
+  const { call, ocr } = setup({ env: { ADMIN_TOKEN: "s3cret" } });
+  assert.equal((await call("/v1/stats")).status, 403, "没有口令也放行");
+  assert.equal(
+    (await call("/v1/stats", { headers: { Authorization: "Bearer nope" } })).status,
+    403,
+    "错误口令也放行",
+  );
+
+  await ocr({});
+  const response = await call("/v1/stats", { headers: { Authorization: "Bearer s3cret" } });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.readings.total, 1);
+  assert.equal(body.today.installations, 1);
+
+  // Reading the counters must not move them.
+  const again = await (await call("/v1/stats", { headers: { Authorization: "Bearer s3cret" } })).json();
+  assert.equal(again.readings.total, 1);
 });

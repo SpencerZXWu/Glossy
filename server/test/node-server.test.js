@@ -72,6 +72,10 @@ test("answers /v1/health over real HTTP", async (t) => {
     ocr: true,
     ocrVendor: "baidu",
     vendors: [],
+    // Which of the switches about the builds this deployment serves are on.
+    // All of them are off here, which is what a deployment that sets nothing
+    // looks like — and what every App met before this field existed.
+    version: { blockBelow: null, minVersion: null, announcement: false },
   });
 });
 

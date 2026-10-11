@@ -53,6 +53,7 @@
     "cloud_status",
     "copy_text",
     "current_service",
+    "dev_stats",
     "developer_lock",
     "developer_unlock",
     "document_cancel",

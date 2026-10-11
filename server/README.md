@@ -355,7 +355,61 @@ npm run check:redis
 
 ## 五、接口
 
-服务端不给浏览器页面用，因此**没有 CORS 头**，只有桌面客户端能调。
+### `GET /v1/stats`（开发者数据，默认关闭）
+
+给你自己看的：今天用了多少字符、谁用的、本月截图读了多少次、全局额度还剩多少。
+读的就是额度计数器本身，所以它和 App 看到的那份数字**永远不会对不上**，而且**不占额度、不写任何东西**。
+
+**默认关闭。** 在环境变量里设一个口令才会开：
+
+| 环境变量 | 默认值 | 含义 |
+| --- | --- | --- |
+| `ADMIN_TOKEN` | 空 | 不填 = 这个接口一直是 `403 not_configured`；填了就要用 `Authorization: Bearer <口令>` 访问 |
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<你的地址>/v1/stats
+```
+
+口令请用一段长随机串（`openssl rand -hex 24` 之类），它是这个接口唯一的门——报告里有**安装 ID 与它们各自的用量**，
+不适合给客户端看。口令是用定长比较的，回答用时不会泄露"前几位对了"。
+
+返回的骨架：
+
+```json
+{
+  "ok": true, "day": "2026-10-11", "month": "2026-10",
+  "limits": { "charsPerClient": 20000, "charsTotal": 30000, "requestsPerMinute": 30, "ocrPerClientMonth": 100 },
+  "today": {
+    "chars": 1234, "requests": 56, "installations": 7, "addresses": 5, "remaining": 28766,
+    "busiestInstallations": [{ "id": "…", "chars": 300, "requests": 4 }],
+    "busiestAddresses":    [{ "id": "0f1e2d3c", "chars": 400, "requests": 5 }],
+    "rate": { "trackedMinutes": 2, "requests": 8 }
+  },
+  "readings": {
+    "total": 3, "installations": 2, "perInstallation": 100,
+    "busiestInstallations": [{ "id": "…", "chars": 0, "requests": 2 }]
+  }
+}
+```
+
+几点说明：
+
+- `busiestAddresses` 里的地址只给哈希的**前 8 位**（存储里本来也只有哈希），够区分调用方就行。
+- 同类行超过 15 条时，长尾会折成一行 `{ "id": "", "rolled": 12, … }`——**各行相加必然等于总数**，报告不会悄悄丢数。
+- `rate` 只反映最近一两分钟（限流桶本来只留这么点），不是全天的。
+- **上游（百度/有道）的剩余额度这里没有**：它们没有公开的查询接口，你在自己的控制台看。
+  想要"这个月累计花了多少"，用下面的导出脚本按天存下来——那才是真正可信的历史。
+- 想换成共享计数（见上一节）之后，这里的数字也会跟着变成**整个部署**的而不是单个实例的。
+
+### 看这份报告的两个地方
+
+- **`scripts/stats.ps1`**：读一次 `/v1/stats`，在屏幕上打印一份中文摘要，并把这一天的数字写进一份 CSV（一天一行；
+  同一天再跑是覆盖那一行，不会重复）。口令用 `-SaveToken` 存成 Windows 的 DPAPI 密文，只有本机这个账户解得开；
+  `-Register daily` 会登记一个每天 23:50 自动记一次的计划任务，任务里不含口令。
+- **App 里「设置 → 服务端报告」页**（开发者模式打开后才显示）：同一份数字铺开在页面上，另有「复制成 JSON」。
+  口令只留在那个窗口的内存里，窗口一关就没了。
+
+以下接口是给客户端调的。服务端不给浏览器页面用，因此**没有 CORS 头**，只有桌面客户端能调。
 
 路径按**最后两段**匹配，所以腾讯云函数 URL 那种自带前缀的地址（`/release/v1/translate`）也能直接用。
 

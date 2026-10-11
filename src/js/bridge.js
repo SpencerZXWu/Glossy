@@ -586,6 +586,56 @@
         settings = { ...settings, developerMode: false };
         previewEmit("glossy://settings", { ...settings });
         return { ...settings };
+      case "dev_stats":
+        // There is no deployment behind a browser tab, so the preview answers
+        // with one day of a small one. An empty field is the one thing it
+        // refuses, and the word "wrong" stands in for a token that does not
+        // match; anything else shows the report.
+        if (String(input.token || "").trim() === "") throw "dev.noToken";
+        if (String(input.token).trim() === "wrong") throw "dev.refused";
+        return {
+          ok: true,
+          service: "glossy-cloud",
+          day: "2026-10-11",
+          month: "2026-10",
+          generatedAt: "2026-10-11T09:41:00.000Z",
+          limits: {
+            charsPerClient: 20000,
+            charsPerIp: 30000,
+            charsTotal: 30000,
+            maxCharsPerRequest: 2000,
+            requestsPerMinute: 30,
+            ocrPerClientMonth: 100,
+          },
+          today: {
+            chars: 11742,
+            requests: 96,
+            installations: 6,
+            addresses: 4,
+            remaining: 18258,
+            busiestInstallations: [
+              { id: "9f21c0b4a7e5d318", chars: 5120, requests: 38 },
+              { id: "4c8ba1f2d90e67ab", chars: 3084, requests: 22 },
+              { id: "d17e5a9304cc8b26", chars: 1902, requests: 14 },
+              { id: "", rolled: 3, chars: 1636, requests: 22 },
+            ],
+            busiestAddresses: [
+              { id: "b73f10ac", chars: 7020, requests: 52 },
+              { id: "21de9940", chars: 4722, requests: 44 },
+            ],
+            rate: { trackedMinutes: 2, requests: 7 },
+          },
+          readings: {
+            total: 18,
+            installations: 4,
+            perInstallation: 100,
+            busiestInstallations: [
+              { id: "9f21c0b4a7e5d318", chars: 0, requests: 7 },
+              { id: "4c8ba1f2d90e67ab", chars: 0, requests: 5 },
+              { id: "", rolled: 2, chars: 0, requests: 6 },
+            ],
+          },
+        };
       case "subtitle_start":
         // The two rectangles are drawn behind a browser tab, so the preview
         // reports the reading as running rather than asking for them.

@@ -54,6 +54,19 @@
     devOn: $("devOn"),
     devLock: $("devLock"),
     devState: $("devState"),
+    dataToken: $("dataToken"),
+    dataRead: $("dataRead"),
+    dataCopy: $("dataCopy"),
+    dataState: $("dataState"),
+    dataBody: $("dataBody"),
+    dataWhen: $("dataWhen"),
+    dataToday: $("dataToday"),
+    dataWho: $("dataWho"),
+    dataRate: $("dataRate"),
+    dataInstallations: $("dataInstallations"),
+    dataAddresses: $("dataAddresses"),
+    dataReadings: $("dataReadings"),
+    dataLimits: $("dataLimits"),
     ignoredList: $("ignoredList"),
     ignoredRunning: $("ignoredRunning"),
     ignoredInput: $("ignoredInput"),
@@ -302,6 +315,8 @@
   let offlineStatus = null;
   /** Whether the pages that are still being built are on show. */
   let developerMode = false;
+  /** The last server report that was read, or nothing before the first one. */
+  let devReport = null;
 
   /**
    * One row per global accelerator. `name` is the slot the backend reports,
@@ -1499,23 +1514,39 @@
   /** The timer that follows the reading while its page is the one on show. */
   let subtitleWatch = 0;
 
+  /** The pages that are only in the sidebar while developer mode is on. */
+  const DEV_PAGES = ["subtitle", "data"];
+
   /**
    * Shows or hides the pages that are still being built.
    *
    * The key is checked in the backend and only the stored settings say whether
    * it was accepted, so this follows them rather than the field. What turns on
-   * and off with the mode is the sidebar's own entry, and a subtitle page that
-   * is open when the mode goes away is left behind with it.
+   * and off with the mode is the sidebar's own entries, and a page that is open
+   * when the mode goes away is left behind with it.
    */
   function applyDeveloperMode() {
-    const item = NAV_ITEMS.find((entry) => entry.dataset.page === "subtitle");
-    if (item) item.hidden = !developerMode;
+    DEV_PAGES.forEach((name) => {
+      const item = NAV_ITEMS.find((entry) => entry.dataset.page === name);
+      if (item) item.hidden = !developerMode;
+    });
     els.devAsk.hidden = developerMode;
     els.devOn.hidden = !developerMode;
     els.devState.textContent = "";
     els.devState.removeAttribute("data-tone");
-    const page = document.getElementById("page-subtitle");
-    if (!developerMode && page && !page.hidden) showPage("translate");
+    if (!developerMode) {
+      const open = DEV_PAGES.map((name) => document.getElementById("page-" + name)).find(
+        (page) => page && !page.hidden,
+      );
+      if (open) showPage("translate");
+      // What was read behind the mode goes with it: the page is not there any
+      // more, and a token left in a field is a token left in a field.
+      els.dataToken.value = "";
+      devReport = null;
+      els.dataBody.hidden = true;
+      els.dataCopy.hidden = true;
+      setDataState("");
+    }
   }
 
   /** Writes the subtitle settings into the page. */
@@ -3240,6 +3271,148 @@
     els.devState.textContent = Glossy.i18n.t(wrong ? "dev.wrongKey" : "dev.failed");
   }
 
+  /* ---- What the deployment says about its own counters ------------------- */
+
+  /** Answers this page knows how to say, rather than one sentence for all. */
+  const DATA_PROBLEMS = ["dev.locked", "dev.noToken", "dev.refused", "dev.closed", "dev.unreadable"];
+
+  /** A number as the interface writes totals: grouped, with no decimals. */
+  function count(value) {
+    return Number(value || 0).toLocaleString();
+  }
+
+  /** The moment a report was written, in this machine's own time. */
+  function readAt(iso) {
+    const at = new Date(String(iso || ""));
+    return Number.isNaN(at.getTime()) ? String(iso || "") : at.toLocaleString();
+  }
+
+  /** Says what the page is doing, or why it could not do it. */
+  function setDataState(key, tone) {
+    els.dataState.textContent = key ? Glossy.i18n.t(key) : "";
+    els.dataState.removeAttribute("data-tone");
+    if (tone) els.dataState.setAttribute("data-tone", tone);
+  }
+
+  /**
+   * One line per row of a busiest list.
+   *
+   * The last row of a long list carries no id and a count instead: the server
+   * rolls its tail into one line rather than dropping it, so that the lines add
+   * up to the total printed above them. What that line is called is said here.
+   */
+  function fillBusiest(box, titleKey, rows) {
+    box.innerHTML = "";
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return;
+    const title = document.createElement("p");
+    title.className = "hint";
+    title.textContent = Glossy.i18n.t(titleKey);
+    box.appendChild(title);
+    list.forEach((row) => {
+      const line = document.createElement("p");
+      line.className = "hint path";
+      const name = row.id || Glossy.i18n.t("data.rolled", count(row.rolled));
+      line.textContent = Glossy.i18n.t("data.row", name, count(row.chars), count(row.requests));
+      box.appendChild(line);
+    });
+  }
+
+  /** Writes one report into the page. */
+  function renderDevReport(report) {
+    const day = String((report && report.day) || "");
+    const today = (report && report.today) || {};
+    const limits = (report && report.limits) || {};
+    const readings = (report && report.readings) || {};
+    const rate = today.rate || {};
+
+    els.dataWhen.textContent = Glossy.i18n.t(
+      "data.generatedAt",
+      day,
+      readAt(report.generatedAt),
+    );
+    els.dataToday.textContent =
+      Number(limits.charsTotal) > 0
+        ? Glossy.i18n.t(
+            "data.today",
+            count(today.chars),
+            count(limits.charsTotal),
+            count(today.requests),
+            count(today.remaining),
+          )
+        : Glossy.i18n.t("data.todayNoLimit", count(today.chars), count(today.requests));
+    els.dataWho.textContent = Glossy.i18n.t(
+      "data.who",
+      count(today.installations),
+      count(today.addresses),
+    );
+    els.dataRate.textContent = Glossy.i18n.t(
+      "data.rate",
+      count(rate.requests),
+      count(limits.requestsPerMinute),
+    );
+    fillBusiest(els.dataInstallations, "data.busiestInstallations", today.busiestInstallations);
+    fillBusiest(els.dataAddresses, "data.busiestAddresses", today.busiestAddresses);
+    els.dataReadings.textContent =
+      Number(readings.perInstallation) > 0
+        ? Glossy.i18n.t(
+            "data.readings",
+            count(readings.total),
+            count(readings.installations),
+            count(readings.perInstallation),
+          )
+        : Glossy.i18n.t(
+            "data.readingsNoLimit",
+            count(readings.total),
+            count(readings.installations),
+          );
+    els.dataLimits.textContent = Glossy.i18n.t(
+      "data.limits",
+      count(limits.charsPerClient),
+      count(limits.charsPerIp),
+      count(limits.maxCharsPerRequest),
+    );
+
+    els.dataBody.hidden = false;
+    els.dataCopy.hidden = false;
+  }
+
+  /** Asks the deployment for its report, with the token that was typed in. */
+  async function readDevReport() {
+    els.dataRead.disabled = true;
+    setDataState("data.reading");
+    try {
+      const report = await Glossy.invoke("dev_stats", { token: els.dataToken.value });
+      devReport = report;
+      setDataState("");
+      renderDevReport(report);
+    } catch (error) {
+      // The token stays in the field: whoever mistyped it can fix one character
+      // rather than the whole thing, and a refused report is not a report.
+      devReport = null;
+      els.dataBody.hidden = true;
+      els.dataCopy.hidden = true;
+      const key = String(Glossy.errorMessage(error) || "");
+      setDataState(DATA_PROBLEMS.indexOf(key) === -1 ? "data.failed" : key, "bad");
+    } finally {
+      els.dataRead.disabled = false;
+    }
+  }
+
+  els.dataRead.addEventListener("click", () => readDevReport());
+  els.dataToken.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") readDevReport();
+  });
+  els.dataCopy.addEventListener("click", async () => {
+    if (!devReport) return;
+    try {
+      await Glossy.invoke("copy_text", { text: JSON.stringify(devReport, null, 2) });
+      showToast(Glossy.i18n.t("data.copied"));
+    } catch (error) {
+      showToast(Glossy.errorMessage(error));
+    }
+  });
+
   // The recognition engine the screenshot translation runs on: the page can
   // download it or take it off the disk, and it follows a download started
   // anywhere else — the first-use prompt in the popup, for instance.
@@ -3741,6 +3914,9 @@
       refreshOfflinePack();
     }
     if (wanted === "backup") refreshLog();
+    // A token that is already in the field is what the page was left with, so
+    // coming back to it reads again rather than showing what it showed before.
+    if (wanted === "data" && els.dataToken.value.trim()) readDevReport();
     syncChannelQuota();
   }
 

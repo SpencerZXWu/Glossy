@@ -96,5 +96,10 @@ export function createFileStore({ file = "" } = {}) {
       sync(nextDay);
       return policyPeekOcr(state, input);
     },
+    /** Every counter of one key, as stored: what `/v1/stats` reads. */
+    snapshot(nextDay) {
+      sync(nextDay);
+      return serializeState(day, state);
+    },
   };
 }

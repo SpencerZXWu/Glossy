@@ -184,5 +184,16 @@ export function createRedisStore({
         () => fallback.peekOcr(day, input),
       );
     },
+
+    /** Every counter of one day, as the shared key holds them. */
+    async snapshot(day) {
+      return orLocal(
+        async () => {
+          const raw = await link.send("GET", `${prefix}${day}`);
+          return raw ? JSON.parse(raw) : serializeState(day, createState());
+        },
+        () => fallback.snapshot(day),
+      );
+    },
   };
 }

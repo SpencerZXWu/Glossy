@@ -11,7 +11,7 @@
 
 import assert from "node:assert/strict";
 import { createServer } from "node:net";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import { createRedisLink } from "../src/redis-link.js";
 import { createRedisStore } from "../src/store-redis.js";
@@ -110,8 +110,20 @@ async function fakeRedis(t) {
 }
 
 function linkTo(db, options = {}) {
-  return createRedisLink({ host: "127.0.0.1", port: db.port, ...options });
+  const link = createRedisLink({ host: "127.0.0.1", port: db.port, ...options });
+  links.push(link);
+  return link;
 }
+
+/**
+ * The links this file opens, closed once the file is over.
+ *
+ * A link holds a socket open for as long as it exists, and a socket that is
+ * still open keeps the test process alive: the run then never prints its
+ * summary, which reads as a hang rather than as the leftover it is.
+ */
+const links = [];
+after(() => links.forEach((link) => link.close()));
 
 function book(store, over = {}) {
   return store.reserve(DAY, {

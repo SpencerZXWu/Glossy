@@ -17,7 +17,8 @@ use crate::log::note;
 use crate::settings::{ApiCredentials, Service, Settings};
 
 pub use self::cloud::{
-    new_install_id, quota as cloud_quota, rates as cloud_rates, Quota as CloudQuota,
+    endpoint as cloud_endpoint, new_install_id, quota as cloud_quota, rates as cloud_rates,
+    Quota as CloudQuota,
 };
 
 /// The free public endpoints reject requests without a browser like agent.

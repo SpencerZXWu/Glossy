@@ -85,6 +85,15 @@ fn endpoint_of() -> Result<String, String> {
     endpoint_from(DEFAULT_ENDPOINT)
 }
 
+/// The address this build translates through, for the operator's own report.
+///
+/// Exported rather than reached for: the report is read from the deployment the
+/// app already asks to translate, so whoever wants the address gets the one
+/// this module would send a translation to, not a second copy of it.
+pub fn endpoint() -> Result<String, String> {
+    endpoint_of()
+}
+
 /// `endpoint_of` with the build default passed in, so the branch that has
 /// nothing to send to stays reachable for a test even though this build ships
 /// with an address.

@@ -86,6 +86,14 @@
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7.5A2 2 0 016 5.5h3l2 2.5h7a2 2 0 012 2V17a2 2 0 01-2 2H6a2 2 0 01-2-2z" /></svg>
           <span data-i18n="nav.backup">Files and logs</span>
         </button>
+        <!-- What the deployment has served is the operator's own view: it names
+             installations and what each of them spent, so the page waits behind
+             developer mode the way the subtitles do. -->
+        <button type="button" class="nav-item" data-page="data" hidden>
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16" /><path d="M7 16.5V9.5M11.7 16.5V5.5M16.4 16.5v-4.5M20.5 16.5v-8" /></svg>
+          <span data-i18n="nav.data">Server report</span>
+          <span class="nav-badge" data-i18n="nav.developer">Developer</span>
+        </button>
         <button type="button" class="nav-item" data-page="updates">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 8v7M9 12.5l3 3 3-3" /></svg>
           <span data-i18n="nav.updates">Updates</span>
@@ -833,6 +841,35 @@
               <button type="button" id="logExport" class="ghost" data-i18n="log.export">Export…</button>
               <button type="button" id="logCopy" class="ghost" data-i18n="log.copy">Copy</button>
               <button type="button" id="logClear" class="ghost" data-i18n="log.clear">Clear</button>
+            </div>
+          </section>
+        </section>
+        <section class="page" id="page-data" hidden>
+          <section class="panel">
+            <h2 data-i18n="panel.data">Server report</h2>
+            <p class="hint" data-i18n="data.hint">
+              What the Glossy server this build translates through has served, counted by the
+              server itself. The token is that deployment's ADMIN_TOKEN: it stays in this window,
+              and it is gone when the window closes.
+            </p>
+            <div class="field-row">
+              <label for="dataToken" data-i18n="data.token">Token</label>
+              <input type="password" id="dataToken" autocomplete="off" spellcheck="false" data-i18n-placeholder="data.tokenPlaceholder" placeholder="The deployment's ADMIN_TOKEN" />
+              <button type="button" id="dataRead" class="ghost" data-i18n="data.read">Read it</button>
+              <button type="button" id="dataCopy" class="ghost" data-i18n="data.copy" hidden>Copy as JSON</button>
+            </div>
+            <p class="hint" id="dataState"></p>
+            <!-- A line per number rather than a table: the same hint style the
+                 pages around it use, and nothing to lay out that could move. -->
+            <div id="dataBody" hidden>
+              <p class="hint path" id="dataWhen"></p>
+              <p class="hint" id="dataToday"></p>
+              <p class="hint" id="dataWho"></p>
+              <p class="hint" id="dataRate"></p>
+              <div id="dataInstallations"></div>
+              <div id="dataAddresses"></div>
+              <p class="hint" id="dataReadings"></p>
+              <p class="hint" id="dataLimits"></p>
             </div>
           </section>
         </section>
