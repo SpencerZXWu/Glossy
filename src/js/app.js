@@ -972,10 +972,29 @@
     });
   }
 
-  /** Fetches the allowance again whenever the shared server comes into view. */
+  /** When the allowance was last asked for, so a page change does not ask again. */
+  let quotaAskedAt = 0;
+
+  /** How long an answer stands before the server is asked for another one. */
+  const QUOTA_STALE_MS = 20000;
+
+  /**
+   * Fetches the allowance again whenever the shared server comes into view.
+   *
+   * A deployment of several instances with no shared store can answer two
+   * questions with two sets of numbers, so asking on every page change and every
+   * glance at the window means watching the same line move for no reason. An
+   * answer younger than the window above is shown again rather than asked for
+   * again; once it has gone stale the next look asks, because then the number has
+   * had time to really change.
+   */
   function syncChannelQuota() {
-    if (cloudQuotaVisible()) refreshCloudQuota();
-    else showQuota("");
+    if (!cloudQuotaVisible()) {
+      showQuota("");
+      return;
+    }
+    if (quotaAskedAt > 0 && Date.now() - quotaAskedAt < QUOTA_STALE_MS) return;
+    refreshCloudQuota();
   }
 
   /**
@@ -991,15 +1010,21 @@
     try {
       const quota = await Glossy.invoke("cloud_status", {});
       if (!cloudQuotaVisible()) return;
+      quotaAskedAt = Date.now();
       const used = quota.used || 0;
       const limit = quota.limit || 0;
       const remaining = quota.remaining === undefined ? Math.max(0, limit - used) : quota.remaining;
+      // A deployment of several instances with no shared store counts in each
+      // of them and answers with whichever copy took the call. The number says
+      // so instead of letting the reader watch it change between two looks.
+      const note = quota.shared === false ? ` ${Glossy.i18n.t("cloud.quota.perInstance")}` : "";
       if (remaining > 0) {
         showQuota(
-          Glossy.i18n.t("cloud.quota.remaining", remaining.toLocaleString(), limit.toLocaleString())
+          Glossy.i18n.t("cloud.quota.remaining", remaining.toLocaleString(), limit.toLocaleString()) +
+            note
         );
       } else {
-        showQuota(Glossy.i18n.t("cloud.quota.used", limit.toLocaleString()), "bad");
+        showQuota(Glossy.i18n.t("cloud.quota.used", limit.toLocaleString()) + note, "bad");
       }
     } catch (error) {
       if (!cloudQuotaVisible()) return;

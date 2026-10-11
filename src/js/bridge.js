@@ -466,7 +466,9 @@
         };
       case "cloud_status":
         // The preview has no server behind it, so it reports a plausible day.
-        return { used: 1234, limit: 30000, remaining: 28766 };
+        // One instance's own counters, which is what a deployment without a
+        // shared store has: the line says so, the way the real one would.
+        return { used: 1234, limit: 30000, remaining: 28766, shared: false };
       case "running_apps":
         return [
           { name: "explorer.exe", title: "File Explorer" },

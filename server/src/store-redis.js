@@ -66,9 +66,14 @@ export function createRedisStore({
   fallback = createFileStore({ file: "" }),
 } = {}) {
   let warned = false;
+  /** Set once the shared counters could not be reached and this instance fell
+      back on its own: from then on the numbers are one instance's, and every
+      report says so. */
+  let wentLocalOnce = false;
 
   /** Says once, not once per request, that the counters are local again. */
   function wentLocal(error) {
+    wentLocalOnce = true;
     if (warned) return;
     warned = true;
     console.error(
@@ -127,6 +132,17 @@ export function createRedisStore({
   }
 
   return {
+    /**
+     * Whether the numbers below came from the deployment's one set of counters.
+     *
+     * True while the shared ones answer, false once anything has fallen back on
+     * this instance's own file: a reader that knows which of the two it is
+     * looking at can say so instead of quietly changing its mind between two
+     * questions.
+     */
+    get shared() {
+      return !wentLocalOnce;
+    },
     async reserve(day, input) {
       return orLocal(
         () =>

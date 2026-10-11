@@ -140,6 +140,8 @@ function book(store, over = {}) {
 test("two instances of the service share one allowance", async (t) => {
   const db = await fakeRedis(t);
   const first = createRedisStore({ link: linkTo(db) });
+  // The numbers are the deployment's own while Redis answers.
+  assert.equal(first.shared, true);
   const second = createRedisStore({ link: linkTo(db) });
 
   assert.equal((await book(first, { chars: 30 })).ok, true);
@@ -227,6 +229,8 @@ test("a Redis that cannot be reached costs accuracy, not translations", async (t
   assert.equal((await store.peek(DAY, { clientId: "client-a" })).client, 10);
   assert.equal(logged.length, 1);
   assert.match(logged[0], /共享计数不可用/);
+  // Having fallen back, it no longer speaks for the deployment.
+  assert.equal(store.shared, false);
 });
 
 test("a lock that is never released still answers", async (t) => {

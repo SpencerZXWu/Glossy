@@ -135,6 +135,13 @@ test("keeps serving when the counter file cannot be written", (t) => {
   assert.equal(errors.length, 1, "只提醒一次");
 });
 
+test("a store that counts in one file says its numbers are its own", () => {
+  // A deployment of several instances reads several answers out of a store
+  // like this one, so it never claims to be the deployment's one set.
+  const store = createFileStore({ file: "" });
+  assert.equal(store.shared, false);
+});
+
 test("works without a file at all", () => {
   const store = createFileStore({ file: "" });
   assert.equal(book(store).ok, true);

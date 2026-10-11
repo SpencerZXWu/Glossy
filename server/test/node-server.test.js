@@ -72,6 +72,9 @@ test("answers /v1/health over real HTTP", async (t) => {
     ocr: true,
     ocrVendor: "baidu",
     vendors: [],
+    // Whether the allowance it metters is one set of numbers for the whole
+    // deployment. This one counts in one file, so it is its own only.
+    counters: { shared: false },
     // Which of the switches about the builds this deployment serves are on.
     // All of them are off here, which is what a deployment that sets nothing
     // looks like — and what every App met before this field existed.

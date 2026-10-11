@@ -73,6 +73,13 @@ pub struct Quota {
     pub limit: u64,
     pub used: u64,
     pub remaining: u64,
+    /// Whether the server counted this on the whole deployment or on one
+    /// instance of it.
+    ///
+    /// `None` when the deployment does not say — a relay built before it did —
+    /// and the window reads both the same way: it only marks the line when the
+    /// server is sure the numbers are the deployment's own.
+    pub shared: Option<bool>,
 }
 
 /// The address requests go to, or an explanation of why there is none.
@@ -305,13 +312,14 @@ fn refused_with(data: &serde_json::Value, vendor: &str) -> Option<String> {
 
 /// The name the card shows for the engine that answered.
 ///
-/// The server's own word for it is trusted when it is one of the two vendors
-/// this build can ask for; anything else falls back to the vendor the request
-/// named, because a card is more useful saying "baidu" than saying nothing.
+/// The server's own word for it is trusted when it is one of the engines the
+/// relay can answer with — the two the App can ask for and the one it keeps
+/// behind them; anything else falls back to the vendor the request named,
+/// because a card is more useful saying "baidu" than saying nothing.
 fn answered_by<'a>(data: &'a serde_json::Value, vendor: &'a str) -> &'a str {
     data.get("vendor")
         .and_then(|value| value.as_str())
-        .filter(|name| matches!(*name, "baidu" | "youdao"))
+        .filter(|name| matches!(*name, "baidu" | "youdao" | "tencent"))
         .unwrap_or(vendor)
 }
 
@@ -363,7 +371,19 @@ pub async fn quota(client: &reqwest::Client, install_id: &str) -> Result<Quota, 
         limit: number(&["limits", "charsPerClient"]),
         used: number(&["usage", "client"]),
         remaining: number(&["remaining"]),
+        shared: shared_in(&data),
     })
+}
+
+/// Whether the counters behind a quota answer for the whole deployment.
+///
+/// A deployment of several instances with no shared store answers with
+/// whichever copy took the call, so the same question twice can come back with
+/// two different numbers. The server says which of the two this is; a relay that
+/// does not say is treated as its own, because a line that is marked is a line
+/// that cannot be read as an exact answer.
+fn shared_in(data: &serde_json::Value) -> Option<bool> {
+    data.get("shared").and_then(|value| value.as_bool())
 }
 
 /// One exchange-rate table the server fetched for this device.
@@ -659,6 +679,28 @@ mod tests {
             answered(serde_json::json!({"vendor": "deepl"}), "baidu"),
             "baidu"
         );
+        // The engine the relay keeps behind the two an App can ask for is
+        // named the same way: a card that says "baidu" when another one did the
+        // work would be a card that lies about who read the text.
+        assert_eq!(
+            answered(serde_json::json!({"vendor": "tencent"}), "baidu"),
+            "tencent"
+        );
+    }
+
+    #[test]
+    fn a_quota_says_whether_the_deployment_counted_it_or_one_instance() {
+        // The relay answers this itself. A deployment of several instances with
+        // no shared store answers with whichever copy took the call, so the same
+        // question twice can come back with two different numbers; the window
+        // marks the line rather than letting it read like an exact answer.
+        assert_eq!(shared_in(&serde_json::json!({"shared": true})), Some(true));
+        assert_eq!(shared_in(&serde_json::json!({"shared": false})), Some(false));
+        // A relay built before it said so, or one saying something else: not a
+        // yes, and the window reads it as one instance's own.
+        assert_eq!(shared_in(&serde_json::json!({})), None);
+        assert_eq!(shared_in(&serde_json::json!({"shared": "yes"})), None);
+        assert_eq!(shared_in(&serde_json::json!({"shared": null})), None);
     }
 
     #[test]

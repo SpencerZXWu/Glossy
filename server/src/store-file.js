@@ -65,8 +65,15 @@ export function createFileStore({ file = "" } = {}) {
     }
   }
 
-  return {
-    reserve(nextDay, input) {
+  return {    /**
+     * Whether these counters are the deployment's own.
+     *
+     * They are not: this store counts in one process and one file, so a
+     * deployment of several instances answers with several sets of numbers. The
+     * report says so rather than pretending, because a number that moves when it
+     * is asked twice for the same thing is worse than a number that is explained.
+     */
+    shared: false,    reserve(nextDay, input) {
       sync(nextDay);
       const result = policyReserve(state, input);
       if (result.ok) save();

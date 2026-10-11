@@ -127,6 +127,13 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
         ocr: Boolean(upstream.ocrConfigured),
         ocrVendor: upstream.ocrVendor || null,
         vendors: upstream.vendors || [],
+        // Whether the allowance this deployment metters is one set of numbers
+        // for the whole deployment or one per instance. It is not a secret and
+        // it is not a setting a reader can look up: the only honest way to say
+        // "this deployment has no shared store" is to answer it here.
+        counters: {
+          shared: store.shared === true,
+        },
         // What this deployment says about the builds it serves. None of it is a
         // secret — an App sees the effect of these in the answers it gets — and
         // reporting them is what makes "is that switch actually on?" a question
@@ -163,6 +170,11 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
         },
         usage: { ...usage, ocrMonth: readings.requests },
         remaining: Math.max(0, limits.charsPerClient - usage.client),
+        // False on a deployment of several instances with no shared store: the
+        // numbers are one instance's, so two questions can be answered by two
+        // different sets of them. The App says so beside the number rather than
+        // letting the line change under the reader.
+        shared: store.shared === true,
         remainingOcrMonth:
           limits.ocrPerClientMonth > 0
             ? Math.max(0, limits.ocrPerClientMonth - readings.requests)
@@ -191,6 +203,7 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
           monthCounters: await ocrStore.snapshot(month),
           limits,
           now: at,
+          shared: store.shared === true,
         }),
       );
     }

@@ -37,6 +37,15 @@ function report(over = {}) {
   });
 }
 
+test("a report says whether it read one set of numbers or one instance's", () => {
+  // The default is the shared reading, and a deployment that counted in one
+  // place passes nothing; an instance that fell back on its own file says so.
+  assert.equal(report().shared, true);
+  assert.equal(report({ shared: false }).shared, false);
+  // Anything that is not a real yes reads as its own, never as shared.
+  assert.equal(report({ shared: 0 }).shared, false);
+});
+
 test("a report says what the counters hold, and adds up", () => {
   const stats = report({
     dayCounters: counters({

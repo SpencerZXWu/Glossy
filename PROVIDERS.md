@@ -37,6 +37,15 @@ service they belong to; Glossy's relay is not in the path.
 | `api-openai` | whatever endpoint the user named, speaking the OpenAI chat completions protocol | the user's own account there | yes, once its credentials are filled in | that endpoint, directly |
 | `offline` | OPUS-MT models on this machine | one 244 MB download | no, deliberately | nowhere |
 
+Both cloud entries reach the same relay, and a relay may translate with a third
+engine the App cannot name. A deployment can put Tencent Cloud's machine
+translation last in its chain (`TENCENT_MT=1`, off unless the operator sets it),
+so a text asked of `cloud-baidu` can come back translated by Tencent when the
+engines that were asked for have both failed to answer — the card names the
+engine that answered, as it does for every fallback. That engine is documented in
+[server/README.md](./server/README.md): it is not a service anyone picks, and its
+allowance is the operator's own.
+
 ## `cloud-baidu`
 
 **Who answers.** A relay deployed from [`server/`](./server/README.md) holds the

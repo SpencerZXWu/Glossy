@@ -88,8 +88,20 @@ function memoryStore() {
   };
 }
 
-function setup({ translateImpl, ratesImpl, ocrImpl, env = {}, configured = true, ocrConfigured = true } = {}) {
+function setup({
+  translateImpl,
+  ratesImpl,
+  ocrImpl,
+  env = {},
+  configured = true,
+  ocrConfigured = true,
+  storeShared = false,
+} = {}) {
   const store = memoryStore();
+  // Only a store that says its numbers are the deployment's own is reported as
+  // shared; one that stays quiet is reported as its own, which is the answer a
+  // reader can act on.
+  if (storeShared) store.shared = true;
   const calls = [];
   const rateCalls = [];
   const ocrCalls = [];
@@ -172,6 +184,21 @@ test("health reports which version switches are on", async () => {
   // Apps, not for anyone who asks.
   assert.equal(JSON.stringify(on).includes("明天维护"), false);
 });
+test("says whether the allowance is one set of numbers or one instance's", async () => {
+  // A deployment of several instances with no shared store answers with
+  // whichever copy took the call, so two questions can be answered differently.
+  // The answer says which of the two the reader is looking at.
+  const own = setup();
+  assert.equal((await (await own.call("/v1/health")).json()).counters.shared, false);
+  const ownQuota = await (await own.call("/v1/quota?client=install-0001")).json();
+  assert.equal(ownQuota.shared, false);
+
+  const shared = setup({ storeShared: true });
+  assert.equal((await (await shared.call("/v1/health")).json()).counters.shared, true);
+  const sharedQuota = await (await shared.call("/v1/quota?client=install-0001")).json();
+  assert.equal(sharedQuota.shared, true);
+});
+
 test("translates and reports usage", async () => {
   const { translate, calls } = setup();
   const response = await translate({ text: "hello world", from: "en", to: "zh-CN" });

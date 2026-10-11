@@ -90,7 +90,15 @@ export function bearerToken(header) {
  * minutes }` — so this works the same whether they came out of a file, a Redis
  * key or a Durable Object.
  */
-export function buildStats({ day, month, dayCounters, monthCounters, limits, now }) {
+export function buildStats({
+  day,
+  month,
+  dayCounters,
+  monthCounters,
+  limits,
+  now,
+  shared = true,
+}) {
   const clients = rowsOf(dayCounters?.usage, "client");
   const addresses = rowsOf(dayCounters?.usage, "ip");
   const total = rowsOf(dayCounters?.usage, "total").find((row) => row.id === "all") ?? {
@@ -108,6 +116,10 @@ export function buildStats({ day, month, dayCounters, monthCounters, limits, now
     day,
     month,
     generatedAt: new Date(now).toISOString(),
+    // Whether this reading came from the deployment's own counters or from one
+    // instance's copy of them: a report that does not say which is a report that
+    // can be read as an exact answer when it is one instance's guess.
+    shared: Boolean(shared),
     limits: {
       charsPerClient: limits.charsPerClient,
       charsPerIp: limits.charsPerIp,

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { recognizeWithTencent, tencentLanguage, tc3Headers } from "../src/tencent-ocr.js";
+import { recognizeWithTencent, tencentLanguage } from "../src/tencent-ocr.js";
+import { tc3Headers } from "../src/tencent-sign.js";
 
 const NOW = 1_700_000_000_000;
 

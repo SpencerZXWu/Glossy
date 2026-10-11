@@ -13,6 +13,7 @@ import { md5 } from "./md5.js";
 import { recognizeWithBaidu } from "./ocr.js";
 import { fetchRates } from "./rates.js";
 import { recognizeWithTencent } from "./tencent-ocr.js";
+import { translateWithTencentMt } from "./tencent-mt.js";
 import { translateWithYoudao } from "./youdao.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
@@ -178,8 +179,28 @@ export function upstreamConfigured(config) {
   return Boolean(
     config.LLM_API_KEY ||
       (config.BAIDU_APP_ID && config.BAIDU_KEY) ||
-      (config.YOUDAO_APP_KEY && config.YOUDAO_APP_SECRET),
+      (config.YOUDAO_APP_KEY && config.YOUDAO_APP_SECRET) ||
+      tencentMtWanted(config),
   );
+}
+
+/**
+ * Whether this deployment asked for Tencent's machine translation.
+ *
+ * Two things have to be true, and the second is the one worth being loud about:
+ * the key pair is the one the reader signs with, and reading pictures and
+ * translating text are separate products on that account. A deployment that has
+ * a reader has not necessarily opened the translator, so this needs a switch of
+ * its own rather than being inferred from keys that are already there — a
+ * backend that answers every request with "not opened" is worse than one that is
+ * not in the chain.
+ */
+export function tencentMtWanted(config) {
+  const wanted = String(config.TENCENT_MT ?? "")
+    .trim()
+    .toLowerCase();
+  if (!wanted || ["0", "false", "off", "no"].includes(wanted)) return false;
+  return Boolean(config.TENCENT_SECRET_ID && config.TENCENT_SECRET_KEY);
 }
 
 /**
@@ -318,6 +339,28 @@ export function createUpstream(config) {
           appKey: config.YOUDAO_APP_KEY,
           secret: config.YOUDAO_APP_SECRET,
           endpoint: config.YOUDAO_ENDPOINT,
+          ...input,
+        }),
+    });
+  }
+
+  // Tencent Cloud's machine translation, last in the chain. It is the
+  // operator's own account — the same one that reads screenshots — so nothing
+  // about it is offered to the App: it is there to keep an answer coming when
+  // the engines a reader asked for have nothing left. It is off unless a
+  // deployment turns it on, because reading pictures and translating text are
+  // two products: the key pair being present says nothing about whether the
+  // second one was opened.
+  if (tencentMtWanted(config)) {
+    backends.push({
+      name: "tencent",
+      call: (input) =>
+        translateWithTencentMt({
+          fetchImpl,
+          secretId: config.TENCENT_SECRET_ID,
+          secretKey: config.TENCENT_SECRET_KEY,
+          endpoint: config.TENCENT_MT_ENDPOINT,
+          region: config.TENCENT_MT_REGION,
           ...input,
         }),
     });

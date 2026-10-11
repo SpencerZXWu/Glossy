@@ -8,9 +8,11 @@
  * and reads Chinese and English off a screen a little more steadily.
  *
  * Tencent signs with TC3-HMAC-SHA256 and has no token to cache, so unlike the
- * Baidu path every call carries its own signature. The algorithms come from
- * WebCrypto, which is all a Worker has; the SCF entry point bridges Node's.
+ * Baidu path every call carries its own signature. The signing itself lives in
+ * `tencent-sign.js`, because the translator signs the same way.
  */
+
+import { tc3Headers } from "./tencent-sign.js";
 
 export const DEFAULT_TENCENT_OCR_ENDPOINT = "https://ocr.tencentcloudapi.com";
 export const DEFAULT_TENCENT_OCR_REGION = "ap-guangzhou";
@@ -18,7 +20,6 @@ export const TENCENT_OCR_ACTION = "GeneralBasicOCR";
 export const TENCENT_OCR_VERSION = "2018-11-19";
 
 const SERVICE = "ocr";
-const CONTENT_TYPE = "application/json; charset=utf-8";
 
 /**
  * The models `general_basic` knows. `auto` reads mixed Chinese and English,
@@ -70,64 +71,6 @@ function tencentProblem(raw) {
   const known = TENCENT_ERRORS[raw] || PREFIX_ERRORS[String(raw).split(".")[0]];
   if (known) return { ...known, upstream: raw };
   return { code: "upstream_error", message: `识图服务返回错误 ${raw}。`, upstream: raw };
-}
-
-const encoder = new TextEncoder();
-const HEX = Array.from({ length: 256 }, (_, index) => index.toString(16).padStart(2, "0"));
-
-function hex(bytes) {
-  let out = "";
-  for (const byte of bytes) out += HEX[byte];
-  return out;
-}
-
-async function sha256Hex(text) {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(text));
-  return hex(new Uint8Array(digest));
-}
-
-async function hmacSha256(key, text) {
-  const imported = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const mac = await crypto.subtle.sign("HMAC", imported, encoder.encode(text));
-  return new Uint8Array(mac);
-}
-
-/**
- * The headers one Tencent API call needs, signature and all.
- *
- * Timestamps are the caller's, so a test can pin them and compare the signature
- * against a known one.
- */
-export async function tc3Headers({ service, host, action, version, region, payload, secretId, secretKey, timestamp }) {
-  const seconds = Math.floor(timestamp / 1000);
-  const date = new Date(seconds * 1000).toISOString().slice(0, 10);
-  const signedHeaders = "content-type;host;x-tc-action";
-  const canonical = [
-    "POST",
-    "/",
-    "",
-    `content-type:${CONTENT_TYPE}\nhost:${host}\nx-tc-action:${action.toLowerCase()}\n`,
-    signedHeaders,
-    await sha256Hex(payload),
-  ].join("\n");
-
-  const scope = `${date}/${service}/tc3_request`;
-  const toSign = ["TC3-HMAC-SHA256", seconds, scope, await sha256Hex(canonical)].join("\n");
-
-  const secretDate = await hmacSha256(encoder.encode(`TC3${secretKey}`), date);
-  const secretService = await hmacSha256(secretDate, service);
-  const secretSigning = await hmacSha256(secretService, "tc3_request");
-  const signature = hex(await hmacSha256(secretSigning, toSign));
-
-  return {
-    Authorization: `TC3-HMAC-SHA256 Credential=${secretId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
-    "Content-Type": CONTENT_TYPE,
-    Host: host,
-    "X-TC-Action": action,
-    "X-TC-Timestamp": String(seconds),
-    "X-TC-Version": version,
-    ...(region ? { "X-TC-Region": region } : {}),
-  };
 }
 
 /**
