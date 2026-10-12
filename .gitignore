@@ -7,6 +7,7 @@ src-tauri/resources/WebView2Loader.dll
 .tmp/
 .mixmark/
 .impeccable/
+.vscode/
 *.log
 
 # Built installers are uploaded to GitHub Releases instead of committed; see release/README.md
