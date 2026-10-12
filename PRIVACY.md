@@ -49,8 +49,10 @@ daily allowance as a selection, and only when what was read has changed. The pic
 never uploaded and nothing about it is stored; stopping the reading, quitting Glossy or
 turning developer mode off ends it.
 
-**Definitions** for single words come from `api.dictionaryapi.dev`, a public service that
-just receives the word.
+**Definitions** for single words are asked of the relay first, which looks the word up on a
+public dictionary endpoint — the word travels there and nothing else does. Only when the
+relay has no entry for it is `api.dictionaryapi.dev` asked, a public service that just
+receives the word in the same way.
 
 **Exchange rates** are fetched when a currency amount is recognised, from the relay or from
 a public rates endpoint, and carry a base currency code and nothing about you.
@@ -106,7 +108,8 @@ Glossy 没有账号、没有统计分析、没有遥测，也不会记录你选�
 发送出去的只有那块矩形识别出来的文字，走的是和划词同一个中转服务、同一份每日额度，而且只在读到的
 内容变化时才发送。图片从不上传，也不保存；停止识别、退出 Glossy 或关掉开发者模式都会结束它。
 
-单词释义来自公共的 `api.dictionaryapi.dev`，它只会收到那个单词。
+单词释先问中转服务，由它去公共的词典接口查——发出去的就只有那个单词。中转没有这个词的条目时，
+才会去问公共的 `api.dictionaryapi.dev`，它同样只会收到那个单词。
 
 **汇率**在识别到货币金额时查询，走中转服务或公开的汇率端点，只带一个基准货币代码，不含任何与你
 相关的信息。

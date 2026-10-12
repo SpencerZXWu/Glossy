@@ -6,6 +6,7 @@ mod cloud;
 mod dictionary;
 mod google;
 pub mod languages;
+mod relay_dict;
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -491,14 +492,28 @@ pub async fn word_details(
     let target = resolve_target(text, &settings.target_lang, languages, settings).0;
 
     let mut result = TranslationResult::new(Kind::Word, "", text, &target);
-    // The dictionary and the free endpoint answer independently, and the free
-    // endpoint alone carries an example, so both are asked at once: together
-    // they must not take longer than the slower of the two. The free endpoint
-    // gets a short budget because on some networks it is simply unreachable,
-    // and whatever has not arrived by then is left out.
-    // The free endpoint is not asked when it is the service the card is
-    // already using: it answered the translation itself, so the extra lookup
-    // would only pay for the same result twice.
+    // The relay is asked first, and this is the part of the card that used to
+    // be the slow one: the deployment reaches a dictionary in a fraction of a
+    // second where the reader's own network can sit on one for twenty. What it
+    // answers with is the card, and the public endpoint below is only asked for
+    // the words it does not have.
+    if relay_dict::wanted(source, &target) {
+        if let Some(entry) = relay_dict::lookup(&client, text, &settings.cloud_id).await {
+            relay_dict::apply(&mut result, entry);
+        }
+    }
+
+    // The free endpoint alone carries an example, so it is still given a chance
+    // to add one to a word the relay answered — but only when something is
+    // missing, because its answers are the ones that take seconds. A word the
+    // relay knew in full never pays for this endpoint at all.
+    let relayed = !result.meanings.is_empty() && result.phonetic.is_some();
+    // The free endpoint and the translation are asked at the same time: the two
+    // must not take longer than the slower of them, and the endpoint gets a
+    // short budget because on some networks it is simply unreachable.
+    // It is not asked when it is the service the card is already using: it
+    // answered the translation itself, so that lookup would only pay for the
+    // same result twice.
     let lookup = if settings.service() == Service::Google {
         None
     } else {
@@ -512,14 +527,14 @@ pub async fn word_details(
         }))
     };
 
-    dictionary::enrich(&client, text, &mut result).await;
-    // The dictionary may already carry everything the free endpoint could add;
-    // waiting for it then only holds the card back. When something is still
-    // missing the card gives the free endpoint a moment, not its whole budget:
-    // a card that renders its translation, phonetics and meanings at once is
-    // worth more than an example that lands a second later. A lookup that runs
-    // on in the background still records that the endpoint is unreachable, so
-    // the next card does not pay for it at all.
+    if !relayed || result.example.is_none() {
+        dictionary::enrich(&client, text, &mut result).await;
+    }
+    // When something is still missing the card gives the free endpoint a
+    // moment, not its whole budget: a card that renders its translation,
+    // phonetics and meanings at once is worth more than an example that lands a
+    // second later. A lookup that runs on in the background still records that
+    // the endpoint is unreachable, so the next card does not pay for it at all.
     let complete =
         result.phonetic.is_some() && !result.meanings.is_empty() && result.example.is_some();
     if let (Some(lookup), false) = (lookup, complete) {

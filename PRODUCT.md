@@ -96,10 +96,11 @@ website cannot truthfully copy.
   `service` value.
 - The provider falls back to another engine when the chosen one cannot answer;
   the order is configurable.
-- Word cards are enriched for single words: phonetics and definitions come from
-  `api.dictionaryapi.dev`, and the card adds inflections, synonyms, the sentence
-  the word was selected from with a translation of that sentence, and pronunciation
-  buttons for each side.
+- Word cards are enriched for single words: phonetics and definitions are looked
+  up by the relay, which asks a public dictionary endpoint, and fall back on
+  `api.dictionaryapi.dev` for a word the relay does not have; the card adds
+  inflections, synonyms, the sentence the word was selected from with a
+  translation of that sentence, and pronunciation buttons for each side.
 - Unit and currency conversion is added when a translation still measures something
   in a unit the target language does not use (`12 ft ≈ 3.66 m`), including the rate.
   Currency rates are fetched live and cached for six hours; every other unit is

@@ -1,0 +1,517 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "see user edits",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && set GIT_PAGER=cat && git --no-pager diff --stat && echo ===== && git --no-pager diff PRIVACY.md CHANGELOG.md"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "stats tests",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\stats.test.js test\\handler.test.js 2>&1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "stats tests 2",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\stats.test.js test\\handler.test.js test\\store-file.test.js test\\store-redis.test.js 2>&1 | findstr /c:\"✖\" /c:\"tests \" /c:\"pass \" /c:\"fail \" /c:\"AssertionError\""
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "stats tests 3",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\stats.test.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "server suite summary",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\*.test.js 2>&1 | findstr /v /c:\"ok\" /c:\"✔\""
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "node-server test",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\node-server.test.js 2>&1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "full suite summary",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\*.test.js > e:\\Glossy\\.tmp\\all.log 2>&1 & type e:\\Glossy\\.tmp\\all.log | findstr /c:\"fail\" /c:\"pass\" /c:\"tests\""
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "ship stats endpoint",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\*.test.js > e:\\Glossy\\.tmp\\t.log 2>&1 && npm run build:scf && cd /d e:\\Glossy && git add server && git commit -F .tmp\\commit.txt && git push origin main && git log --oneline -2 && git status -sb"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "check ship result",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && findstr /c:\"fail\" /c:\"pass\" /c:\"tests\" /c:\"AssertionError\" .tmp\\t.log & echo ===== && git log --oneline -2 && git status -sb"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "tail test log",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\tail.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "list node procs",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | ForEach-Object { \"$($_.ProcessId) :: $($_.CommandLine)\" } | Set-Content -Encoding UTF8 e:\\Glossy\\.tmp\\ps1.txt"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "tail t2 log",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\tail.js",
+				"e:\\Glossy\\.tmp\\t2.log"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "verify stats script",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"node e:\\Glossy\\.tmp\\bom.js e:\\Glossy\\scripts\\stats.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File e:\\Glossy\\.tmp\\check.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File e:\\Glossy\\.tmp\\verify-stats.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "run stats verify",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"powershell -NoProfile -ExecutionPolicy Bypass -File e:\\Glossy\\.tmp\\verify-stats.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "rerun stats verify",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"node e:\\Glossy\\.tmp\\bom.js e:\\Glossy\\scripts\\stats.ps1 && powershell -NoProfile -ExecutionPolicy Bypass -File e:\\Glossy\\.tmp\\verify-stats.ps1 > e:\\Glossy\\.tmp\\verify-console.txt 2>&1 & echo EXIT %ERRORLEVEL%"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "check everything",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\check-all.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "recheck all",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\check-all.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "verify notice path",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\verify-notice.mjs"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "probe quota stability",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\probe-quota.mjs"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "server suite after shared flag",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test/*.test.js 2>&1 | findstr /c:\"# tests\" /c:\"# pass\" /c:\"# fail\" /c:\"not ok\""
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "server suite to log",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test/*.test.js > e:\\Glossy\\.tmp\\s1.log 2>&1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "tail server suite",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\tail.js",
+				"e:\\Glossy\\.tmp\\s1.log"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "normalise line endings",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\fixcr.js",
+				"e:\\Glossy\\server\\src\\upstream.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "tencent tests",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test/tencent-mt.test.js test/tencent-ocr.test.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "check client and server",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"e:\\Glossy\\.tmp\\check-all.js"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "set version 2.2.0",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"e:\\Glossy\\scripts\\version.ps1",
+				"-Set",
+				"2.2.0"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "peek log",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-Command",
+				"$f='e:\\Glossy\\.tmp\\b5.log'; if(Test-Path $f){ '{0} bytes, changed {1}' -f (Get-Item $f).Length,(Get-Item $f).LastWriteTime; Get-Content $f -Encoding UTF8 -Tail 12 } else { 'no log yet' }; '--- release dir ---'; Get-ChildItem e:\\Glossy\\release\\v2.2.0 -ErrorAction SilentlyContinue | Select-Object Name,Length | Format-Table -AutoSize | Out-String -Width 120"
+			]
+		},
+		{
+			"label": "release 2.2.0",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\rel.cmd"
+			]
+		},
+		{
+			"label": "publish 2.2.0",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\pub.cmd"
+			]
+		},
+		{
+			"label": "verify release 2.2.0",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && gh release view v2.2.0"
+			]
+		},
+		{
+			"label": "diag live relay",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && node .tmp\\diag.mjs"
+			]
+		},
+		{
+			"label": "probe relay 2",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe2.cmd"
+			]
+		},
+		{
+			"label": "probe relay 3",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe3.cmd"
+			]
+		},
+		{
+			"label": "probe relay 4",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && powershell -NoProfile -ExecutionPolicy Bypass -File .tmp\\probe4.ps1"
+			]
+		},
+		{
+			"label": "probe relay 5",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && powershell -NoProfile -ExecutionPolicy Bypass -File .tmp\\probe5.ps1"
+			]
+		},
+		{
+			"label": "probe relay 6",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe6.cmd"
+			]
+		},
+		{
+			"label": "probe relay 7",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe7.cmd"
+			]
+		},
+		{
+			"label": "probe relay 8",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe8.cmd"
+			]
+		},
+		{
+			"label": "probe relay 9",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe9.cmd"
+			]
+		},
+		{
+			"label": "probe relay 10",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe10.cmd"
+			]
+		},
+		{
+			"label": "probe relay 11",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\probe11.cmd"
+			]
+		},
+		{
+			"label": "check tccli",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"where tccli & tccli --version & echo --- & dir /b e:\\Glossy\\server\\dist\\scf"
+			]
+		},
+		{
+			"label": "time the dictionary",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\dict-time.cmd"
+			]
+		},
+		{
+			"label": "youdao shape",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\youdao-shape.cmd"
+			]
+		},
+		{
+			"label": "server dict tests",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\youdao-dict.test.js test\\handler.test.js"
+			]
+		},
+		{
+			"label": "dict tests again",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\youdao-dict.test.js"
+			]
+		},
+		{
+			"label": "rust relay dict tests",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\src-tauri && cargo test --lib relay_dict 2>&1"
+			]
+		},
+		{
+			"label": "check all (dict)",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && node .tmp\\check-all.js"
+			]
+		},
+		{
+			"label": "dict live + scf",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && node .tmp\\dict-live.mjs && cd server && npm run build:scf"
+			]
+		},
+		{
+			"label": "dict live again",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && node .tmp\\dict-live.mjs && cd server && node --test test\\youdao-dict.test.js 2>&1 | findstr /i \"pass fail\" & npm run build:scf"
+			]
+		},
+		{
+			"label": "dict tests final",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && node --test test\\youdao-dict.test.js"
+			]
+		},
+		{
+			"label": "bump 2.2.1",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy && powershell -ExecutionPolicy Bypass -File scripts\\version.ps1 -Set 2.2.1"
+			]
+		},
+		{
+			"label": "final check 2.2.1",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"cd /d e:\\Glossy\\server && npm run build:scf && cd /d e:\\Glossy && node .tmp\\check-all.js"
+			]
+		},
+		{
+			"label": "commit dict work",
+			"type": "shell",
+			"command": "cmd",
+			"args": [
+				"/c",
+				"e:\\Glossy\\.tmp\\commit4.cmd"
+			]
+		}
+	]
+}

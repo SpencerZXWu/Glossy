@@ -15,6 +15,7 @@ import { fetchRates } from "./rates.js";
 import { recognizeWithTencent } from "./tencent-ocr.js";
 import { translateWithTencentMt } from "./tencent-mt.js";
 import { translateWithYoudao } from "./youdao.js";
+import { dictEndpoint, lookupWord } from "./youdao-dict.js";
 
 const BAIDU_ENDPOINT = "https://fanyi-api.baidu.com/api/trans/vip/translate";
 
@@ -387,6 +388,14 @@ export function createUpstream(config) {
         timeoutMs: Number.parseInt(config.RATES_TIMEOUT_MS ?? "", 10) || undefined,
         ...input,
       }),
+    /**
+     * One word's entry, for the card that shows meanings instead of a sentence.
+     *
+     * No key and no vendor choice is involved — the endpoint behind it is
+     * public — so this is offered by every deployment, the way rates are.
+     */
+    dict: (input = {}) =>
+      lookupWord({ fetchImpl, endpoint: dictEndpoint(config), ...input }),
     /** Reads the text off one screenshot. Answers `not_configured` without keys. */
     ocr: (input = {}) => readWithBackends(ocr, input),
     async translate(input = {}) {

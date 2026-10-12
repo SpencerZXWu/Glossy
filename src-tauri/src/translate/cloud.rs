@@ -397,6 +397,43 @@ pub struct RateTable {
     pub rates: HashMap<String, f64>,
 }
 
+/// The longest a word lookup waits.
+///
+/// The deployment answers these from its own network in a fraction of a second,
+/// and the card this feeds is already on screen: a lookup that is not coming
+/// back must give up rather than hold the card.
+const DICT_TIMEOUT: Duration = Duration::from_secs(4);
+
+/// One word's entry, asked for from the deployment rather than from the reader.
+///
+/// No characters are booked for it — the endpoint behind the relay is public —
+/// so this is a request a card can afford, and it leaves the day's allowance
+/// exactly where it was. Every failure is silent: `None` means the card falls
+/// back on the lookups that were there before.
+pub async fn dictionary(
+    client: &reqwest::Client,
+    word: &str,
+    install_id: &str,
+) -> Option<serde_json::Value> {
+    let endpoint = endpoint_of().ok()?;
+    let response = client
+        .get(format!("{endpoint}/v1/dict"))
+        .query(&[
+            ("word", word),
+            ("client", install_id),
+            ("appVersion", env!("CARGO_PKG_VERSION")),
+        ])
+        .timeout(DICT_TIMEOUT)
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let data: serde_json::Value = response.json().await.ok()?;
+    (data.get("ok").and_then(|value| value.as_bool()) == Some(true)).then_some(data)
+}
+
 /// How long the rate lookup may take. The card asks for this on the way to the
 /// first paint, so it is bounded well below the translation's own budget.
 const RATE_TIMEOUT: Duration = Duration::from_secs(4);

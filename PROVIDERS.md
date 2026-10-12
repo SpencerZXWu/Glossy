@@ -239,15 +239,17 @@ Besides translation, the app reaches the network for four things. Only the first
 are asked directly by the app; the third goes through the same relay as a selection,
 and the fourth is off until it is turned on.
 
-### Dictionary (`api.dictionaryapi.dev`)
+### Dictionary (the relay's `/v1/dict`, and `api.dictionaryapi.dev`)
 
-Phonetics and definitions for a single English word come from
-`api.dictionaryapi.dev`, a public service that receives only the word. It is free, it
-needs no key, it is reachable from mainland China, and it is used strictly as a
-best-effort extra: the lookup runs after the card is already showing, a failure is
-ignored, and the endpoint's rate limiting is why the word's extras can be missing while
-the translation is present. The Google endpoint is asked for details only when the
-selected provider did not return them.
+Phonetics and definitions for a single word are asked of the relay first: `GET /v1/dict`
+looks the word up on a public dictionary endpoint from the deployment's own network and
+answers in a fraction of a second, where `api.dictionaryapi.dev` reached from the reader's
+network answers in anything from half a second to twenty — measured here as one request in
+three taking over twenty seconds and coming back `522`. The relay's entry is the card; the
+public endpoint is asked only for a word the relay has no entry for, and only then with a
+three-second budget. Both are free and need no key, and both receive only the word. A
+failure of either is ignored: the card is complete without them, and the Google endpoint is
+asked for details only when the selected provider did not return them.
 
 ### Currency rates
 
@@ -519,12 +521,13 @@ Glossy 不缓存任何内容，也没有任何把凭据或额度转手给别人�
 除翻译之外，应用还会为四件事联网。前两件由应用直接请求；第三件与划词一样走同一台中转服务；第四件
 在打开之前一直是关着的。
 
-### 词典（`api.dictionaryapi.dev`）
+### 词典（中转的 `/v1/dict`，以及 `api.dictionaryapi.dev`）
 
-单个英文单词的音标和释义来自 `api.dictionaryapi.dev`，这个公共服务只会收到那个单词。它免费、无需
-密钥、中国大陆可直接访问，而且严格只是尽力而为的补充：查询在卡片已经显示之后才进行，失败会被忽略，
-也正是该端点的限流导致单词的附加信息可能缺失，而译文依然存在。只有在所选服务没有返回某些细节时，
-才会去请求 Google 接口。
+单个单词的音标和释义先问中转服务：`GET /v1/dict` 由部署方自己的网络去查公共词典接口，零点几秒就
+回来；而从读者自己的网络去问 `api.dictionaryapi.dev`，则是半秒到二十秒不等（本机实测三次里有一次
+超过 20 秒，返回 `522`）。中转给出的条目就是卡片本身，只有中转查不到的词才会去问公共接口，而且只给
+三秒预算。两个接口都免费、无需密钥，也都只收到那个单词。任一路失败都会被忽略：卡片没有它们也是完整的；
+只有在所选服务没有返回某些细节时，才会去请求 Google 接口。
 
 ### 汇率
 

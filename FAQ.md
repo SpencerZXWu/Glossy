@@ -44,8 +44,10 @@ Only the text you asked about leaves the machine, and only to the service you pi
 
 The other calls Glossy makes over the network are:
 
-- **Word definitions and phonetics** for a single word go to `api.dictionaryapi.dev`, which
-  receives the word and nothing else.
+- **Word definitions and phonetics** for a single word are looked up by the relay first, which
+  asks a public dictionary endpoint for it; the word is all that goes, and it goes there.
+  `api.dictionaryapi.dev` is asked only for the words the relay has no entry for, and it
+  receives the word in the same way.
 - **Currency rates**, when a currency amount is recognised, come from the relay's rate
   endpoint or, when that cannot answer, directly from `open.er-api.com` or
   `api.frankfurter.app`; they carry a base currency code (and the install id when they go
@@ -242,7 +244,8 @@ completions 协议的服务地址、密钥和模型名。这两个渠道——`a
 
 Glossy 其它会联网的地方还有：
 
-- **单词的释义与音标**会发给 `api.dictionaryapi.dev`，它只收到那个单词，别的什么都没有。
+- **单词的释义与音标**先由中转服务去查公共词典接口，发出去的就只有那个单词。只有中转里没有
+  这个词的条目时，才会去问 `api.dictionaryapi.dev`，它同样只收到那个单词。
 - **汇率**在识别到货币金额时查询，走中转服务的汇率接口；它答不上时，应用会直接访问
   `open.er-api.com` 或 `api.frankfurter.app`。请求只带一个基准货币代码（经过中转服务时还会
   带上安装 ID），不含任何与你相关的信息。

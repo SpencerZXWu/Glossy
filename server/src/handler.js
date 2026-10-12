@@ -9,6 +9,7 @@
 import { isBaseCode } from "./rates.js";
 import { bearerToken, buildStats, tokenMatches } from "./stats.js";
 import { BLOCK_MESSAGE, blockedBy, noticeFor } from "./version.js";
+import { isWordLookup } from "./youdao-dict.js";
 
 const CLIENT_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_BODY = 64 * 1024;
@@ -245,6 +246,35 @@ export function createHandler({ store, ocrStore, upstream, config, now = () => D
         date: result.date ?? null,
         rates: result.rates,
       });
+    }
+
+    if (route === "/v1/dict") {
+      if (request.method !== "GET") return fail(405, "method_not_allowed", "只支持 GET。");
+      const clientId = url.searchParams.get("client") || "";
+      const word = url.searchParams.get("word") || "";
+      if (!CLIENT_ID.test(clientId)) return fail(400, "invalid_request", "缺少或非法的客户端标识。");
+      if (!isWordLookup(word)) return fail(400, "invalid_request", "这里只查一个单词。");
+
+      // A word costs no characters: the endpoint behind it is public and free,
+      // so the daily allowances stay untouched and only the per-minute limit is
+      // booked, exactly as a rate lookup is. It is what keeps a card that fills
+      // itself in from being a way to spend the translation quota.
+      const reserved = await store.reserve(day, { clientId, ipHash, chars: 0, limits, now: at, minute });
+      if (!reserved.ok) {
+        return fail(429, reserved.code, reserved.message, {
+          retryAfter: reserved.retryAfter ?? null,
+          limit: reserved.limit ?? null,
+          remaining: reserved.remaining ?? 0,
+        });
+      }
+
+      const entry = await upstream.dict({ word: word.trim() });
+      if (!entry.ok) return fail(502, entry.code, entry.message);
+
+      // `usage` is sent the way the other routes send it, so a card that has
+      // just been filled can show what the day still holds without a second
+      // round trip.
+      return json({ ...entry, usage: { client: reserved.used, remaining: reserved.remaining } });
     }
 
     if (route === "/v1/ocr") {

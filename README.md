@@ -282,9 +282,10 @@ Baidu takes, and the offline pack takes `en` and
 languages of the engine the card is using, so one it would refuse is never offered
 and never sent.
 
-Phonetics and definitions for single words come from `api.dictionaryapi.dev`, which is free,
-needs no key and is reachable from mainland China. The Google endpoint is only asked for
-details the selected provider did not return.
+Phonetics and definitions for single words are looked up by the relay first, which answers in a
+fraction of a second; `api.dictionaryapi.dev` is asked only for a word the relay has no entry
+for. Both are free and need no key. The Google endpoint is only asked for details the selected
+provider did not return.
 
 ### Free quotas and commercial use
 
@@ -1073,7 +1074,9 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 每个渠道能翻的语言并不相同：百度普通账号会拒绝 Glossy 提供的 31 种语言中的 8 种（`uk`、`tr`、`hi`、`id`、`ms`、`he`、`no`、`sk`），有道、Google 和 `api-openai` 全部支持，`api-baidu` 支持百度支持的那些，离线包只支持 `en` 和 `zh-CN`。两个语言栏只列出卡片当前所用渠道支持的语言，因此它翻不了的语言既不会出现在列表里，也不会被发出去。
 
-单个单词的音标和释义来自 `api.dictionaryapi.dev`，它免费、无需密钥，且中国大陆可直接访问。只有在所选服务没有返回某些细节时，才会去请求 Google 接口。
+单个单词的音标和释义先由中转服务去查，零点几秒就回来；只有中转没有这个词的条目时，才会去问
+`api.dictionaryapi.dev`。两个接口都免费、无需密钥。只有在所选服务没有返回某些细节时，才会去请求
+Google 接口。
 
 ### 免费额度与商业使用
 

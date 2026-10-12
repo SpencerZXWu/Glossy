@@ -80,7 +80,7 @@ npm run build:scf
 生成三个文件：
 
 ```
-dist/scf/index.mjs        整个服务（一个文件，23 KB 左右）
+dist/scf/index.mjs        整个服务（一个文件，90 KB 左右）
 dist/scf/scf_bootstrap    SCF 要求的启动脚本
 dist/scf/package.json     {"type":"module"}
 ```
@@ -150,6 +150,7 @@ exec /var/lang/node18/bin/node index.mjs
 | `RATES_ENDPOINT` | 汇率接口地址（可选，默认 `https://open.er-api.com/v6/latest/`，**不需要密钥**） |
 | `RATES_FALLBACK_ENDPOINT` | 备用汇率接口（可选，默认 `https://api.frankfurter.app/latest?from=`，即欧洲央行） |
 | `RATES_TIMEOUT_MS` | 取汇率超时毫秒数（可选，默认 6000） |
+| `YOUDAO_DICT_ENDPOINT` | 词典接口地址（可选，默认 `https://dict.youdao.com/jsonapi`，**不需要密钥**） |
 
 额度参数也可以在同一个地方配（不配就是用下面的默认值）：`DAILY_CHARS_PER_CLIENT`、
 `DAILY_CHARS_PER_IP`、`DAILY_CHARS_TOTAL`、`MAX_CHARS_PER_REQUEST`、`MAX_REQUESTS_PER_MINUTE`、
@@ -463,6 +464,30 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<你的地址>/v1/stats
 这个接口**不花字符额度**（按 `chars: 0` 记账，失败也不用退还），只计入每分钟请求数，所以卡片上多一条
 换算不会吃掉当天的翻译量。客户端取不到 `/v1/rates`（比如服务端还没更新）时会自己直连上面两家，
 最坏情况是换算不出来，不影响翻译。
+
+### `GET /v1/dict?client=<安装ID>&word=<一个单词>`
+
+单词卡片上的音标和释义。由**部署方自己的网络**去查公共词典接口（默认为 `dict.youdao.com`），
+所以读者那边不再等一个常常要二十秒的公网请求。
+
+```json
+{
+  "ok": true, "source": "youdao", "word": "draft", "found": true,
+  "phonetic": "dræft", "phonetics": { "uk": "drɑːft", "us": "dræft" },
+  "meanings": [{ "partOfSpeech": "n.", "definitions": ["草稿，草案"] }, { "partOfSpeech": "v.", "definitions": ["起草，草拟"] }],
+  "example": "I've made a rough draft of the letter.",
+  "synonyms": ["sketch"],
+  "usage": { "client": 0, "remaining": 20000 }
+}
+```
+
+- 只接受**一个单词**（字母、连字符、撇号、空格，最多 64 字符）；`hello, world` 这种会被 400 拒绝。
+- 词典里没有这个词时返回 `"found": false`，并且**其余字段一律为空**——接口有时会附带一句恰好含有该词的
+  例句，那不是这个词的例句，所以不带出来。
+- 和 `/v1/rates` 一样**不花字符额度**，只计入每分钟请求数；不需要任何密钥，所以**没配翻译密钥的部署也能用**。
+- 取不到时是 `upstream_unreachable`（502）。客户端拿到 404 / 502 会直接忽略，退回 `api.dictionaryapi.dev`
+  那条老路，最坏情况只是卡片少了释义。
+- 想换成别的词典后端（或指向本地假接口做测试）就设 `YOUDAO_DICT_ENDPOINT`。
 
 ### `POST /v1/translate`
 

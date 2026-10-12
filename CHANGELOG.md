@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [2.2.1] - 2026-10-12
+
+### Added
+
+- **`GET /v1/dict`: the word card's meanings, looked up by the deployment.** A
+  single word's phonetics and definitions used to come from a public endpoint in
+  the reader's own network, which answers in anything from half a second to
+  twenty — measured here as one request in three taking over twenty seconds and
+  coming back `522` — so a word card could sit empty while the card beside it
+  was already translated. The relay now looks the word up from its own network
+  and answers in a fraction of a second, and the public endpoint is only asked
+  for a word the relay has no entry for. The route takes no credentials, books
+  no characters (only the per-minute limit), and refuses anything that is not a
+  single word.
+
+### Changed
+
+- **The word card is built on the relay's answer, not on a timeout.** The public
+  endpoint's budget drops from eight seconds to three, and it is not called at
+  all for a word the relay knew in full: what is left for it is the word the
+  deployment does not have, which is the case its budget was sized for. A word
+  the relay answered in 400 ms used to wait up to eight seconds for a second
+  opinion it did not need.
+
 ## [2.2.0] - 2026-10-11
 
 ### Added

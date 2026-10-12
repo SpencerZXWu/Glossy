@@ -92,6 +92,7 @@ function setup({
   translateImpl,
   ratesImpl,
   ocrImpl,
+  dictImpl,
   env = {},
   configured = true,
   ocrConfigured = true,
@@ -105,10 +106,27 @@ function setup({
   const calls = [];
   const rateCalls = [];
   const ocrCalls = [];
+  const dictCalls = [];
   const upstream = {
     isLanguageTag,
     configured,
     ocrConfigured,
+    dict: async (input) => {
+      dictCalls.push(input);
+      return dictImpl
+        ? dictImpl(input)
+        : {
+            ok: true,
+            source: "youdao",
+            word: "hello",
+            found: true,
+            phonetic: "həˈloʊ",
+            phonetics: { uk: "həˈləʊ", us: "həˈloʊ" },
+            meanings: [{ partOfSpeech: "int.", definitions: ["喂，你好"] }],
+            example: "'Hello, Paul,' they chorused.",
+            synonyms: ["hallo"],
+          };
+    },
     rates: async (input) => {
       rateCalls.push(input);
       return ratesImpl
@@ -150,7 +168,7 @@ function setup({
   const translate = (body) =>
     call("/v1/translate", { method: "POST", body: JSON.stringify({ clientId: "install-0001", ...body }) });
   const ocr = (body) => call("/v1/ocr", { method: "POST", body: JSON.stringify({ clientId: "install-0001", image: PNG, ...body }) });
-  return { store, calls, rateCalls, ocrCalls, call, translate, ocr, upstream };
+  return { store, calls, rateCalls, ocrCalls, dictCalls, call, translate, ocr, upstream };
 }
 
 test("health reports whether the upstream has credentials", async () => {
@@ -395,6 +413,45 @@ test("rate limits rate requests as well", async () => {
   const response = await call("/v1/rates?client=install-0001&base=USD");
   assert.equal(response.status, 429);
   assert.equal((await response.json()).code, "rate_limited");
+});
+
+test("answers a word from the dictionary without booking characters", async () => {
+  const { call, dictCalls, store } = setup();
+  const response = await call("/v1/dict?client=install-0001&word=hello");
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.word, "hello");
+  assert.equal(body.phonetic, "həˈloʊ");
+  assert.equal(body.source, "youdao");
+  assert.deepEqual(body.meanings, [{ partOfSpeech: "int.", definitions: ["喂，你好"] }]);
+  assert.equal(body.usage.remaining, 100);
+  assert.deepEqual(dictCalls, [{ word: "hello" }]);
+
+  // A word is free, so nothing about it reaches the day's counters — but it
+  // still counts against the per-minute limit, which is what `reserve` books.
+  assert.equal(store.calls.reserve, 1);
+  assert.equal((await (await call("/v1/quota?client=install-0001")).json()).usage.client, 0);
+});
+
+test("rejects a dictionary lookup before touching the counters", async () => {
+  const { call, store, dictCalls } = setup();
+  assert.equal((await call("/v1/dict?word=hello")).status, 400);
+  assert.equal((await call("/v1/dict?client=nope&word=hello")).status, 400);
+  assert.equal((await call("/v1/dict?client=install-0001")).status, 400);
+  assert.equal((await call("/v1/dict?client=install-0001&word=hello, world")).status, 400);
+  assert.equal((await call("/v1/dict?client=install-0001&word=hello", { method: "POST" })).status, 405);
+  assert.equal(store.calls.reserve, 0);
+  assert.equal(dictCalls.length, 0);
+});
+
+test("reports a dictionary that cannot answer", async () => {
+  const { call } = setup({
+    dictImpl: async () => ({ ok: false, code: "upstream_unreachable", message: "词典服务连不上" }),
+  });
+  const response = await call("/v1/dict?client=install-0001&word=hello");
+  assert.equal(response.status, 502);
+  assert.equal((await response.json()).code, "upstream_unreachable");
 });
 
 test("health says whether the server can read pictures", async () => {

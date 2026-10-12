@@ -10,11 +10,13 @@ use super::TranslationResult;
 
 const ENDPOINT: &str = "https://api.dictionaryapi.dev/api/v2/entries/en/";
 
-/// This endpoint is a best effort extra, so it must never hold back a popup for
-/// long: the shared client would otherwise wait its full timeout. The lookup
-/// runs after the card is already showing, so it can afford to sit out the
-/// endpoint's slower answers, which are as long as twenty seconds.
-const TIMEOUT: Duration = Duration::from_secs(8);
+/// This endpoint is a best effort extra, so it must never hold back a popup: the
+/// shared client would otherwise wait its full timeout. It is only asked when
+/// the relay's own dictionary had nothing for the word — see `relay_dict` — so
+/// what is left here is the word the deployment does not know, and a budget of
+/// a couple of seconds is enough for those. It used to be eight, which was the
+/// longest a word card could sit empty while this endpoint thought about it.
+const TIMEOUT: Duration = Duration::from_secs(3);
 
 use super::{MAX_DEFINITIONS, MAX_MEANINGS};
 
