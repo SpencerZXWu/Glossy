@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Reads, checks and sets the Glossy version number.
 
