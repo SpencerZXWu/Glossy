@@ -8,6 +8,9 @@ Planned work, grouped into releases. Every release listed here maps to a GitHub
 milestone of the same name; the acceptance criteria are what has to be true before
 the milestone is closed and the tag is pushed.
 
+What is left after v2.0.0 — the deployment, the end of tags, and the state of every
+open item on the day it was written — is in [PLAN.md](./PLAN.md).
+
 ## Where the project stands
 
 | Area | State |
@@ -390,6 +393,9 @@ rather than investing in it early.
 
 按版本分组的计划工作。这里列出的每个版本都对应一个同名的 GitHub 里程碑；验收标准
 是关闭该里程碑、推送标签之前必须成立的条件。
+
+v2.0.0 之后剩下的事——部署、不再建标签，以及每一条未完成项写下当天的状态——在
+[PLAN.md](./PLAN.md)。
 
 ## 项目现状
 
