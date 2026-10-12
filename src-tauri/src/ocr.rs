@@ -495,17 +495,18 @@ pub async fn ocr_region(
         return Err(message);
     }
 
-    // The same entry point the selection uses: the card appears under the
-    // cursor and translates straight away, because the user asked for it when
-    // they dragged the rectangle.
+    // The same entry point the selection uses, with one difference: the card
+    // stops here. What was read is what the rectangle was dragged for, and
+    // translating it is a second decision — one that spends the day's
+    // characters, while the reading itself cost nothing — so the card holds the
+    // text and waits for its button. The reader's own clipboard gets it from the
+    // card, which is what a screenshot is usually wanted for in the first place.
     let (cursor_x, cursor_y) = platform::desktop::cursor_pos();
-    popup::reveal(
+    popup::reveal_recognized(
         &app,
         &state,
         recognized,
-        None,
         (cursor_x as f64, cursor_y as f64),
-        true,
     );
     Ok(())
 }

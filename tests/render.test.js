@@ -61,7 +61,7 @@ test("the module exports the render helpers the windows rely on", () => {
   assert.equal(typeof Glossy.languageName, "function");
   assert.equal(typeof Glossy.errorMessage, "function");
   assert.ok(Array.isArray(Array.from(Glossy.languageCodes)));
-  for (const name of ["loading", "error", "result", "clear", "stopSpeaking"]) {
+  for (const name of ["loading", "error", "recognized", "result", "clear", "stopSpeaking"]) {
     assert.equal(typeof Glossy.render[name], "function", `${name} is missing`);
   }
 });
@@ -202,6 +202,57 @@ test("the original is plain text when the card cannot translate again", () => {
   const original = findByClass(node, "original");
   assert.equal(original.getAttribute("contenteditable"), null);
   assert.equal(original.getAttribute("role"), null);
+});
+
+test("a screenshot that was read shows the text and waits for its button", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.recognized(
+    node,
+    { sourceText: "Speech recognition is not understanding." },
+    { provider: "baidu", onTranslate: (value) => asked.push(value) },
+  );
+
+  // What was read, in the same grey block the original is drawn in, with the
+  // copy button that is the usual reason for reading a screenshot at all.
+  assert.equal(findByClass(node, "original").textContent, "Speech recognition is not understanding.");
+  const tools = toolsOf(node).filter((row) => findByClass(row, "tool"));
+  assert.equal(tools.length, 1, "the original has one row of tools");
+  assert.equal(findByClass(tools[0], "tool").getAttribute("data-copy"), "render.copyOriginal");
+
+  // One button, and only one: pressing it is what asks for a translation.
+  const button = findByClass(node, "primary-button");
+  assert.equal(button.textContent, "Translate");
+  assert.equal(asked.length, 0, "nothing is translated before the button is pressed");
+  button.dispatch("click");
+  assert.deepEqual(asked, ["Speech recognition is not understanding."]);
+
+  // No translation is drawn, and nothing has an engine to switch to by accident.
+  assert.equal(findByClass(node, "translation"), null);
+  assert.equal(findByClass(node, "service"), null);
+  assert.equal(findByClass(node, "engine").textContent, "Baidu Translate");
+});
+
+test("the text of a reading cannot be edited into a translation", () => {
+  const node = target();
+  // The caller offers the usual way back into a translation; the card refuses it,
+  // because leaving an editable field is what translates on every other card.
+  Glossy.render.recognized(
+    node,
+    { sourceText: "fox" },
+    { onRetranslate: () => {}, onTranslate: () => {} },
+  );
+  const original = findByClass(node, "original");
+  assert.equal(original.getAttribute("contenteditable"), null);
+  assert.equal(original.getAttribute("role"), null);
+});
+
+test("a reading with nothing in it draws nothing", () => {
+  for (const value of [null, {}, { sourceText: "" }, { sourceText: "   " }]) {
+    const node = target();
+    Glossy.render.recognized(node, value, { onTranslate: () => {} });
+    assert.equal(node.childNodes.length, 0, JSON.stringify(value));
+  }
 });
 
 test("the original is editable when the card can translate again", () => {

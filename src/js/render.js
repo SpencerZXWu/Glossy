@@ -332,6 +332,48 @@
     foot(target, opts.provider, opts);
   }
 
+  /**
+   * Draws a screenshot that has been read but not translated.
+   *
+   * The reading happened on this machine and cost nothing; translating what it
+   * read is what spends the day's characters. A screenshot therefore stops here:
+   * the card holds what was read, the copy button puts it on the clipboard, and
+   * the one button that spends anything is the one the reader presses. Nothing
+   * else on this card reaches a provider — the engine is named but not chosen
+   * from here, and the language bar is not drawn at all, so no click can turn
+   * into a translation the reader did not ask for.
+   */
+  function recognized(target, value, options) {
+    clear(target);
+    const opts = options || {};
+    const data = value || {};
+    const sourceText = String(data.sourceText || "").trim();
+    if (!sourceText) return;
+
+    const hint = node("div", "read-hint", Glossy.i18n.t("render.readFromScreen"));
+    hint.setAttribute("aria-live", "polite");
+    target.appendChild(hint);
+
+    // The block the grey original is drawn in, without the editing hooks: the
+    // text is here to be read and copied, and the button below is what acts on
+    // it. Making it editable would mean a blur that translates — which is the
+    // thing this card exists to prevent, so the options that would turn it into
+    // a field are deliberately not passed on.
+    originalBlock(target, sourceText, {});
+    sideTools(target, { key: "Original", text: sourceText, language: "" }, { onCopied: opts.onCopied, speak: false });
+
+    const translate = node("button", "primary-button", Glossy.i18n.t("render.translate"));
+    translate.type = "button";
+    translate.addEventListener("click", () => {
+      if (typeof opts.onTranslate === "function") opts.onTranslate(sourceText);
+    });
+    target.appendChild(translate);
+
+    // The engine that will answer is named without being choosable: switching
+    // it translates, and this card has exactly one way to start a translation.
+    foot(target, opts.provider);
+  }
+
   function result(target, value, options) {
     const opts = options || {};
     const data = value || {};
@@ -895,5 +937,5 @@
     if (error && typeof error.message === "string") return error.message;
     return Glossy.i18n.t("render.failed");
   };
-  Glossy.render = { loading, error, result, clear, stopSpeaking, overwrite };
+  Glossy.render = { loading, error, recognized, result, clear, stopSpeaking, overwrite };
 })(window.Glossy);

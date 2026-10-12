@@ -306,6 +306,32 @@ pub fn reveal(
     );
 }
 
+/// What a screenshot hands the card once it has been read.
+///
+/// No context travels with it: the text came off the screen, so there is no
+/// sentence around a word to look at, and the reader is looking at the same
+/// screen it came from.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecognizedPayload {
+    pub text: String,
+}
+
+/// Tells the card that a screenshot has been read, and stops there.
+///
+/// The reading is done — on this machine, at no cost to anything — and what
+/// comes next is the reader's decision rather than the app's: the card holds the
+/// text that was read, and the one button on it starts a provider. Dragging a
+/// rectangle is a request to read it, not to spend the day's characters on
+/// whatever happened to be inside it.
+pub fn reveal_recognized(app: &AppHandle, state: &AppState, text: String, anchor: (f64, f64)) {
+    let Some(window) = popup_window(app) else {
+        return;
+    };
+    state.set_anchor(anchor);
+    let _ = window.emit("glossy://recognized", RecognizedPayload { text });
+}
+
 /// Shows a card that says why there is no translation, where the pointer is.
 ///
 /// The card the user was expecting is not coming, so this one takes its place:

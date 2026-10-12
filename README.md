@@ -402,10 +402,14 @@ up in the recognised text, and a card that was up is taken off the screen for th
 too — and it is recognised **on this machine**: PP-OCRv4 on ONNX
 Runtime, downloaded and removed on the **Resources** page. The picture never leaves the
 machine, a reading costs nothing, and it works with no connection at all. What comes back is
-translated by the ordinary popup path: the same card, the same service order, the same daily
-allowance, the same history entry as a selection. The card is put up as soon as the
-rectangle is let go — naming the engine, or saying that the reading engine is being fetched —
-and the translation takes its place, so the screen is never empty while the picture is read.
+where the reading *stops*: the card holds the text it read, in the same grey block the
+original is drawn in on every other card, with the copy button beside it, and one button
+translates it. Translating is the half of the flow that spends the day's characters, so a
+rectangle that was dragged to copy a line never spends any. Once the button is pressed the
+translation takes the text's place, and from there the card is the ordinary popup card: the
+same service order, the same daily allowance, the same history entry as a selection. The card
+is put up as soon as the rectangle is let go — naming the engine, or saying that the reading
+engine is being fetched — so the screen is never empty while the picture is read.
 
 `Esc`, a right click, or a rectangle too small to hold anything cancels without a request.
 The overlay also puts itself away after 30 seconds, and pressing `Ctrl+Alt+Q` again while it
@@ -767,7 +771,7 @@ none of them is covered by the automated tests.
 | 35 | Turn on a Windows contrast theme (Settings → Accessibility → Contrast themes), look at both windows, then turn it off | Both windows take the system colours, no text is read through a translucent surface, the ring on a focused control and the state of a switch stay visible, and the ordinary light and dark palettes come back afterwards |
 | 36 | Download a second language on the Resources page, check it, take a screenshot of text in that language, then delete the pack | The download fetches only the new pair of files (the engine is not downloaded again), the screenshot is read by both languages at once and comes back in the script of the picture, and after the delete the check moves off that language while at least one stays checked |
 | 37 | On the Resources page, read one row of every kind | Every downloadable file names its source and its licence, the sources block opens and names RapidOCR, PaddleOCR and Apache-2.0, and `THIRD_PARTY_NOTICES.md` sits next to `glossy.exe` in the install folder |
-| 38 | Press the screenshot shortcut with the reading engine already installed, and again with a language whose pack is not | The card is up under the cursor the moment the rectangle is let go — naming the engine that is about to be asked, or saying that the reading engine is being fetched — and the translation takes its place without the screen ever going empty |
+| 38 | Press the screenshot shortcut with the reading engine already installed, and again with a language whose pack is not | The card is up under the cursor the moment the rectangle is let go — naming the engine that is about to be asked, or saying that the reading engine is being fetched — and when the reading is done the card stops on the text it read, copyable, with the **Translate** button that turns it into a translation |
 | 39 | In the card's engine menu, switch to another service, then open the settings, change something unrelated on another page, and close it | The engine stays the one the card chose; the two windows and the settings file agree, and nothing goes back to Baidu on its own |
 | 40 | On a machine that still has to fetch the reading engine, press **Download the engine** on the Resources page, then watch a language row while it is downloaded | The bar and its numbers appear under the engine while the runtime and the detector arrive, and the language's row counts that language alone — a 10 MB language never reads as a 33 MB engine; a failure says so on the row it belongs to |
 | 41 | Mark the history file read-only (`attrib +r "%APPDATA%\com.glossy.translator\history.json"`), translate something, then open **Files and logs** | The app keeps working and the failure is in `glossy.log`; the page shows the path and the new size, **Open the folder** opens Explorer with `glossy.log` selected, and **Clear** empties the file, after which the size reads 0.0 of 256 KB |
@@ -1113,7 +1117,7 @@ Google 接口。
 
 ### 读取屏幕
 
-**功能**下的**图片文字翻译**（页面标题是**截图翻译**）就是屏幕取字快捷键的不用键盘版本：按下那里的按钮、按下已经显示在屏幕上的卡片里的**相机**按钮，或在任何程序里按 `Ctrl+Alt+Q`，屏幕会在变暗的遮罩下定住。拖动鼠标框选你要翻译的文字。这块区域是从画遮罩之前就拍好的截图上裁下来的，所以遮罩本身绝不会出现在识别结果里，原本显示着的卡片也会为这一刻先离开屏幕，然后它**就在这台机器上**被识别：PP-OCRv4 跑在 ONNX Runtime 上，引擎在**资源**页下载和删除。图片从不离开这台机器，读一次不花任何额度，完全断网也能用。拿回来的内容走的是普通弹窗那条路：同一张卡片、同一套渠道顺序、同一份每日额度、同一条历史记录，就像你手动选中一样。松开矩形的那一刻卡片就会立起来——写着即将使用的引擎，或者说明正在准备文字识别——译文随后接替它，所以识别期间屏幕不会一直是空的。
+**功能**下的**图片文字翻译**（页面标题是**截图翻译**）就是屏幕取字快捷键的不用键盘版本：按下那里的按钮、按下已经显示在屏幕上的卡片里的**相机**按钮，或在任何程序里按 `Ctrl+Alt+Q`，屏幕会在变暗的遮罩下定住。拖动鼠标框选你要翻译的文字。这块区域是从画遮罩之前就拍好的截图上裁下来的，所以遮罩本身绝不会出现在识别结果里，原本显示着的卡片也会为这一刻先离开屏幕，然后它**就在这台机器上**被识别：PP-OCRv4 跑在 ONNX Runtime 上，引擎在**资源**页下载和删除。图片从不离开这台机器，读一次不花任何额度，完全断网也能用。**读回来的地方就是它停下的地方**：卡片把识别到的文字放在和其它卡片画原文一样的灰色块里，旁边是复制按钮，下面只有一个**翻译**按钮。花掉当天字符额度的正是“翻译”这一半，所以只是想把一行字复制走的框选，一分额度也不会花。按下那个按钮之后，译文才接替这段文字，从那里开始才是普通弹窗卡片：同一套渠道顺序、同一份每日额度、同一条历史记录，就像你手动选中一样。松开矩形的那一刻卡片就会立起来——写着即将使用的引擎，或者说明正在准备文字识别——所以识别期间屏幕不会一直是空的。
 
 按 `Esc`、点右键，或者框出的区域小到装不下任何东西，都会取消且不发出请求。遮罩本身也会在 30 秒后自动收起，遮罩还在时再按一次 `Ctrl+Alt+Q` 同样会把它关掉——被遮罩罩住的屏幕不会变成一块用不了的屏幕。读取屏幕需要有识别引擎，而且识别是分语言的：**中文与英文**、日语、繁体中文、拉丁字母各语言、西里尔字母各语言和韩语，在**资源**页上各是一个独立的语言包。勾上的每一种都会读同一张截图——检测只跑一次，每一行取读得最好的那种语言——所以一张同时有日文和英文的图片不用你先说它是哪种语言。一个语言包只认它自己的文字，中文与英文那个包完全不认假名，这就是语言要勾选、而不该靠猜的原因。第一次截图会先问过你再下载（引擎加第一门语言约 33 MB），文件放在 `%APPDATA%\com.glossy.translator\ocr`；没有它时页面会直接说明而不是给出翻译；以后再装别的语言只是它自己的两个文件，不需要再下一套引擎。
 
@@ -1325,7 +1329,7 @@ $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = '<the password you chose>'
 | 35 | 打开 Windows 的对比度主题（设置 → 辅助功能 → 对比度主题），两个窗口各看一眼，然后关掉 | 两个窗口都改用系统配色，没有任何文字是靠半透明表面读出来的，聚焦控件的焦点环和开关的开/关状态依然看得出来；关掉之后原来的浅色/深色配色照旧回来 |
 | 36 | 在资源页下载第二种语言并勾上它，对那种语言的文字截一次图，然后删掉这个包 | 下载只取新的一对文件（引擎不会重新下载）；截图同时交给两种语言识别，结果用图像里那种文字正确识别；删掉之后这一项自动取消勾选，同时至少还保留着一种 |
 | 37 | 在资源页把每一类行都看一遍 | 每个可下载的文件都写明来源与许可证，来源区块能展开并写出 RapidOCR、PaddleOCR 与 Apache-2.0，安装目录里 `glossy.exe` 旁边有 `THIRD_PARTY_NOTICES.md` | 
-| 38 | 在文字识别引擎已安装的情况下按截图快捷键，再对一种尚未下载语言包的语种按一次 | 松开矩形的那一刻卡片就出现在光标下——写着即将使用的引擎，或者说正在准备文字识别——译文随后接替它，屏幕全程不会空着 |
+| 38 | 在文字识别引擎已安装的情况下按截图快捷键，再对一种尚未下载语言包的语种按一次 | 松开矩形的那一刻卡片就出现在光标下——写着即将使用的引擎，或者说正在准备文字识别——读完之后卡片停下来显示识别到的文字（可复制），按下它的**翻译**按钮才出现译文 |
 | 39 | 在卡片的引擎菜单里切到另一个服务，然后打开设置，在别的页面改一个无关选项再关闭 | 引擎仍然是卡片选的那个；两个窗口与设置文件一致，不会自己变回百度 |
 | 40 | 在一台还需要下载识别引擎的机器上，点资源页的**下载引擎**，然后盯着语言那一行看它下载 | 运行时和检测模型到达期间，进度条和数字出现在引擎那一段下面；语言那一行只数它自己的文件——10 MB 的一门语言不会显示成 33 MB 的引擎；失败时消息出现在它所属的那一行 |
 | 41 | 把历史记录文件设为只读（`attrib +r "%APPDATA%\com.glossy.translator\history.json"`），翻译一次，然后打开**文件与日志** | 应用照常工作，失败信息写在 `glossy.log` 里；页面显示路径和新的文件大小，**打开所在文件夹**会用资源管理器打开并选中 `glossy.log`，**清空**之后文件为空、大小显示 0.0 / 256 KB |

@@ -1067,6 +1067,57 @@
     closeServiceMenu();
   });
 
+  /**
+   * A rectangle that has been read, with nothing translated yet.
+   *
+   * The reading is done and cost nothing — it happened on this machine — but the
+   * translation is not paid for, and this is where the reader decides whether it
+   * is worth spending. What is on screen is the text that was read, the button
+   * that copies it, and one button that translates; nothing here starts a
+   * provider on its own, which is why the language bar is left off (changing a
+   * language there starts a translation) and why an edit of the text is not
+   * offered (leaving that field translates too).
+   */
+  async function showRecognized(recognized) {
+    const value = String(recognized || "").trim();
+    if (value.length < minimumLength()) return;
+
+    const mine = ++ticket;
+    clearTimeout(closeTimer);
+    serviceMenu = null;
+    resetLanguages();
+    Glossy.render.stopSpeaking();
+    current = null;
+    text = value;
+    historyId = null;
+    historySteps = { older: false, newer: false };
+    // There is no selection behind a screenshot to write a translation over.
+    showWriteBack(false);
+    detected = "";
+    headword.textContent = value;
+    langbar.hidden = true;
+    document.body.dataset.state = "recognized";
+    Glossy.render.recognized(
+      content,
+      { sourceText: value },
+      {
+        provider: SERVICE_ENGINES[service],
+        // The one thing on this card that spends anything.
+        onTranslate: (chosen) => run(String(chosen || value)),
+      },
+    );
+    size = { width: 0, height: 0 };
+    await place(!pinned);
+    if (mine !== ticket) return;
+    // No auto-close is scheduled: the reader is being asked a question, and a
+    // card that takes itself away before it is answered is worse than no card.
+  }
+
+  Glossy.listen("glossy://recognized", (event) => {
+    const payload = (event && event.payload) || {};
+    showRecognized(payload.text);
+  });
+
   Glossy.listen("glossy://selection", (event) => {
     resetLanguages();
     const payload = (event && event.payload) || {};
@@ -1231,6 +1282,14 @@
         provider: SERVICE_ENGINES[service],
         onChooseService: toggleServiceMenu,
       });
+      return;
+    }
+    if (sample === "recognized") {
+      // A screenshot that has been read and not yet translated: the state a
+      // rectangle used to go straight past on its way to a provider.
+      showRecognized(
+        "Speech recognition is not the same thing as understanding.\nThe machine writes down what was said, and nothing more.",
+      );
       return;
     }
 

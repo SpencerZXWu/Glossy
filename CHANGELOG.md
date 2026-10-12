@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [2.3.0] - 2026-10-12
+
+### Changed
+
+- **A screenshot is read, and then it waits.** Dragging a rectangle used to read it
+  and translate it in one go: the card arrived with the translation already in it, and
+  the day's characters were spent on whatever the rectangle happened to hold — a
+  heading, a file name, a line the reader only wanted to copy. The card now stops at
+  what was read: the text sits in the same grey block the original is drawn in, with
+  the copy button beside it, and one button translates it. Nothing else on that card
+  reaches a provider — the language bar is not drawn on it and the text cannot be
+  edited, because both of those are what translate on every other card — and no
+  auto-close is armed while the reader is deciding.
+- **The language bar is hidden when a card says it is.** `.langbar` is `display: flex`,
+  which wins over the `hidden` attribute that the badge, the loading card and the
+  engine wait all set on it, so the bar and its two live combo boxes were on screen in
+  three states that have nothing to choose yet. Changing a language there starts a
+  translation, which is why this had to be right rather than merely tidy.
+
 ## [2.2.1] - 2026-10-12
 
 ### Added

@@ -193,6 +193,15 @@ body.dragging .card::before {
   cursor: default;
 }
 
+/* A bar of two combo boxes, however it is hidden, is not there. The card hides
+   this row itself — the badge has no languages to pick, and neither has a
+   screenshot that has been read but not translated — and `display: flex` above
+   would otherwise win over the `hidden` attribute, which is a rule of the
+   browser's own stylesheet and loses to every class. */
+.langbar[hidden] {
+  display: none;
+}
+
 /* Reads as a pair of combo boxes. The fill has to be opaque: Windows paints the
    native list of a select with the background of the select, and a see-through
    list would put the language names straight onto whatever is behind the popup. */
@@ -990,6 +999,39 @@ body.dragging .card::before {
 .ghost-button:hover {
   background: var(--bg-soft);
   color: var(--fg);
+}
+
+/* The card that holds a screenshot nothing has been done with yet: one line
+   saying where the text came from, the text itself, and the one button on the
+   card that spends anything. */
+.read-hint {
+  margin-bottom: 6px;
+  color: var(--fg-soft);
+  font-size: calc(11px * var(--popup-font));
+}
+
+.primary-button {
+  align-self: stretch;
+  margin-top: 10px;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--g-on-accent);
+  font: inherit;
+  font-size: calc(13px * var(--popup-font));
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter var(--g-dur-fast) var(--g-ease-standard);
+}
+
+.primary-button:hover {
+  filter: brightness(1.08);
+}
+
+.primary-button:focus-visible {
+  outline: var(--g-focus-width) solid var(--accent);
+  outline-offset: 2px;
 }
 
 body[data-state="loading"] .content {
