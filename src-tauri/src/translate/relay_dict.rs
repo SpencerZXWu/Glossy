@@ -112,11 +112,7 @@ pub fn entry_from(data: &Value) -> Option<Entry> {
 }
 
 /// Asks the deployment for one word, or nothing when it cannot answer.
-pub async fn lookup(
-    client: &reqwest::Client,
-    word: &str,
-    install_id: &str,
-) -> Option<Entry> {
+pub async fn lookup(client: &reqwest::Client, word: &str, install_id: &str) -> Option<Entry> {
     entry_from(&dictionary(client, word, install_id).await?)
 }
 
@@ -166,8 +162,14 @@ mod tests {
         assert_eq!(entry.meanings.len(), 2);
         assert_eq!(entry.meanings[0].part_of_speech, "int.");
         assert_eq!(entry.meanings[0].definitions, vec!["喂，你好".to_string()]);
-        assert_eq!(entry.example.as_deref(), Some("'Hello, Paul,' they chorused."));
-        assert_eq!(entry.synonyms, vec!["hallo".to_string(), "holloo".to_string()]);
+        assert_eq!(
+            entry.example.as_deref(),
+            Some("'Hello, Paul,' they chorused.")
+        );
+        assert_eq!(
+            entry.synonyms,
+            vec!["hallo".to_string(), "holloo".to_string()]
+        );
     }
 
     #[test]
@@ -205,7 +207,12 @@ mod tests {
 
     #[test]
     fn only_asks_about_a_word_read_into_chinese() {
-        for (source, target) in [("en", "zh-CN"), ("auto", "zh"), ("EN", "zh-TW"), ("", "zh-Hans")] {
+        for (source, target) in [
+            ("en", "zh-CN"),
+            ("auto", "zh"),
+            ("EN", "zh-TW"),
+            ("", "zh-Hans"),
+        ] {
             assert!(wanted(source, target), "{source} -> {target}");
         }
         for (source, target) in [("en", "ja"), ("en", "fr"), ("fr", "zh-CN"), ("ja", "zh-CN")] {
@@ -215,12 +222,14 @@ mod tests {
 
     #[test]
     fn fills_a_card_that_has_only_its_headword() {
-        let mut result =
-            TranslationResult::new(super::super::Kind::Word, "", "hello", "zh-CN");
+        let mut result = TranslationResult::new(super::super::Kind::Word, "", "hello", "zh-CN");
         result.translation = "你好".to_string();
         apply(&mut result, entry_from(&answer()).expect("an entry"));
         assert_eq!(result.phonetic.as_deref(), Some("həˈloʊ"));
         assert_eq!(result.meanings.len(), 2);
-        assert_eq!(result.translation, "你好", "the translation itself is untouched");
+        assert_eq!(
+            result.translation, "你好",
+            "the translation itself is untouched"
+        );
     }
 }

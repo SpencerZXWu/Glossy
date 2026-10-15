@@ -462,14 +462,21 @@ pub fn confirm_key(value: &str) -> String {
     if text.is_empty() {
         return DEFAULT_CONFIRM_KEY.to_string();
     }
-    let parts: Vec<&str> = text.split('+').map(str::trim).filter(|part| !part.is_empty()).collect();
+    let parts: Vec<&str> = text
+        .split('+')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
     // A combination names a key at the end and modifiers before it: two parts at
     // least, and the last one is not itself a modifier.
     if parts.len() < 2 {
         return DEFAULT_CONFIRM_KEY.to_string();
     }
     let last = parts[parts.len() - 1];
-    if CONFIRM_MODIFIERS.iter().any(|name| name.eq_ignore_ascii_case(last)) {
+    if CONFIRM_MODIFIERS
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(last))
+    {
         return DEFAULT_CONFIRM_KEY.to_string();
     }
     let held = parts[..parts.len() - 1].iter().any(|part| {

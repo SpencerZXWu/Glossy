@@ -732,7 +732,10 @@ mod tests {
         // question twice can come back with two different numbers; the window
         // marks the line rather than letting it read like an exact answer.
         assert_eq!(shared_in(&serde_json::json!({"shared": true})), Some(true));
-        assert_eq!(shared_in(&serde_json::json!({"shared": false})), Some(false));
+        assert_eq!(
+            shared_in(&serde_json::json!({"shared": false})),
+            Some(false)
+        );
         // A relay built before it said so, or one saying something else: not a
         // yes, and the window reads it as one instance's own.
         assert_eq!(shared_in(&serde_json::json!({})), None);

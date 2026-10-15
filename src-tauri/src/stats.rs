@@ -61,11 +61,22 @@ pub async fn report(token: &str) -> Result<serde_json::Value, String> {
                     .map(str::to_string)
             })
             .unwrap_or_default();
-        crate::log::note!("glossy: the server report was refused ({code}): {}", body.trim());
-        return Err(if code == "not_configured" { CLOSED } else { REFUSED }.to_string());
+        crate::log::note!(
+            "glossy: the server report was refused ({code}): {}",
+            body.trim()
+        );
+        return Err(if code == "not_configured" {
+            CLOSED
+        } else {
+            REFUSED
+        }
+        .to_string());
     }
     if !status.is_success() {
-        crate::log::note!("glossy: the server report answered HTTP {status}: {}", body.trim());
+        crate::log::note!(
+            "glossy: the server report answered HTTP {status}: {}",
+            body.trim()
+        );
         return Err(UNREADABLE.to_string());
     }
 

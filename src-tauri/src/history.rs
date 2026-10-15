@@ -68,8 +68,7 @@ pub fn neighbors(id: Option<u64>, source_text: &str, target_lang: &str) -> Neigh
         .and_then(|id| entries.iter().position(|entry| entry.id == id))
         .or_else(|| {
             entries.iter().position(|entry| {
-                entry.result.source_text == source_text
-                    && entry.result.target_lang == target_lang
+                entry.result.source_text == source_text && entry.result.target_lang == target_lang
             })
         });
     let Some(index) = index else {

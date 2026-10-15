@@ -502,12 +502,7 @@ pub async fn ocr_region(
     // text and waits for its button. The reader's own clipboard gets it from the
     // card, which is what a screenshot is usually wanted for in the first place.
     let (cursor_x, cursor_y) = platform::desktop::cursor_pos();
-    popup::reveal_recognized(
-        &app,
-        &state,
-        recognized,
-        (cursor_x as f64, cursor_y as f64),
-    );
+    popup::reveal_recognized(&app, &state, recognized, (cursor_x as f64, cursor_y as f64));
     Ok(())
 }
 

@@ -372,13 +372,7 @@ pub fn reveal_result(
         return;
     };
     state.set_anchor(anchor);
-    let _ = window.emit(
-        "glossy://result",
-        StoredPayload {
-            result,
-            history_id,
-        },
-    );
+    let _ = window.emit("glossy://result", StoredPayload { result, history_id });
 }
 
 /// Sizes, places and optionally shows the popup window.

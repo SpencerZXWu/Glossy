@@ -309,7 +309,9 @@ static CLIENT: Mutex<Option<reqwest::Client>> = Mutex::new(None);
 
 /// The shared HTTP client, built the first time one is asked for.
 pub fn client() -> Result<reqwest::Client, String> {
-    let mut held = CLIENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut held = CLIENT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(client) = held.as_ref() {
         return Ok(client.clone());
     }
@@ -333,7 +335,9 @@ pub fn client() -> Result<reqwest::Client, String> {
 /// the road is back — begin from a fresh pool instead of waiting for a restart
 /// the user should not have to perform.
 pub fn reset_client() {
-    let mut held = CLIENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut held = CLIENT
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     *held = None;
 }
 
@@ -439,7 +443,8 @@ pub async fn translate(
         && resembles(&result.translation, text)
     {
         if let Some(alternate) = alternate_target(&target) {
-            if let Ok(retry) = call_provider(&client, settings, text, source, &alternate, kind).await
+            if let Ok(retry) =
+                call_provider(&client, settings, text, source, &alternate, kind).await
             {
                 target = alternate;
                 result = retry;

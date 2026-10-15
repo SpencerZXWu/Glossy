@@ -124,7 +124,11 @@ pub fn show(app: &AppHandle) {
 /// A line that has already been shown this run is dropped: it comes back with
 /// every translation, and repeating it would turn news into a nag.
 pub fn announce(app: &AppHandle, message: &str) {
-    let Some(line) = ANNOUNCED.lock().ok().and_then(|mut guard| guard.take(message)) else {
+    let Some(line) = ANNOUNCED
+        .lock()
+        .ok()
+        .and_then(|mut guard| guard.take(message))
+    else {
         return;
     };
     set_line(app, Some(&line));
@@ -294,7 +298,10 @@ mod tests {
         // News that is not the last thing said is news again: the relay has no
         // way to know what this App has already shown.
         assert_eq!(announced.take("维护已结束").as_deref(), Some("维护已结束"));
-        assert_eq!(announced.take("明天上午维护").as_deref(), Some("明天上午维护"));
+        assert_eq!(
+            announced.take("明天上午维护").as_deref(),
+            Some("明天上午维护")
+        );
     }
 
     /// An empty line is not a line: a relay with nothing to say leaves the card
