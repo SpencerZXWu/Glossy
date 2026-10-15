@@ -436,6 +436,53 @@ pub fn ignores_process(names: &[String], process: &str) -> bool {
         .any(|name| name.strip_suffix(".exe").unwrap_or(name) == stem)
 }
 
+/// The combination that translates what has been typed, when the file says
+/// nothing usable.
+pub const DEFAULT_CONFIRM_KEY: &str = "Ctrl+Enter";
+
+/// The modifiers a combination may hold, spelled the way the window records
+/// them, and the one of them every combination has to hold at least one of.
+const CONFIRM_MODIFIERS: [&str; 4] = ["Ctrl", "Alt", "Shift", "Win"];
+
+/// Normalizes the combination that translates typed text.
+///
+/// Both boxes this key acts in are multi-line — the card's grey original and the
+/// **Translate text** box — so `Enter` alone has to keep starting a new line and
+/// a combination without a modifier is not a combination here at all. Anything
+/// that cannot be a combination, and anything that would take the newline away,
+/// falls back on the default rather than leaving the reader with a key that
+/// cannot work.
+///
+/// The spelling is not rebuilt, only checked: what the window records is already
+/// the spelling the rest of the app reads, and a hand edit that spells it
+/// differently (`ctrl+enter`) is left alone so the matching in the window is the
+/// only place that has to know how it is written.
+pub fn confirm_key(value: &str) -> String {
+    let text = value.trim();
+    if text.is_empty() {
+        return DEFAULT_CONFIRM_KEY.to_string();
+    }
+    let parts: Vec<&str> = text.split('+').map(str::trim).filter(|part| !part.is_empty()).collect();
+    // A combination names a key at the end and modifiers before it: two parts at
+    // least, and the last one is not itself a modifier.
+    if parts.len() < 2 {
+        return DEFAULT_CONFIRM_KEY.to_string();
+    }
+    let last = parts[parts.len() - 1];
+    if CONFIRM_MODIFIERS.iter().any(|name| name.eq_ignore_ascii_case(last)) {
+        return DEFAULT_CONFIRM_KEY.to_string();
+    }
+    let held = parts[..parts.len() - 1].iter().any(|part| {
+        CONFIRM_MODIFIERS
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(part))
+    });
+    if !held {
+        return DEFAULT_CONFIRM_KEY.to_string();
+    }
+    text.to_string()
+}
+
 /// Normalizes the source-language list: canonical codes, no duplicates, no
 /// separators left inside an entry.
 pub fn language_codes(names: &[String]) -> Vec<String> {
@@ -604,6 +651,15 @@ pub struct Settings {
     pub hotkey_settings: String,
     /// Accelerator such as `Ctrl+Alt+Q` that starts a screenshot translation.
     pub hotkey_ocr: String,
+    /// Combination such as `Ctrl+Enter` that translates the text the reader has
+    /// typed or pasted, in the floating card and in the settings window.
+    ///
+    /// It is not a global accelerator: both windows see it themselves while the
+    /// caret is in a text box, so nothing is registered with Windows and no
+    /// other program ever feels it. A combination without a modifier is refused
+    /// on the way in, because both boxes are multi-line and `Enter` alone has to
+    /// stay the key that starts a new line.
+    pub confirm_key: String,
     /// Which languages the on-machine recogniser may read with.
     ///
     /// Each language is a downloadable pack of two files (the recogniser and
@@ -686,6 +742,7 @@ impl Default for Settings {
             hotkey: "Ctrl+Alt+C".to_string(),
             hotkey_settings: "Ctrl+Alt+G".to_string(),
             hotkey_ocr: "Ctrl+Alt+Q".to_string(),
+            confirm_key: DEFAULT_CONFIRM_KEY.to_string(),
             ocr_packs: vec![crate::ocr::models::DEFAULT_PACK.to_string()],
             developer_mode: false,
             subtitle_source_lang: "auto".to_string(),
@@ -1130,6 +1187,7 @@ impl Settings {
         self.hotkey = self.hotkey.trim().to_string();
         self.hotkey_settings = self.hotkey_settings.trim().to_string();
         self.hotkey_ocr = self.hotkey_ocr.trim().to_string();
+        self.confirm_key = confirm_key(&self.confirm_key);
         // The languages the recogniser reads with: names this build does not
         // offer are dropped, a repeat is kept once, the order is the one the
         // page shows, and a list that ends up empty is the language that was
@@ -1229,6 +1287,56 @@ mod tests {
 
         assert_eq!(settings.target_lang, Settings::default().target_lang);
         assert!(settings.enabled);
+    }
+
+    #[test]
+    fn a_confirmation_key_needs_a_modifier_and_a_key() {
+        let usable = [
+            "Ctrl+Enter",
+            "Alt+Enter",
+            "Ctrl+Shift+Enter",
+            "Ctrl+Space",
+            "Ctrl+Alt+Enter",
+            "Win+Enter",
+            "ctrl+enter",
+        ];
+        for value in usable {
+            assert_eq!(confirm_key(value), value, "{value} should be kept");
+        }
+    }
+
+    #[test]
+    fn a_confirmation_key_that_would_swallow_the_newline_falls_back() {
+        // Both boxes are multi-line, so a bare Enter has to keep starting a new
+        // line, and anything that is not a combination at all is not one here.
+        for value in [
+            "",
+            "   ",
+            "Enter",
+            "Ctrl",
+            "Ctrl+",
+            "Ctrl++",
+            "+Enter",
+            "Enter+Ctrl",
+        ] {
+            assert_eq!(
+                confirm_key(value),
+                DEFAULT_CONFIRM_KEY,
+                "{value:?} should fall back"
+            );
+        }
+    }
+
+    #[test]
+    fn the_confirmation_key_survives_a_round_trip_through_the_file() {
+        let settings = Settings::parse("{\"confirmKey\":\"Alt+Enter\"}");
+        assert_eq!(settings.confirm_key, "Alt+Enter");
+        // A file that names something unusable is read as the default rather
+        // than kept: the reader can always record another one.
+        let broken = Settings::parse("{\"confirmKey\":\"Enter\"}");
+        assert_eq!(broken.confirm_key, DEFAULT_CONFIRM_KEY);
+        let spaced = Settings::parse("{\"confirmKey\":\"  Ctrl+Enter  \"}");
+        assert_eq!(spaced.confirm_key, "Ctrl+Enter");
     }
 
     #[test]

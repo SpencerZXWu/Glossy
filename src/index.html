@@ -110,7 +110,7 @@
                 <span data-i18n="demo.units">Convert units</span>
               </label>
             </div>
-            <p class="hint" data-i18n="demo.hint">
+            <p class="hint" id="demoHint" data-i18n="demo.hint">
               Type or paste a text, then select a word, a phrase or a sentence — or press
               Translate — to see the result right here, in the same card as the popup.
             </p>
@@ -441,9 +441,28 @@
               Windows, and the program you are reading in never feels them. To
               translate from any program, use the global hotkey above.
             </p>
+            <div class="field">
+              <label for="confirmKey" data-i18n="field.confirmKey">Translate the text you typed</label>
+              <div class="recorder">
+                <input
+                  type="text"
+                  id="confirmKey"
+                  readonly
+                  spellcheck="false"
+                  autocomplete="off"
+                  placeholder="Ctrl+Enter"
+                  data-i18n-placeholder="hotkey.empty"
+                  aria-describedby="confirmKeyHint"
+                />
+                <button type="button" class="ghost" id="confirmKeyRecord" data-i18n="hotkey.record">Record</button>
+              </div>
+            </div>
+            <p class="hint" id="confirmKeyHint" data-i18n="hotkey.values.confirm">
+              Press this with the cursor in a text box to translate everything in it —
+              the floating card and the Translate text box both answer to it.
+            </p>
             <ul class="keys">
               <li><span class="key-group"><kbd>Esc</kbd></span><span data-i18n="shortcut.escape">Close the floating popup</span></li>
-              <li><span class="key-group"><kbd>Ctrl</kbd><kbd>Enter</kbd></span><span data-i18n="shortcut.enter">Translate the whole text of the Translate box, while the cursor is in that box</span></li>
             </ul>
             <p class="hint" data-i18n="shortcuts.more">Every shortcut Glossy gains will be listed here.</p>
           </section>

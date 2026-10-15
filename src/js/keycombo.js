@@ -47,6 +47,15 @@
   const PURE_MODIFIERS = ["Control", "Alt", "Shift", "Meta", "AltGraph", "OS", "Hyper"];
 
   /**
+   * The combination that confirms typed text, when nothing else was recorded.
+   *
+   * It is the one every build before this setting existed used, and it is what a
+   * settings file that names nothing usable falls back on. The backend keeps the
+   * same default on its side of the file.
+   */
+  const DEFAULT_CONFIRM = "Ctrl+Enter";
+
+  /**
    * Combinations Windows answers itself, so `RegisterHotKey` never receives
    * them: recording one would leave the user with a hotkey that cannot work.
    */
@@ -164,5 +173,39 @@
     return "";
   }
 
-  Glossy.keycombo = { capture, conflict, label, normalize, BLOCKED, BUSY };
+  /**
+   * The combination a stored spec names, normalized, or the default one.
+   *
+   * A settings file written before this setting existed, and a hand edit that
+   * spelled the key as nothing at all, both land here: the window has to have
+   * something to compare a key press against, and the default is what every
+   * build before this one did.
+   */
+  function spec(value) {
+    return normalize(value) || DEFAULT_CONFIRM;
+  }
+
+  /**
+   * Whether a key press is the combination a spec names.
+   *
+   * The pressed combination is spelled out through the same two functions the
+   * recorder uses — `label` for the key itself, the modifier table for the rest —
+   * so a key the app can record is a key it can recognise, and the two spellings
+   * are compared after `normalize`.
+   *
+   * The modifiers have to match exactly: holding Shift as well as `Ctrl+Enter`
+   * is not `Ctrl+Enter`. Both places this is asked from are text boxes where the
+   * reader is holding a key on purpose, so a near miss is better left alone than
+   * treated as a confirmation.
+   */
+  function holds(event, spec) {
+    const wanted = normalize(spec);
+    if (!wanted || !event) return false;
+    const key = label(event);
+    if (!key) return false;
+    const held = MODIFIERS.filter(([flag]) => event[flag]).map(([, name]) => name);
+    return normalize(held.concat([key]).join("+")) === wanted;
+  }
+
+  Glossy.keycombo = { capture, conflict, holds, label, normalize, spec, DEFAULT_CONFIRM, BLOCKED, BUSY };
 })(window.Glossy);

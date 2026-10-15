@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 See [ROADMAP.md](./ROADMAP.md) for what is planned next.
 
+## [2.4.0] - 2026-10-12
+
+### Added
+
+- **The key that confirms typed text is the reader's own.** Translating the text in a
+  box used to be `Ctrl+Enter` and nothing else — in the floating card's grey original
+  and in the **Translate text** box alike. It is now a setting, recorded under
+  **General** next to the three accelerators and remembered as `confirmKey`: record
+  another combination and both boxes answer to it, whether the change is saved or not.
+  A combination with no modifier is refused — both boxes are multi-line, so `Enter`
+  alone has to keep starting a new line — and an empty or unusable value in the file
+  falls back on `Ctrl+Enter` rather than leaving a key that cannot work.
+- **Two lines that name it say the combination the reader actually set.** The hint
+  above the Translate box and the tooltip on the card's grey original are dictionary
+  entries with a placeholder now, so changing the shortcut changes what they say
+  instead of leaving them pointing at a key that no longer does anything.
+
 ## [2.3.0] - 2026-10-12
 
 ### Changed

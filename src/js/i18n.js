@@ -178,18 +178,20 @@
       "The shortcuts below are handled by the window itself: they work only while this window has the keyboard focus, they are not registered with Windows, and the program you are reading in never feels them. To translate from any program, use the global hotkey above.",
     "shortcuts.more": "More shortcuts will be listed here as they are added.",
     "shortcut.escape": "Close the floating popup",
-    "shortcut.enter": "Translate the whole text of the Translate box, while the cursor is in that box",
     "panel.trigger": "Trigger",
     "field.minLength": "Shortest selection to translate",
     "field.hotkey.translate": "Translate the selection",
     "field.hotkey.settings": "Open this window",
     "field.hotkey.ocr": "Read the screen",
+    "field.confirmKey": "Translate the text you typed",
     "hotkey.values":
       "Registered with Windows, so it works in every program: it translates the text you have selected, or the clipboard content when nothing is selected, and it never shows the icon.",
     "hotkey.values.settings":
       "Registered with Windows, so it works in every program: it brings this window to the front, restoring it if you minimised it.",
     "hotkey.values.ocr":
       "Registered with Windows, so it works in every program: it freezes the screen, and the text inside the rectangle you draw is read and translated in the usual popup.",
+    "hotkey.values.confirm":
+      "Handled by the window itself, in whichever box the cursor is in: {0} translates everything that box holds. The floating card and the Translate text box both answer to the same key, and nothing is registered with Windows.",
     "hotkey.howto":
       "Click the box, then press the combination you want — nothing is typed, so it cannot be misspelled. Glossy registers it with Windows at once and reports whether Windows accepted it.",
     "hotkey.empty": "Click to record",
@@ -203,6 +205,8 @@
     "hotkey.busy":
       "{0} is usually owned by Windows or another program; if Windows refuses it, the line below will say so.",
     "hotkey.recorded": "Recorded {0}. Waiting for Windows to confirm…",
+    "hotkey.taken":
+      "{0} is already another Glossy shortcut. Both would fire on one press — record another, or clear that one first.",
     "hotkey.none": "No global hotkey. Press Record to set one.",
     "hotkey.active":
       "Active: {0}. Press it in any program to translate the selected text, or the clipboard when nothing is selected.",
@@ -392,7 +396,7 @@
     "document.failed": "The translation stopped: {0}",
     "document.saved": "Saved to {0}",
     "demo.hint":
-      "Type or paste text below, then select a part of it — a word, a phrase or a sentence — or press Translate (Ctrl+Enter). A pasted text is translated as soon as it lands. The result appears in the same card the floating popup draws.",
+      "Type or paste text below, then select a part of it — a word, a phrase or a sentence — or press {0} to translate the whole box. A pasted text is translated as soon as it lands. The result appears in the same card the floating popup draws.",
     "demo.placeholder":
       "Type or paste the text to translate, then select a part of it…",
     "demo.run": "Translate",
@@ -586,7 +590,7 @@
     "render.overwriteFailed": "The original could not be replaced",
     "render.originalEdit": "The text that was translated, editable",
     "render.originalHint":
-      "Correct the text here, then press Ctrl+Enter to translate it again.",
+      "Correct the text here, then press {0} to translate it again.",
     "render.stop": "Stop reading",
     "render.speakFailed": "Could not read this out loud",
     "hint.shortcut": "{0} ({1})",
@@ -782,18 +786,20 @@
       "下面这些快捷键由窗口自己处理：只在窗口拥有键盘焦点时有效，没有向 Windows 注册，你正在阅读的程序也完全感觉不到它们。想在任意程序里翻译，请用上面的全局快捷键。",
     "shortcuts.more": "后续新增的快捷键会继续列在这里。",
     "shortcut.escape": "关闭翻译弹窗",
-    "shortcut.enter": "翻译文本框里的整段文字（光标需在文本框内）",
     "panel.trigger": "触发",
     "field.minLength": "触发翻译的最短长度",
     "field.hotkey.translate": "翻译选中文字",
     "field.hotkey.settings": "打开本窗口",
     "field.hotkey.ocr": "识别屏幕文字",
+    "field.confirmKey": "翻译你输入的文字",
     "hotkey.values":
       "向 Windows 注册，任何程序里都有效：翻译你选中的文字，没有选中时翻译剪贴板内容，而且不会显示图标。",
     "hotkey.values.settings":
       "向 Windows 注册，任何程序里都有效：把本窗口切到最前，最小化时也会还原。",
     "hotkey.values.ocr":
       "向 Windows 注册，任何程序里都有效：先冻结屏幕，再用鼠标框选区域，识别出的文字会用平时的翻译弹窗给出结果。",
+    "hotkey.values.confirm":
+      "由窗口自己处理，光标在哪个框里就在哪个框生效：按 {0} 会翻译那个框里的整段文字。弹窗卡片和这里的「翻译文字」框共用同一个组合键，没有向 Windows 注册。",
     "hotkey.howto":
       "点击输入框后直接按下组合键即可，不用手打，也就不会打错。Glossy 会立刻向 Windows 注册，并告诉你 Windows 是否接受。",
     "hotkey.empty": "点击开始录制",
@@ -806,6 +812,7 @@
     "hotkey.blocked": "{0} 属于 Windows 系统，无法被注册。",
     "hotkey.busy": "{0} 通常已被 Windows 或其它程序占用；如果 Windows 拒绝，下面的提示会写明。",
     "hotkey.recorded": "已记录 {0}，正在等待 Windows 确认…",
+    "hotkey.taken": "{0} 已经是 Glossy 的另一个快捷键了。这样按一次会同时触发两件事——换一个组合，或者先把那一个清掉。",
     "hotkey.none": "未设置全局快捷键。点击「录制」来设置。",
     "hotkey.active": "已生效：{0}。在任何程序里按下即可翻译选中的文字，没有选中时翻译剪贴板内容。",
     "hotkey.active.settings": "已生效：{0}。在任何程序里按下即可把本窗口切到最前。",
@@ -987,7 +994,7 @@
     "document.failed": "翻译中断：{0}",
     "document.saved": "已保存到 {0}",
     "demo.hint":
-      "在下面输入或粘贴文本，然后选中其中任意一部分——单词、短语或整句——也可以直接点「翻译」（Ctrl+Enter）。粘贴进来的整段文本会立即翻译。结果会用与悬浮窗完全相同的卡片就地显示。",
+      "在下面输入或粘贴文本，然后选中其中任意一部分——单词、短语或整句——也可以按 {0} 翻译整个框。粘贴进来的整段文本会立即翻译。结果会用与悬浮窗完全相同的卡片就地显示。",
     "demo.placeholder": "输入或粘贴要翻译的文本，然后选中其中一部分…",
     "demo.run": "翻译",
     "demo.clear": "清空",
@@ -1176,7 +1183,7 @@
     "render.overwritten": "已替换原文",
     "render.overwriteFailed": "替换原文失败",
     "render.originalEdit": "被翻译的原文，可修改",
-    "render.originalHint": "可以直接在这里修改原文，按 Ctrl+Enter 重新翻译。",
+    "render.originalHint": "可以直接在这里修改原文，按 {0} 重新翻译。",
     "render.stop": "停止朗读",
     "render.speakFailed": "无法朗读这段文字",
     "hint.shortcut": "{0}（{1}）",

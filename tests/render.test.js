@@ -291,6 +291,44 @@ test("Ctrl+Enter in the original translates the corrected text once", () => {
   assert.deepEqual(original.textContent, "foxes");
 });
 
+test("the combination that confirms is the one the settings hold", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", sourceText: "fox", translation: "狐狸" },
+    { onRetranslate: (value) => asked.push(value), confirmKey: "Alt+Enter" },
+  );
+  const original = findByClass(node, "original");
+  original.textContent = "vixen";
+
+  // The combination it was not given does nothing, and leaves the newline to
+  // the box.
+  const other = keyEvent("Enter", { ctrlKey: true });
+  original.dispatch("keydown", other);
+  assert.deepEqual(asked, []);
+  assert.equal(other.defaultPrevented, false);
+
+  const chosen = keyEvent("Enter", { altKey: true });
+  original.dispatch("keydown", chosen);
+  assert.deepEqual(asked, ["vixen"]);
+  assert.ok(chosen.defaultPrevented);
+});
+
+test("a card that was told nothing still confirms with Ctrl+Enter", () => {
+  const node = target();
+  const asked = [];
+  Glossy.render.result(
+    node,
+    { kind: "word", sourceText: "fox", translation: "狐狸" },
+    { onRetranslate: (value) => asked.push(value) },
+  );
+  const original = findByClass(node, "original");
+  original.textContent = "vixen";
+  original.dispatch("keydown", keyEvent("Enter", { ctrlKey: true }));
+  assert.deepEqual(asked, ["vixen"]);
+});
+
 test("Escape in the original puts the text back and keeps the card open", () => {
   const node = target();
   const asked = [];

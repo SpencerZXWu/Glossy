@@ -245,13 +245,16 @@
       block.setAttribute("spellcheck", "false");
       block.setAttribute("role", "textbox");
       block.setAttribute("aria-label", Glossy.i18n.t("render.originalEdit"));
-      block.setAttribute("title", Glossy.i18n.t("render.originalHint"));
+      block.setAttribute(
+        "title",
+        Glossy.i18n.t("render.originalHint", Glossy.keycombo.spec(opts.confirmKey)),
+      );
 
       const read = () => String(block.innerText || block.textContent || "").trim();
 
       // The one place an edit becomes a translation. It ignores text that is
-      // empty or unchanged, so asking twice for the same text — a Ctrl+Enter
-      // followed by the blur it causes — costs one translation, not two.
+      // empty or unchanged, so asking twice for the same text — the confirmation
+      // key followed by the blur it causes — costs one translation, not two.
       const commit = () => {
         const edited = read();
         if (!edited || edited === committed) {
@@ -263,9 +266,16 @@
         opts.onRetranslate(edited);
       };
 
+      // Which combination confirms is the reader's choice (**General → the text
+      // you typed**), and it is offered to the settings window and to this card
+      // the same way. It is not a global accelerator: nothing is registered with
+      // Windows, and only the boxes this key acts in ever see it.
+      const confirm = Glossy.keycombo.spec(opts.confirmKey);
+
       block.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-          // Enter alone still breaks a line; with the modifier it translates.
+        if (Glossy.keycombo.holds(event, confirm)) {
+          // The key alone still breaks a line: only the recorded combination
+          // translates.
           event.preventDefault();
           commit();
           block.blur();
@@ -285,11 +295,11 @@
       // quietly dropped when the reader clicks elsewhere.
       block.addEventListener("blur", commit);
 
-      // Ctrl+Enter belongs to the field while the caret is in it, and to the
-      // card while it is not: the card's own is registered with Windows, so it
-      // reaches the card before the field the key was pressed in. The field
-      // therefore says when it holds the caret, and the card lets go of the
-      // accelerator for as long as it does.
+      // The confirmation key belongs to the field while the caret is in it, and
+      // to the card while it is not: the card's own shortcut is registered with
+      // Windows, so it reaches the card before the field the key was pressed in.
+      // The field therefore says when it holds the caret, and the card lets go
+      // of its accelerator for as long as it does.
       if (typeof opts.onEditing === "function") {
         block.addEventListener("focus", () => opts.onEditing(true));
         block.addEventListener("blur", () => opts.onEditing(false));

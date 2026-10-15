@@ -82,6 +82,7 @@
     hotkey: "Ctrl+Alt+C",
     hotkeySettings: "Ctrl+Alt+G",
     hotkeyOcr: "Ctrl+Alt+Q",
+    confirmKey: "Ctrl+Enter",
     ocrPacks: ["ch", "ja"],
     developerMode: false,
     subtitleSourceLang: "ja",

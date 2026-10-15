@@ -26,6 +26,9 @@
     hotkeyOcrRecord: $("hotkeyOcrRecord"),
     hotkeyOcrClear: $("hotkeyOcrClear"),
     hotkeyOcrHint: $("hotkeyOcrHint"),
+    confirmKey: $("confirmKey"),
+    confirmKeyRecord: $("confirmKeyRecord"),
+    confirmKeyHint: $("confirmKeyHint"),
     ocrRun: $("ocrRun"),
     ocrEngineState: $("ocrEngineState"),
     ocrEngineProgress: $("ocrEngineProgress"),
@@ -122,6 +125,7 @@
     guideAgain: $("guideAgain"),
     guideReadKey: $("guideReadKey"),
     demoText: $("demoText"),
+    demoHint: $("demoHint"),
     demoRun: $("demoRun"),
     demoClear: $("demoClear"),
     demoService: $("demoService"),
@@ -319,6 +323,16 @@
   let devReport = null;
 
   /**
+   * The combination that translates text the reader typed, as the settings hold
+   * it.
+   *
+   * Held rather than read from the box each time: the box is emptied while a
+   * recording is running, and `Translate text` below answers to whatever the
+   * setting says at that moment.
+   */
+  let confirmKey = Glossy.keycombo.spec("");
+
+  /**
    * One row per global accelerator. `name` is the slot the backend reports,
    * `key` the settings key holding the combination.
    */
@@ -353,6 +367,22 @@
       record: els.hotkeyOcrRecord,
       clear: els.hotkeyOcrClear,
       hint: els.hotkeyOcrHint,
+      saved: "",
+      recording: false,
+    },
+    {
+      // Not a global accelerator: this one is the box the reader types in, and
+      // it is the same combination in the floating card. It is recorded the same
+      // way so it cannot be misspelled, but there is nothing to register it
+      // with and nothing to clear it to — a combination without a modifier is
+      // refused, because both boxes are multi-line. It sits in the Shortcuts
+      // panel, which the sidebar reaches through **General**.
+      name: "confirm",
+      key: "confirmKey",
+      local: true,
+      input: els.confirmKey,
+      record: els.confirmKeyRecord,
+      hint: els.confirmKeyHint,
       saved: "",
       recording: false,
     },
@@ -2400,6 +2430,16 @@
     els.guideReadKey.parentElement.hidden = !readKey;
   }
 
+  /**
+   * Puts the combination that confirms into the line above the Translate box.
+   *
+   * That line is a dictionary entry with a placeholder rather than a sentence
+   * with a key baked into it, so changing the shortcut changes what it says.
+   */
+  function syncDemoHint() {
+    els.demoHint.textContent = Glossy.i18n.t("demo.hint", confirmKey);
+  }
+
   /** Re-applies the interface language to everything the script writes itself. */
   function applyLanguage() {
     Glossy.i18n.apply(document);
@@ -2415,6 +2455,7 @@
     renderAppVersion();
     showHotkeys(lastStatus);
     syncAllHotkeyLabels();
+    syncDemoHint();
     fillSample();
     syncDemoLanguage();
     renderHistory();
@@ -2478,6 +2519,10 @@
       row.input.value = next[row.key] || "";
       row.saved = row.input.value;
     }
+    // The confirmation key is a setting of its own, and one the window is
+    // currently listening for: what came out of the file is what the box below
+    // compares a keypress against.
+    confirmKey = Glossy.keycombo.spec(next.confirmKey);
     els.theme.value = themeOr(next.theme);
     els.fontScale.value = String(pick(FONT_SCALES, next.fontScale, 100));
     els.popupWidth.value = String(pick(POPUP_SIZES, next.popupWidth, 356));
@@ -2659,6 +2704,16 @@
     // A recording owns the line while it is running: the event that ends it
     // writes the verdict, and the registration behind it follows a moment later.
     if (row.recording) return;
+    // A combination the window handles itself is not registered with Windows, so
+    // there is no verdict to report: its line says what the key does instead.
+    if (row.local) {
+      setHotkeyHint(
+        row,
+        "",
+        Glossy.i18n.t("hotkey.values.confirm", Glossy.keycombo.spec(row.saved)),
+      );
+      return;
+    }
     const reported = ((status && status.hotkeys) || []).find(
       (entry) => entry && entry.slot === row.name,
     );
@@ -2757,6 +2812,22 @@
     }
 
     row.saved = read.spec;
+    // A combination this window answers to itself takes effect at once: the box
+    // below is listening for it, and a reader who just recorded one will try it
+    // without saving first.
+    if (row.local) {
+      confirmKey = Glossy.keycombo.spec(read.spec);
+      syncDemoHint();
+      // Two things answering to one key is a state the reader cannot debug:
+      // pressing it would translate *and* do whatever the other one does.
+      const clash = HOTKEYS.some(
+        (other) =>
+          other !== row &&
+          other.saved &&
+          Glossy.keycombo.normalize(other.saved) === Glossy.keycombo.normalize(read.spec),
+      );
+      if (clash) showToast(Glossy.i18n.t("hotkey.taken", read.spec));
+    }
     stopHotkey(row);
     setHotkeyHint(row, "", Glossy.i18n.t("hotkey.recorded", read.spec));
     // The warning outlives the line: the registration that follows replaces it
@@ -3188,6 +3259,9 @@
       if (row.recording) cancelHotkey(row);
       else startHotkey(row);
     });
+    // A combination the window handles itself has nothing to be cleared to: the
+    // field is always holding one, so it has no clear button.
+    if (!row.clear) continue;
     row.clear.addEventListener("click", () => {
       row.saved = "";
       stopHotkey(row);
@@ -3778,7 +3852,9 @@
   els.demoService.addEventListener("change", () => chooseService(els.demoService.value));
   els.demoClear.addEventListener("click", clearDemo);
   els.demoText.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+    // Which key confirms is the reader's own setting, and the card they paste
+    // into answers to the same one (**General → the text you typed**).
+    if (!Glossy.keycombo.holds(event, confirmKey)) return;
     event.preventDefault();
     runDemo(els.demoText.value);
   });

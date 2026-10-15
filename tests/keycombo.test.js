@@ -38,9 +38,46 @@ function press(key, options) {
 
 test("the module exports what the settings window reads", () => {
   assert.equal(typeof keycombo.capture, "function");
-  assert.equal(typeof keycombo.conflict, "function");
+  assert.equal(typeof keycombo.holds, "function");
+  assert.equal(typeof keycombo.spec, "function");
   assert.ok(Array.isArray(keycombo.BLOCKED));
   assert.ok(Array.isArray(keycombo.BUSY));
+});
+
+test("holds recognizes the combination a spec names", () => {
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), "Ctrl+Enter"), true);
+  assert.equal(keycombo.holds(press("Enter", { alt: true }), "Alt+Enter"), true);
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true, shift: true }), "Ctrl+Shift+Enter"), true);
+  assert.equal(keycombo.holds(press(" ", { ctrl: true }), "Ctrl+Space"), true);
+  // The spelling of the stored value does not have to be the recorder's.
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), "ctrl+enter"), true);
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), "Ctrl + Enter"), true);
+});
+
+test("holds is exact about which modifiers are down", () => {
+  // A near miss is left alone rather than taken as a confirmation: both boxes
+  // this key is used in are holding real text.
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true, shift: true }), "Ctrl+Enter"), false);
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true, alt: true }), "Ctrl+Enter"), false);
+  assert.equal(keycombo.holds(press("Enter"), "Ctrl+Enter"), false);
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), "Alt+Enter"), false);
+  assert.equal(keycombo.holds(press("Space", { ctrl: true }), "Ctrl+Enter"), false);
+});
+
+test("holds answers false rather than throwing on nothing to compare", () => {
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), ""), false);
+  assert.equal(keycombo.holds(press("Enter", { ctrl: true }), null), false);
+  assert.equal(keycombo.holds(null, "Ctrl+Enter"), false);
+  assert.equal(keycombo.holds(press("Control", { ctrl: true }), "Ctrl+Enter"), false);
+});
+
+test("spec falls back on the default combination", () => {
+  assert.equal(keycombo.spec("Alt+Enter"), "Alt+Enter");
+  assert.equal(keycombo.spec("alt+enter"), "Alt+Enter");
+  assert.equal(keycombo.spec(""), keycombo.DEFAULT_CONFIRM);
+  assert.equal(keycombo.spec(null), keycombo.DEFAULT_CONFIRM);
+  assert.equal(keycombo.spec("Enter"), "Enter");
+  assert.equal(keycombo.DEFAULT_CONFIRM, "Ctrl+Enter");
 });
 
 test("capture spells a combination the way the backend parses it", () => {

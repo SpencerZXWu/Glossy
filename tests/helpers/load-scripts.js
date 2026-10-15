@@ -7,7 +7,9 @@ const vm = require("node:vm");
 const { FakeDocument } = require("./fake-dom.js");
 
 const JS_DIR = path.resolve(__dirname, "..", "..", "src", "js");
-const DEFAULT_FILES = ["i18n.js", "render.js"];
+// `render.js` reads the combination that confirms typed text out of
+// `keycombo.js`, so the two are loaded together wherever a card is built.
+const DEFAULT_FILES = ["i18n.js", "keycombo.js", "render.js"];
 
 function readScript(name) {
   const file = path.join(JS_DIR, name);

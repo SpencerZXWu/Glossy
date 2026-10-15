@@ -119,9 +119,11 @@ four lines) and, for a long paragraph, a sentence-by-sentence view underneath.
 Both shapes of card — the word card and the translation-only one — carry that original in
 grey under the language row, and the grey text can be edited. Click it, correct what
 Glossy was handed — a selection that came out wrong, a word that was meant to be a
-different one — and Ctrl+Enter, or simply clicking away, translates the corrected text
-instead. Nothing is sent while the caret is still in the field, and text left empty or
-unchanged costs nothing. Esc puts the translated text back without closing the card.
+different one — and the confirmation key, or simply clicking away, translates the corrected
+text instead. The key is **Ctrl+Enter** unless another one is recorded under **General** in the
+settings window. Nothing is sent while the caret is still in the field, and
+text left empty or unchanged costs nothing. Esc puts the translated text back without
+closing the card.
 
 Three combinations are registered with Windows, and each one works in every program — and
 is taken away from every program while Glossy holds it. **Ctrl+Alt+C** translates the
@@ -134,8 +136,9 @@ open. All three are recorded under **General** in the settings window, and a fie
 switches that shortcut off. Every button that does what one of them does names its combination
 in its tooltip — the camera and the settings button of a card, and the screenshot button in
 this window — and names the latest one, because the tooltip is built from what was recorded.
-The window's own Ctrl+Enter (on the same page) is the opposite: it
-exists only inside the Translate box of this window and never affects another program. The
+The window's own confirmation key (under **General**, next to the three registered ones) is
+the opposite: it exists only inside a text box of this window — and the same combination in
+the floating card's grey original — and never affects another program. The
 card on screen has a Ctrl+Enter of its own — the write-back below — and that one is not a
 setting either: it is registered with Windows while such a card is up and given back the
 moment it closes, because Ctrl+Enter is what many programs send a message with.
@@ -376,7 +379,7 @@ OpenAI — reads as `cloud-baidu`. Baidu with one's own key is offered again, as
 
 The first entry of the sidebar — **Translate text**, under *Features* — holds the
 same translation feature as the popup: a text box for typing or pasting text. Select a word, a phrase or a sentence in that
-box — or press **Translate** (Ctrl+Enter) to use the whole text — and the result
+box — or press **Translate**, or the confirmation key, to use the whole text — and the result
 appears right below, in a card identical to the popup one: the source/target
 language bar with its swap button, the copy button and the same word/sentence
 rendering. A pasted text is translated as soon as it lands, whether it arrives
@@ -997,9 +1000,9 @@ Windows 11 x64；需要 WebView2，当前的 Windows 版本已自带。同一发
 
 单词卡片会显示音标、各词性及其释义、一个简单例句，并在同一张卡片里补上这个词的词形变化、意思相近的词、它被选中时所在的句子及该句译文，以及原文与译文下方各一个复制按钮和一个朗读按钮。句子或段落直接显示译文，原文在译文上方（最多四行），段落较长时下方还有逐句对照。
 
-两种卡片——单词卡和只有译文的卡片——都会在语言栏下方用灰色显示原文，并且这段灰色文字可以直接编辑。点击它，改掉 Glossy 拿到的那段文字（选区取错了、想翻的其实是另一个词），然后按 Ctrl+Enter 或直接点开别处，就会翻译改过的文字。光标还在字段里时不会发出任何请求；文本为空或没有改动也不会有任何消耗。按 `Esc` 会把译文对应的那段原文放回去，并且不会关闭卡片。
+两种卡片——单词卡和只有译文的卡片——都会在语言栏下方用灰色显示原文，并且这段灰色文字可以直接编辑。点击它，改掉 Glossy 拿到的那段文字（选区取错了、想翻的其实是另一个词），然后按**确认键**或直接点开别处，就会翻译改过的文字。确认键默认是 Ctrl+Enter，可以在**常规**页改成别的。光标还在字段里时不会发出任何请求；文本为空或没有改动也不会有任何消耗。按 `Esc` 会把译文对应的那段原文放回去，并且不会关闭卡片。
 
-有三个组合键向 Windows 注册，每个都在任何程序里有效——代价是 Glossy 持有它期间，其他程序收不到这个组合：**Ctrl+Alt+C** 翻译剪贴板内容（而不是选区），**Ctrl+Alt+G** 把本窗口切到最前，**Ctrl+Alt+Q** 读取你在屏幕上框选区域内的文字（见下文*读取屏幕*）——同一件事也可以在屏幕上那张卡片里按**相机**按钮来完成，不用键盘。与手动选区不同，快捷键按下即翻译——不需要点击图标——并显示在当前卡片中；已经有固定卡片时就翻译进那张固定卡片。三个都在**快捷键**页录制，字段留空就等于关掉这一个。凡是与某个快捷键做同一件事的按钮，都会在自己的悬停提示里写上那个组合——卡片上的相机按钮和设置按钮、以及本窗口里的截图按钮——而且总是显示最新的那个，因为提示是按已录制的内容现写的。窗口自己的 Ctrl+Enter（见同一页）正好相反：它只存在于本窗口的文本框里，永远不会影响别的程序。屏幕上那张卡片的 Ctrl+Enter 又是另一回事——就是下文的写回——它同样不是一个「设置」：卡片在屏幕上时才向 Windows 注册，卡片一关立刻交还，因为 Ctrl+Enter 正是许多程序用来发送消息的键。
+有三个组合键向 Windows 注册，每个都在任何程序里有效——代价是 Glossy 持有它期间，其他程序收不到这个组合：**Ctrl+Alt+C** 翻译剪贴板内容（而不是选区），**Ctrl+Alt+G** 把本窗口切到最前，**Ctrl+Alt+Q** 读取你在屏幕上框选区域内的文字（见下文*读取屏幕*）——同一件事也可以在屏幕上那张卡片里按**相机**按钮来完成，不用键盘。与手动选区不同，快捷键按下即翻译——不需要点击图标——并显示在当前卡片中；已经有固定卡片时就翻译进那张固定卡片。三个都在**快捷键**页录制，字段留空就等于关掉这一个。凡是与某个快捷键做同一件事的按钮，都会在自己的悬停提示里写上那个组合——卡片上的相机按钮和设置按钮、以及本窗口里的截图按钮——而且总是显示最新的那个，因为提示是按已录制的内容现写的。窗口自己的确认键（在**常规**页，就在那三个注册过的快捷键旁边）正好相反：它只存在于本窗口的文本框里——屏幕上那张卡片的灰色原文也认同一个组合——永远不会影响别的程序。屏幕上那张卡片的 Ctrl+Enter 又是另一回事——就是下文的写回——它同样不是一个「设置」：卡片在屏幕上时才向 Windows 注册，卡片一关立刻交还，因为 Ctrl+Enter 正是许多程序用来发送消息的键。
 
 弹窗是一个不抢焦点、始终置顶的窗口：它绝不会从你正在阅读的应用那里抢走键盘焦点。它始终保持在光标所在显示器的工作区之内，下方没有空间时会翻到光标上方。它自己的控件照样听键盘：光标进入灰色的原文那一格时（点进去，或者卡片已经拿着键盘时按 Tab）就等于开口要前台，之后焦点环会从卡片头部一路走到尾部，卡片底部的引擎菜单可以用方向键走，卡片关闭时键盘交还给这段选区原本所在的程序。
 
@@ -1113,7 +1116,7 @@ Google 接口。
 
 ### 在应用内翻译
 
-左侧菜单的第一项——**功能**下的**文本翻译**——是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（Ctrl+Enter）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与**单位换算**页里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（源语言的临时选择不会被保存，目标语言则会被保存下来并成为已配置的语言）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
+左侧菜单的第一项——**功能**下的**文本翻译**——是与弹窗相同的翻译功能：一个用来输入或粘贴文本的文本框。在该框中选中一个单词、一个短语或一个句子——或者按下**翻译**（也可以用确认键）来使用整段文本——结果会立刻显示在下方一张与弹窗完全相同的卡片里：带交换按钮的源语言/目标语言栏、复制按钮，以及相同的单词/句子渲染。粘贴进来的文本会立即翻译，无论用的是**粘贴**按钮还是 Ctrl+V；**清空**会清空文本框并收起卡片。标题右侧的开关为整个应用开关单位换算：它与**单位换算**页里的是同一个设置，也是唯一能就地切换卡片换算结果的地方。语言栏遵循弹窗的规则，因此源语言从*自动检测*开始，目标语言跟随已配置的语言，新的选区会重置语言对（源语言的临时选择不会被保存，目标语言则会被保存下来并成为已配置的语言）。按下**在悬浮窗中显示**会用当前选区（没有选中内容时则用整段文本）打开真正的弹窗——这样无需全局钩子就能检验弹窗。
 
 ### 读取屏幕
 
